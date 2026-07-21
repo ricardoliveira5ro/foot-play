@@ -1,0 +1,21 @@
+{
+  "name": "footplay",
+  "version": "0.1.0",
+  "private": true,
+  "description": "FootPlay — Football data platform",
+  "workspaces": [
+    "frontend",
+    "backend",
+    "scripts"
+  ],
+  "scripts": {
+    "dev": "echo 'Task 1.4 will wire concurrently here'",
+    "build": "echo 'Build will be wired per workspace'",
+    "lint": "echo 'Task 1.7 will wire ESLint here'",
+    "format": "echo 'Task 1.7 will wire Prettier here'"
+  },
+  "devDependencies": {},
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}
