@@ -8,6 +8,17 @@ FootPlay is a web platform hosting football-themed mini-games, starting with "Mi
 
 Players can guess a football match's full starting lineup through interactive Wordle-style mechanics on a tactic board.
 
+## Current Milestone: v1.0 Missing Eleven MVP
+
+**Goal:** Deliver a playable Missing Eleven game — a Wordle-style football lineup puzzle — backed by real match data and a responsive web UI.
+
+**Target features:**
+- Player data pipeline (transfermarkt CSV → PostgreSQL via Prisma)
+- Match/puzzle generation with team & league filters
+- Missing Eleven game: tactic board with 11 shirts, Wordle-style guessing per player slot, match info display
+- REST API endpoints for matches, players, game sessions, and guesses
+- Desktop-first responsive UI (Tailwind, works on mobile)
+
 ## Requirements
 
 ### Validated
@@ -16,14 +27,12 @@ Players can guess a football match's full starting lineup through interactive Wo
 
 ### Active
 
-- [ ] **Missing Eleven game** — Full tactic board with 11 shirts, Wordle-style guessing per player, match info display
-- [ ] **Match/puzzle generation** — Random match selection from dataset with filter support (team, league, era, nation)
-- [ ] **Player data pipeline** — Import and clean data from transfermarkt-datasets CSV files into PostgreSQL
-- [ ] **Game filters** — Filter matches by team, league, era/decade, nation, or random
-- [ ] **REST API** — Endpoints for matches, players, game sessions, and guesses
-- [ ] **Responsive UI** — Desktop pitch view + mobile-friendly tap interaction
-- [ ] **Docker deployment** — Multi-service Docker Compose on Oracle Cloud ARM instance
-- [ ] **CI/CD pipeline** — GitHub Actions automated build, test, and deploy
+- [ ] **PLAY-01**: Player data pipeline — import and clean transfermarkt CSV data into PostgreSQL
+- [ ] **MATCH-01**: Match/puzzle generation — random match selection from dataset with team & league filter support
+- [ ] **GAME-01**: Missing Eleven game — tactic board with 11 shirts, Wordle-style guessing per player slot, match info display
+- [ ] **GAME-02**: Game filters — filter by team and/or league
+- [ ] **API-01**: REST API — endpoints for matches, players, game sessions, and guesses
+- [ ] **UI-01**: Responsive UI — desktop-first pitch view + mobile-friendly tap interaction
 
 ### Out of Scope
 
@@ -33,6 +42,9 @@ Players can guess a football match's full starting lineup through interactive Wo
 - Easy/Hard difficulty modes — future scope
 - Kit colors per team — default shirt color for all teams
 - Mobile app — web-first
+- Docker deployment — deferred to v1.1 infrastructure milestone
+- CI/CD pipeline — deferred to v1.1 infrastructure milestone
+- Era/nation filters — deferred to v1.2 feature expansion
 
 ## Context
 
@@ -76,4 +88,4 @@ This document evolves at phase transitions and milestone boundaries.
 
 ---
 
-*Last updated: 2026-07-21 after initialization*
+*Last updated: 2026-07-21 after milestone v1.0 definition*
