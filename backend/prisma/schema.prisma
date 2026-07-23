@@ -1,13 +1,73 @@
-// Placeholder — will be replaced with the full schema in Task 1.5
 generator client {
   provider = "prisma-client-js"
 }
 
 datasource db {
   provider = "postgresql"
-  url      = env("DATABASE_URL")
+  //url      = env("DATABASE_URL")
 }
 
-model Placeholder {
-  id Int @id @default(autoincrement())
+model Competition {
+  id                      Int           @id @default(autoincrement())
+  competitionId           String        @unique
+  name                    String
+
+  games                   Game[]
+}
+
+model Club {
+  id                      Int           @id @default(autoincrement())
+  clubId                  Int           @unique
+  name                    String 
+}
+
+model Player {
+  id                      Int           @id @default(autoincrement())
+  playerId                Int           @unique
+  name                    String
+  displayName             String?
+  position                String?
+  subPosition             String?
+
+  appearances             Appearance[]
+}
+
+model Game {
+  id                      Int           @id @default(autoincrement())
+  gameId                  Int           @unique
+  competitionId           String
+  season                  Int?
+  round                   String?
+  date                    DateTime?
+  homeClubId              Int
+  awayClubId              Int
+  homeClubGoals           Int?
+  awayClubGoals           Int?
+  homeClubFormation       String?
+  awayClubFormation       String?
+  stadium                 String?
+
+  competition             Competition   @relation(fields: [competitionId], references: [competitionId])
+  appearances             Appearance[]
+
+  @@index([competitionId])
+}
+
+model Appearance {
+  id                      Int           @id @default(autoincrement())
+  gameId                  Int       
+  playerId                Int       
+  number                  Int?
+  type                    String
+  position                String?
+  isCaptain               Boolean?
+  goals                   Int           @default(0)
+  assists                 Int           @default(0)
+  redCards                Int           @default(0)
+
+  match                   Game          @relation(fields: [gameId], references: [gameId])
+  player                  Player        @relation(fields: [playerId], references: [playerId])
+
+  @@unique([gameId, playerId])
+  @@index([gameId])
 }
