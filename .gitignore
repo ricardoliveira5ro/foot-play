@@ -1,1 +1,22 @@
-.idea
+# Dependencies
+node_modules/
+
+# Build output
+.next/
+dist/
+*.tsbuildinfo
+
+# Environment
+.env
+.env.local
+
+# Prisma
+.prisma/
+
+# IDE
+.idea/
+.vscode/
+
+# OS
+.DS_Store
+Thumbs.db

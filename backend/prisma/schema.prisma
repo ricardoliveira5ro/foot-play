@@ -1,0 +1,13 @@
+// Placeholder — will be replaced with the full schema in Task 1.5
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Placeholder {
+  id Int @id @default(autoincrement())
+}
