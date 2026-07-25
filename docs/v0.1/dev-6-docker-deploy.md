@@ -17,6 +17,7 @@ Package the full application stack for production deployment. By the end of this
 **Docker strategy**: Multi-stage Dockerfiles for frontend and backend to minimize image size. Frontend uses Next.js standalone output. Both images built for `linux/arm64`.
 
 **Production stack**: Five services managed by `docker-compose.yml`:
+
 1. `frontend` — Next.js standalone server (port 3000)
 2. `backend` — Express API (port 4000)
 3. `postgres` — PostgreSQL 16 (internal port 5432)
@@ -26,6 +27,7 @@ Package the full application stack for production deployment. By the end of this
 **Nginx**: Reverse proxy serving frontend at `/`, proxying `/api/*` to backend. Static assets cached with far-future expiry. SSL termination with Let's Encrypt.
 
 **CI/CD pipeline**: GitHub Actions triggered on push to `main`:
+
 1. Build ARM64 Docker images
 2. Run linting
 3. SSH into Oracle Cloud → pull updated images → run migrations → restart services → health check
@@ -135,7 +137,12 @@ Package the full application stack for production deployment. By the end of this
   - `backend/src/index.ts` — update `/api/health`
 - **Response**:
   ```json
-  { "status": "ok", "version": "1.0.0", "timestamp": "2026-07-21T12:00:00Z", "database": "connected" }
+  {
+    "status": "ok",
+    "version": "1.0.0",
+    "timestamp": "2026-07-21T12:00:00Z",
+    "database": "connected"
+  }
   ```
 - **Acceptance criteria**:
   - [ ] Returns status, version, timestamp
@@ -157,28 +164,28 @@ Package the full application stack for production deployment. By the end of this
 
 **M (3-5 days)**
 
-| Task | Estimate |
-|------|----------|
-| Task 6.1 (Frontend Dockerfile) | 0.5 day |
-| Task 6.2 (Backend Dockerfile) | 0.5 day |
-| Task 6.3 (Nginx config) | 0.5 day |
-| Task 6.4 (Production docker-compose) | 0.5 day |
-| Task 6.5 (GitHub Actions) | 0.5 day |
-| Task 6.6 (Oracle provisioning + SSL) | 1 day |
-| Task 6.7 (Health check) | 0.25 day |
-| Buffer | 0.5 day (ARM64 issues, DNS, SSL) |
+| Task                                 | Estimate                         |
+| ------------------------------------ | -------------------------------- |
+| Task 6.1 (Frontend Dockerfile)       | 0.5 day                          |
+| Task 6.2 (Backend Dockerfile)        | 0.5 day                          |
+| Task 6.3 (Nginx config)              | 0.5 day                          |
+| Task 6.4 (Production docker-compose) | 0.5 day                          |
+| Task 6.5 (GitHub Actions)            | 0.5 day                          |
+| Task 6.6 (Oracle provisioning + SSL) | 1 day                            |
+| Task 6.7 (Health check)              | 0.25 day                         |
+| Buffer                               | 0.5 day (ARM64 issues, DNS, SSL) |
 
 ---
 
 ## Risk Factors
 
-| Risk | Likelihood | Impact | Mitigation |
-|------|-----------|--------|------------|
-| ARM64 Docker build failures in CI | Medium | High | Test locally with emulation first. Pin to arm64-compatible tags. |
-| SSL certificate setup complexity | Medium | Medium | Use certbot with webroot. Document steps. Test on staging domain. |
-| Oracle Cloud Free Tier resource limits (4 GB RAM) | Low | Medium | Monitor usage. Split PostgreSQL if needed. |
-| DNS propagation delay | Low | Low | Use Cloudflare for fast propagation. Test with IP directly first. |
-| CI/CD secrets management | Low | Low | Use GitHub Actions secrets. Never commit secrets. |
+| Risk                                              | Likelihood | Impact | Mitigation                                                        |
+| ------------------------------------------------- | ---------- | ------ | ----------------------------------------------------------------- |
+| ARM64 Docker build failures in CI                 | Medium     | High   | Test locally with emulation first. Pin to arm64-compatible tags.  |
+| SSL certificate setup complexity                  | Medium     | Medium | Use certbot with webroot. Document steps. Test on staging domain. |
+| Oracle Cloud Free Tier resource limits (4 GB RAM) | Low        | Medium | Monitor usage. Split PostgreSQL if needed.                        |
+| DNS propagation delay                             | Low        | Low    | Use Cloudflare for fast propagation. Test with IP directly first. |
+| CI/CD secrets management                          | Low        | Low    | Use GitHub Actions secrets. Never commit secrets.                 |
 
 ---
 

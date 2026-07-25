@@ -17,12 +17,14 @@ Download, parse, clean, and seed real football data from transfermarkt-datasets 
 **Data source**: [transfermarkt-datasets](https://github.com/dcaribou/transfermarkt-datasets) — a stable, well-maintained open dataset of football transfers, matches, lineups, and player data. We download the latest CSV release and parse it.
 
 **Download strategy**: The `scripts/` workspace contains a TypeScript script (`download-data.ts`) that:
+
 1. Fetches the latest release archive from GitHub
 2. Extracts relevant CSVs (`players.csv`, `clubs.csv`, `games.csv`, `game_lineups.csv`, `competitions.csv`)
 3. Caches them locally for reproducibility
 4. Validates column presence before proceeding
 
 **Name cleaning**: The critical and riskiest step. Strategy:
+
 1. Use `last_name` as the default `display_name` for most players
 2. For players known by a single name (Pelé, Neymar), use `name` field
 3. For players with common short forms, build a manual override mapping in `scripts/name-overrides.ts`
@@ -31,6 +33,7 @@ Download, parse, clean, and seed real football data from transfermarkt-datasets 
 **Position mapping**: Convert `sub_position` values to tactic-board x/y coordinates. Lives in `backend/src/services/positionMapping.ts`.
 
 **Lineup filtering algorithm**:
+
 1. Load all appearances with `type = "starting_lineup"`
 2. Group by `(game_id, club_id)`
 3. Filter groups where count = 11
@@ -149,26 +152,26 @@ Download, parse, clean, and seed real football data from transfermarkt-datasets 
 
 **M (3-5 days)**
 
-| Task | Estimate |
-|------|----------|
-| Task 2.1 (download script) | 0.5 day |
-| Task 2.2 (name cleaning) | 1-2 days (RISK: unknown scope) |
-| Task 2.3 (seed script + lineup filtering) | 1.5 days |
-| Task 2.4 (position mapping) | 0.25 day |
-| Task 2.5 (verification) | 0.25 day |
-| Buffer | 0.5-1 day |
+| Task                                      | Estimate                       |
+| ----------------------------------------- | ------------------------------ |
+| Task 2.1 (download script)                | 0.5 day                        |
+| Task 2.2 (name cleaning)                  | 1-2 days (RISK: unknown scope) |
+| Task 2.3 (seed script + lineup filtering) | 1.5 days                       |
+| Task 2.4 (position mapping)               | 0.25 day                       |
+| Task 2.5 (verification)                   | 0.25 day                       |
+| Buffer                                    | 0.5-1 day                      |
 
 ---
 
 ## Risk Factors
 
-| Risk | Likelihood | Impact | Mitigation |
-|------|-----------|--------|------------|
-| **Name cleaning scope larger than expected** | **High** | Medium | Budget 2 days. Log edge cases. Defer to v1.2 name override table. |
-| CSV parsing edge cases (encoding, commas) | Medium | Medium | Use `csv-parse` with `relax_column_count: true`. Validate row counts. |
-| Large dataset memory issues | Medium | Medium | Batch inserts (500-1000 rows). Use streaming CSV parser. |
-| Lineup filtering eliminates too many matches | Medium | Medium | Test filtering early with a sample. Report filtering stats. |
-| transfermarkt-datasets schema changes | Low | Medium | Pin to specific release tag. Validate columns before parsing. |
+| Risk                                         | Likelihood | Impact | Mitigation                                                            |
+| -------------------------------------------- | ---------- | ------ | --------------------------------------------------------------------- |
+| **Name cleaning scope larger than expected** | **High**   | Medium | Budget 2 days. Log edge cases. Defer to v1.2 name override table.     |
+| CSV parsing edge cases (encoding, commas)    | Medium     | Medium | Use `csv-parse` with `relax_column_count: true`. Validate row counts. |
+| Large dataset memory issues                  | Medium     | Medium | Batch inserts (500-1000 rows). Use streaming CSV parser.              |
+| Lineup filtering eliminates too many matches | Medium     | Medium | Test filtering early with a sample. Report filtering stats.           |
+| transfermarkt-datasets schema changes        | Low        | Medium | Pin to specific release tag. Validate columns before parsing.         |
 
 ---
 

@@ -20,14 +20,14 @@ v1.0 (Missing Eleven MVP) is decomposed into **6 sequential developments**, each
 
 ### Development Order
 
-| Order | Development | Effort | Dependencies |
-|-------|-------------|--------|--------------|
-| 1 | Repo Scaffold & Prisma Schema | S (2-3 days) | None |
-| 2 | Data Pipeline | M (3-5 days) | Dev 1 |
-| 3 | Core REST API | M (2-4 days) | Dev 2 |
-| 4 | Frontend Shell & Layout (mock data) | S (2-3 days) | Dev 1 (can parallel Dev 2/3) |
-| 5 | Wordle Algorithm & Game Loop | M (3-5 days) | Dev 3 + Dev 4 |
-| 6 | Docker, CI/CD & Deploy | M (3-5 days) | Dev 1 (refined through Dev 5) |
+| Order | Development                         | Effort       | Dependencies                  |
+| ----- | ----------------------------------- | ------------ | ----------------------------- |
+| 1     | Repo Scaffold & Prisma Schema       | S (2-3 days) | None                          |
+| 2     | Data Pipeline                       | M (3-5 days) | Dev 1                         |
+| 3     | Core REST API                       | M (2-4 days) | Dev 2                         |
+| 4     | Frontend Shell & Layout (mock data) | S (2-3 days) | Dev 1 (can parallel Dev 2/3)  |
+| 5     | Wordle Algorithm & Game Loop        | M (3-5 days) | Dev 3 + Dev 4                 |
+| 6     | Docker, CI/CD & Deploy              | M (3-5 days) | Dev 1 (refined through Dev 5) |
 
 ### Total Estimated Effort
 
@@ -48,6 +48,7 @@ Create the monorepo foundation that all future development builds upon. By the e
 #### 2.1.2 Approach
 
 **Monorepo structure**: npm workspaces with three packages:
+
 - `frontend/` — Next.js 14 (App Router) + TypeScript + Tailwind CSS
 - `backend/` — Express 4 + TypeScript + Prisma
 - `scripts/` — TypeScript scripts for data pipeline (no framework)
@@ -59,6 +60,7 @@ Create the monorepo foundation that all future development builds upon. By the e
 **Prisma schema** models the five core entities (Player, Team, Competition, Match, Appearance) as close to the transfermarkt-datasets source schema as possible, with internal auto-increment IDs plus source IDs for traceability.
 
 **Key decisions**:
+
 - `name` field on Player stores the full name (`"Cristiano Ronaldo"`), `display_name` is computed during seeding (Dev 2) — Prisma schema defines both columns but Dev 2 populates them.
 - Formation is stored as a free-text string (`"4-3-3"`) on Match. No enum — formations vary and filtering is out of scope.
 - Appearance uses a composite-like pattern: each row is one player in one match for one club. The `type` field distinguishes `starting_lineup` from `substitutes`.
@@ -150,10 +152,10 @@ Create the monorepo foundation that all future development builds upon. By the e
     subPosition     String?       @map("sub_position") // Centre-Back, Left Winger, etc.
     countryOfCitizenship String?    @map("country_of_citizenship")
     appearances     Appearance[]
-  
+
     @@map("players")
   }
-  
+
   model Team {
     id              Int           @id @default(autoincrement())
     clubId          Int           @unique @map("club_id")
@@ -162,19 +164,19 @@ Create the monorepo foundation that all future development builds upon. By the e
     homeMatches     Match[]       @relation("HomeTeam")
     awayMatches     Match[]       @relation("AwayTeam")
     appearances     Appearance[]
-  
+
     @@map("teams")
   }
-  
+
   model Competition {
     id              Int           @id @default(autoincrement())
     competitionId   String        @unique @map("competition_id")
     name            String
     matches         Match[]
-  
+
     @@map("competitions")
   }
-  
+
   model Match {
     id              Int           @id @default(autoincrement())
     gameId          Int           @unique @map("game_id")
@@ -192,10 +194,10 @@ Create the monorepo foundation that all future development builds upon. By the e
     awayClub        Team          @relation("AwayTeam", fields: [awayClubId], references: [clubId])
     competition     Competition?  @relation(fields: [competitionId], references: [competitionId])
     appearances     Appearance[]
-  
+
     @@map("matches")
   }
-  
+
   model Appearance {
     id              Int           @id @default(autoincrement())
     gameId          Int           @map("game_id")
@@ -208,12 +210,13 @@ Create the monorepo foundation that all future development builds upon. By the e
     game            Match         @relation(fields: [gameId], references: [gameId])
     club            Team          @relation(fields: [clubId], references: [clubId])
     player          Player        @relation(fields: [playerId], references: [playerId])
-  
+
     @@map("appearances")
     @@index([gameId, type])
     @@index([playerId])
   }
   ```
+
 - **Acceptance criteria**:
   - [ ] `npx prisma validate` passes with no errors
   - [ ] `npx prisma migrate dev --name init` creates migration and applies it to local PostgreSQL
@@ -229,12 +232,12 @@ Create the monorepo foundation that all future development builds upon. By the e
   - `.env.example` — update with PostgreSQL connection string
 - **Docker Compose details**:
   ```yaml
-  version: "3.8"
+  version: '3.8'
   services:
     postgres:
       image: postgres:16-alpine
       ports:
-        - "5432:5432"
+        - '5432:5432'
       environment:
         POSTGRES_USER: footplay
         POSTGRES_PASSWORD: footplay_dev
@@ -270,6 +273,7 @@ None. This is the foundation.
 **S (2-3 days)**
 
 Breakdown:
+
 - Task 1.1 (monorepo init): 0.5 day
 - Task 1.2 (Next.js scaffold): 0.5 day
 - Task 1.3 (Express scaffold): 0.5 day
@@ -281,12 +285,12 @@ Breakdown:
 
 #### 2.1.6 Risk Factors
 
-| Risk | Likelihood | Impact | Mitigation |
-|------|-----------|--------|------------|
-| npm workspaces dependency resolution conflicts | Low | Medium | Use exact versions in initial install. Test `npm install` on clean clone. |
-| Prisma schema misalignment with transfermarkt-datasets | Medium | Medium | Schema designed from verified source tables. Validate during Dev 2. |
-| Next.js 14 App Router learning curve | Low | Low | Standard pattern. One route at this stage. |
-| PostgreSQL Docker port conflict (5432 already in use) | Low | Low | Document `docker compose down` and port change procedure in README. |
+| Risk                                                   | Likelihood | Impact | Mitigation                                                                |
+| ------------------------------------------------------ | ---------- | ------ | ------------------------------------------------------------------------- |
+| npm workspaces dependency resolution conflicts         | Low        | Medium | Use exact versions in initial install. Test `npm install` on clean clone. |
+| Prisma schema misalignment with transfermarkt-datasets | Medium     | Medium | Schema designed from verified source tables. Validate during Dev 2.       |
+| Next.js 14 App Router learning curve                   | Low        | Low    | Standard pattern. One route at this stage.                                |
+| PostgreSQL Docker port conflict (5432 already in use)  | Low        | Low    | Document `docker compose down` and port change procedure in README.       |
 
 #### 2.1.7 "Done" Checklist
 
@@ -313,12 +317,14 @@ Download, parse, clean, and seed real football data from transfermarkt-datasets 
 **Data source**: [transfermarkt-datasets](https://github.com/dcaribou/transfermarkt-datasets) — a stable, well-maintained open dataset of football transfers, matches, lineups, and player data. We download the latest CSV release and parse it.
 
 **Download strategy**: The `scripts/` workspace contains a TypeScript script (`download-data.ts`) that:
+
 1. Fetches the latest release archive from GitHub
 2. Extracts relevant CSVs (`players.csv`, `clubs.csv`, `games.csv`, `game_lineups.csv`, `competitions.csv`)
 3. Caches them locally for reproducibility
 4. Validates column presence before proceeding
 
 **Name cleaning**: The critical and riskiest step. Strategy:
+
 1. Use `last_name` as the default `display_name` for most players
 2. For players known by a single name (Pelé, Neymar), the dataset's `name` field already stores just that — use `name`
 3. For players with common short forms, build a manual override mapping seeded from `scripts/name-overrides.ts`
@@ -327,6 +333,7 @@ Download, parse, clean, and seed real football data from transfermarkt-datasets 
 **Position mapping**: Convert `sub_position` values (Centre-Back, Left Winger, etc.) to tactic-board x/y coordinates. The mapping utility lives in `backend/src/services/positionMapping.ts` (used by the API) and is also used during seed to validate position data quality.
 
 **Lineup filtering algorithm**:
+
 1. Load all appearances with `type = "starting_lineup"`
 2. Group by `(game_id, club_id)`
 3. Filter groups where count = 11
@@ -335,6 +342,7 @@ Download, parse, clean, and seed real football data from transfermarkt-datasets 
 6. Log excluded games with reason (count != 11, missing player references)
 
 **Data integrity verification**: After seeding, run validation queries:
+
 - `SELECT COUNT(*) FROM matches` — should match filtered game count
 - Random match query returns 11 appearances
 - No orphaned appearance rows (every `game_id`, `club_id`, `player_id` references existing rows)
@@ -367,10 +375,10 @@ Download, parse, clean, and seed real football data from transfermarkt-datasets 
 - **Name override examples**:
   ```typescript
   const NAME_OVERRIDES: Record<string, string> = {
-    "Cristiano Ronaldo dos Santos Aveiro": "Ronaldo",
-    "Lionel Andrés Messi Cuccittini": "Messi",
-    "Neymar da Silva Santos Júnior": "Neymar",
-    "Edson Arantes do Nascimento": "Pelé",
+    'Cristiano Ronaldo dos Santos Aveiro': 'Ronaldo',
+    'Lionel Andrés Messi Cuccittini': 'Messi',
+    'Neymar da Silva Santos Júnior': 'Neymar',
+    'Edson Arantes do Nascimento': 'Pelé',
     // ... expanded as discovered during data inspection
   };
   ```
@@ -432,39 +440,39 @@ Download, parse, clean, and seed real football data from transfermarkt-datasets 
   // X-axis: 0 = left, 100 = right
   // Coordinates match the pitch position mapping defined in Project.md.
   // LCB/RCB split and LCM/RCM split are handled at render time via FORMATION_SPLIT_COORDS.
-  
+
   const POSITION_COORDS: Record<string, { x: number; y: number }> = {
-    "Goalkeeper": { x: 50, y: 90 },
-    "Centre-Back": { x: 50, y: 72 },
-    "Left-Back": { x: 10, y: 60 },
-    "Right-Back": { x: 90, y: 60 },
-    "Defensive Midfield": { x: 50, y: 50 },
-    "Central Midfield": { x: 50, y: 45 },
-    "Attacking Midfield": { x: 50, y: 35 },
-    "Left Midfield": { x: 15, y: 42 },
-    "Right Midfield": { x: 85, y: 42 },
-    "Left Winger": { x: 15, y: 25 },
-    "Right Winger": { x: 85, y: 25 },
-    "Centre-Forward": { x: 50, y: 15 },
-    "Second Striker": { x: 50, y: 25 },
+    Goalkeeper: { x: 50, y: 90 },
+    'Centre-Back': { x: 50, y: 72 },
+    'Left-Back': { x: 10, y: 60 },
+    'Right-Back': { x: 90, y: 60 },
+    'Defensive Midfield': { x: 50, y: 50 },
+    'Central Midfield': { x: 50, y: 45 },
+    'Attacking Midfield': { x: 50, y: 35 },
+    'Left Midfield': { x: 15, y: 42 },
+    'Right Midfield': { x: 85, y: 42 },
+    'Left Winger': { x: 15, y: 25 },
+    'Right Winger': { x: 85, y: 25 },
+    'Centre-Forward': { x: 50, y: 15 },
+    'Second Striker': { x: 50, y: 25 },
   };
-  
+
   // Formation-specific split positions (used at render time to spread
   // Centre-Backs into LCB/RCB and Central Midfielders into LCM/RCM).
   const FORMATION_SPLIT_COORDS: Record<string, { x: number; y: number }> = {
-    "LCB": { x: 30, y: 72 },
-    "RCB": { x: 70, y: 72 },
-    "LCM": { x: 30, y: 45 },
-    "RCM": { x: 70, y: 45 },
+    LCB: { x: 30, y: 72 },
+    RCB: { x: 70, y: 72 },
+    LCM: { x: 30, y: 45 },
+    RCM: { x: 70, y: 45 },
   };
-  
+
   // Fallback mapping when position string isn't recognized
   // Maps the general position group to a reasonable default
   const POSITION_GROUP_FALLBACK: Record<string, { x: number; y: number }> = {
-    "Goalkeeper": { x: 50, y: 90 },
-    "Defender": { x: 50, y: 72 },
-    "Midfield": { x: 50, y: 45 },
-    "Forward": { x: 50, y: 15 },
+    Goalkeeper: { x: 50, y: 90 },
+    Defender: { x: 50, y: 72 },
+    Midfield: { x: 50, y: 45 },
+    Forward: { x: 50, y: 15 },
   };
   ```
 - **Acceptance criteria**:
@@ -500,6 +508,7 @@ Download, parse, clean, and seed real football data from transfermarkt-datasets 
 **M (3-5 days)**
 
 Breakdown:
+
 - Task 2.1 (download script): 0.5 day
 - Task 2.2 (name cleaning): 1-2 days (RISK: unknown scope)
 - Task 2.3 (seed script + lineup filtering): 1.5 days
@@ -509,13 +518,13 @@ Breakdown:
 
 #### 2.2.6 Risk Factors
 
-| Risk | Likelihood | Impact | Mitigation |
-|------|-----------|--------|------------|
-| **Name cleaning scope larger than expected** | **High** | Medium | Budget 2 days. Log ambiguous cases for manual review. Seed 50+ overrides. Defer edge cases to v1.2 name override table. |
-| CSV parsing edge cases (encoding, commas in names) | Medium | Medium | Use robust CSV parser (`csv-parse` with `relax_column_count: true`). Validate row counts after parse. |
-| Large dataset causes memory issues | Medium | Medium | Batch inserts (500-1000 rows). Use streaming CSV parser to avoid loading all rows into memory. |
-| Lineup filtering eliminates too many matches | Medium | Medium | Test filtering logic early with a sample. Report filtering stats (e.g., "79k games → 35k valid after lineup filter"). |
-| transfermarkt-datasets schema changes | Low | Medium | Pin to specific release tag. Validate columns before parsing. |
+| Risk                                               | Likelihood | Impact | Mitigation                                                                                                              |
+| -------------------------------------------------- | ---------- | ------ | ----------------------------------------------------------------------------------------------------------------------- |
+| **Name cleaning scope larger than expected**       | **High**   | Medium | Budget 2 days. Log ambiguous cases for manual review. Seed 50+ overrides. Defer edge cases to v1.2 name override table. |
+| CSV parsing edge cases (encoding, commas in names) | Medium     | Medium | Use robust CSV parser (`csv-parse` with `relax_column_count: true`). Validate row counts after parse.                   |
+| Large dataset causes memory issues                 | Medium     | Medium | Batch inserts (500-1000 rows). Use streaming CSV parser to avoid loading all rows into memory.                          |
+| Lineup filtering eliminates too many matches       | Medium     | Medium | Test filtering logic early with a sample. Report filtering stats (e.g., "79k games → 35k valid after lineup filter").   |
+| transfermarkt-datasets schema changes              | Low        | Medium | Pin to specific release tag. Validate columns before parsing.                                                           |
 
 #### 2.2.7 "Done" Checklist
 
@@ -621,6 +630,7 @@ Build the three Express API endpoints that power the Missing Eleven game. By the
   - `backend/src/services/matchService.ts` — Prisma query logic
   - `backend/src/services/positionMapping.ts` — reuse from Dev 2 (or create stub if not yet available)
 - **Query logic**: Include the competition relation so the response can resolve `competition_id` to a human-readable name (e.g. "Premier League").
+
   ```typescript
   // Select a random match that has at least one complete lineup
   const match = await prisma.match.findFirst({
@@ -638,15 +648,17 @@ Build the three Express API endpoints that power the Missing Eleven game. By the
     },
   });
   ```
-  
+
   **Alternative (more efficient random selection)**:
+
   ```sql
   SELECT * FROM matches OFFSET floor(random() * (SELECT COUNT(*) FROM matches)) LIMIT 1;
   ```
-  
+
   Then fetch lineups in a second query. This avoids loading the random offset into application memory.
-  
+
   **Competition name**: Populated from `match.competition.name`. The `competition` field in the API response is the resolved name, not the raw ID.
+
 - **Acceptance criteria**:
   - [ ] Returns 200 with valid JSON response
   - [ ] Response includes match metadata (date, score, competition name, formations)
@@ -721,10 +733,10 @@ Build the three Express API endpoints that power the Missing Eleven game. By the
   ```json
   // 400 Bad Request
   { "error": "Query parameter 'q' must be at least 2 characters", "code": "INVALID_PARAMETER" }
-  
+
   // 404 Not Found
   { "error": "Match with id 999999 not found", "code": "NOT_FOUND" }
-  
+
   // 500 Internal Server Error
   { "error": "Internal server error", "code": "INTERNAL_ERROR" }
   ```
@@ -743,6 +755,7 @@ Build the three Express API endpoints that power the Missing Eleven game. By the
 **M (2-4 days)**
 
 Breakdown:
+
 - Task 3.1 (middleware): 0.5 day
 - Task 3.2 (matches/random): 1 day
 - Task 3.3 (matches/:id): 0.5 day
@@ -752,11 +765,11 @@ Breakdown:
 
 #### 2.3.6 Risk Factors
 
-| Risk | Likelihood | Impact | Mitigation |
-|------|-----------|--------|------------|
-| Random match query performance | Low | Medium | `ORDER BY RANDOM()` is acceptable for 35k rows. If slow, use `OFFSET floor(random() * count)` approach. |
-| Player search under 300ms with 37k records | Medium | Medium | Add database index on `display_name`. Prisma `contains` with `insensitive` mode uses ILIKE which can be slow — monitor and add trigram index if needed. |
-| Large response payloads (full lineup = lots of data) | Low | Low | Response is ~5-10 KB per match. Acceptable. No pagination needed for single-match endpoints. |
+| Risk                                                 | Likelihood | Impact | Mitigation                                                                                                                                              |
+| ---------------------------------------------------- | ---------- | ------ | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Random match query performance                       | Low        | Medium | `ORDER BY RANDOM()` is acceptable for 35k rows. If slow, use `OFFSET floor(random() * count)` approach.                                                 |
+| Player search under 300ms with 37k records           | Medium     | Medium | Add database index on `display_name`. Prisma `contains` with `insensitive` mode uses ILIKE which can be slow — monitor and add trigram index if needed. |
+| Large response payloads (full lineup = lots of data) | Low        | Low    | Response is ~5-10 KB per match. Acceptable. No pagination needed for single-match endpoints.                                                            |
 
 #### 2.3.7 "Done" Checklist
 
@@ -783,6 +796,7 @@ Build the frontend foundation — shared layout, page structure, and all game co
 #### 2.4.2 Approach
 
 **Component tree**:
+
 ```
 Layout
 ├── Navbar
@@ -798,6 +812,7 @@ Layout
 **Mock data**: A static mock object in `frontend/src/lib/mockData.ts` mimics the API response shape from Dev 3. This allows development to proceed without the real API.
 
 **Shirt component states** (from Project.md):
+
 1. **Default**: Shirt color with player number
 2. **In progress**: Below shirt, guessed letters displayed (e.g., `..R...`)
 3. **Correct**: Full player name below shirt in default color
@@ -822,7 +837,7 @@ For this development, shirt states are driven by mock data and local click handl
 - **Acceptance criteria**:
   - [ ] Layout renders on all pages
   - [ ] Navbar shows "FootPlay" logo and "Missing Eleven" link
-   - [ ] Footer shows copyright
+  - [ ] Footer shows copyright
   - [ ] Responsive: Navbar collapses hamburger menu on mobile
 - **Validation**: Run frontend, verify layout renders correctly at desktop and mobile viewport sizes.
 
@@ -845,12 +860,12 @@ For this development, shirt states are driven by mock data and local click handl
     homeFormation: string;
     awayFormation: string;
   }
-  
+
   export interface Club {
     id: number;
     name: string;
   }
-  
+
   export interface LineupPlayer {
     playerId: number;
     displayName: string;
@@ -858,36 +873,36 @@ For this development, shirt states are driven by mock data and local click handl
     position: string;
     coords: PositionCoords;
   }
-  
+
   export interface PositionCoords {
     x: number; // 0-100 percentage
     y: number; // 0-100 percentage
   }
-  
+
   export interface MatchResponse {
     match: Match;
     homeLineup: LineupPlayer[];
     awayLineup: LineupPlayer[];
   }
-  
+
   export interface PlayerSearchResult {
     id: number;
     displayName: string;
   }
-  
+
   export interface PlayerSearchResponse {
     results: PlayerSearchResult[];
   }
-  
+
   export type ShirtState = 'default' | 'in-progress' | 'correct' | 'failed';
-  
+
   export interface ShirtData {
     player: LineupPlayer;
     state: ShirtState;
     guessedLetters: string; // e.g., "..R..." for in-progress
     attemptsRemaining: number;
   }
-  
+
   export type TeamSide = 'home' | 'away';
   ```
 - **Acceptance criteria**:
@@ -904,9 +919,9 @@ For this development, shirt states are driven by mock data and local click handl
   - `frontend/src/lib/mockData.ts` — static mock match response
 - **API client functions**:
   ```typescript
-  export async function fetchRandomMatch(): Promise<MatchResponse>
-  export async function fetchMatchById(id: number): Promise<MatchResponse>
-  export async function searchPlayers(query: string): Promise<PlayerSearchResponse>
+  export async function fetchRandomMatch(): Promise<MatchResponse>;
+  export async function fetchMatchById(id: number): Promise<MatchResponse>;
+  export async function searchPlayers(query: string): Promise<PlayerSearchResponse>;
   ```
 - **Mock data**: At least 2 mock matches with complete 11-player lineups for both teams.
 - **Acceptance criteria**:
@@ -922,7 +937,7 @@ For this development, shirt states are driven by mock data and local click handl
 - **Files to create/modify**:
   - `frontend/src/components/TacticBoard.tsx` — pitch SVG/CSS + shirt placement
   - `frontend/src/components/Pitch.tsx` — optional sub-component for pitch background
-- **Rendering approach**: 
+- **Rendering approach**:
   - Use a `div` with `position: relative` and `aspect-ratio: 2/3` (portrait pitch)
   - Pitch background: green via CSS, white markings via SVG overlay (center circle, halfway line, penalty areas, goal area)
   - Each shirt is positioned with `position: absolute; left: ${x}%; top: ${y}%; transform: translate(-50%, -50%)`
@@ -997,12 +1012,14 @@ For this development, shirt states are driven by mock data and local click handl
   5. On match load, randomly select one team (home or away) as the active team — only that team's lineup is shown on the tactic board
 - **State management (minimal, replaced in Dev 5)**:
   ```typescript
-  const [shirts, setShirts] = useState<ShirtData[]>(mockLineup.map(p => ({
-    player: p,
-    state: 'default',
-    guessedLetters: '',
-    attemptsRemaining: 6,
-  })));
+  const [shirts, setShirts] = useState<ShirtData[]>(
+    mockLineup.map((p) => ({
+      player: p,
+      state: 'default',
+      guessedLetters: '',
+      attemptsRemaining: 6,
+    })),
+  );
   ```
 - **Acceptance criteria**:
   - [ ] `/missing-eleven` renders MatchInfo and TacticBoard
@@ -1037,6 +1054,7 @@ For this development, shirt states are driven by mock data and local click handl
 **S (2-3 days)**
 
 Breakdown:
+
 - Task 4.1 (Layout, Navbar, Footer): 0.5 day
 - Task 4.2 (TypeScript types): 0.25 day
 - Task 4.3 (API client + mock data): 0.5 day
@@ -1048,11 +1066,11 @@ Breakdown:
 
 #### 2.4.6 Risk Factors
 
-| Risk | Likelihood | Impact | Mitigation |
-|------|-----------|--------|------------|
-| Shirt positioning overlaps for some formations | Medium | Medium | Test with 5 common formations during development. Add minimum distance constraint. |
-| Pitch SVG markings complex to render | Low | Low | Use simplified markings (center circle + halfway line + penalty areas). SVG overlay is well-documented. |
-| Responsive layout breaks on very small screens | Low | Low | Set minimum width for game container, allow horizontal scroll on tiny screens. |
+| Risk                                           | Likelihood | Impact | Mitigation                                                                                              |
+| ---------------------------------------------- | ---------- | ------ | ------------------------------------------------------------------------------------------------------- |
+| Shirt positioning overlaps for some formations | Medium     | Medium | Test with 5 common formations during development. Add minimum distance constraint.                      |
+| Pitch SVG markings complex to render           | Low        | Low    | Use simplified markings (center circle + halfway line + penalty areas). SVG overlay is well-documented. |
+| Responsive layout breaks on very small screens | Low        | Low    | Set minimum width for game container, allow horizontal scroll on tiny screens.                          |
 
 #### 2.4.7 "Done" Checklist
 
@@ -1084,6 +1102,7 @@ Build the core game mechanics — the Wordle algorithm, the Wordle modal UI, the
 **Wordle algorithm** (`lib/wordle.ts`): A pure function that compares a guess string against the target `display_name` and returns an array of letter results (green/orange/grey). Input is normalized: lowercase, diacritics stripped. Output matches the classic Wordle feedback model.
 
 **WordleModal component**: A modal dialog that appears when a shirt is clicked. Contains:
+
 - Target player position hint (optional: "Position: Centre-Forward")
 - Text input field (autofocused, max length = target name length)
 - 6-row feedback grid showing all guesses for this player
@@ -1092,6 +1111,7 @@ Build the core game mechanics — the Wordle algorithm, the Wordle modal UI, the
 - Close/minimize button (player can switch to another shirt mid-guess)
 
 **Game state machine** (`lib/gameState.ts`): Uses `useReducer` for predictable state transitions. State includes:
+
 - `match`: The current match data (from API)
 - `teamSide`: 'home' | 'away'
 - `shirts`: Array of ShirtData objects (one per lineup player)
@@ -1116,12 +1136,12 @@ Build the core game mechanics — the Wordle algorithm, the Wordle modal UI, the
 - **Algorithm details**:
   ```typescript
   export type LetterResult = 'correct' | 'present' | 'absent';
-  
+
   export interface LetterFeedback {
     letter: string;
     result: LetterResult;
   }
-  
+
   export function evaluateGuess(guess: string, target: string): LetterFeedback[] {
     // 1. Normalize both strings: lowercase, strip diacritics
     // 2. First pass: mark correct positions (green)
@@ -1140,7 +1160,7 @@ Build the core game mechanics — the Wordle algorithm, the Wordle modal UI, the
       .toLowerCase()
       .normalize('NFD')
       .replace(/[\u0300-\u036f]/g, '') // Strip diacritics
-      .replace(/[^a-z0-9\s-]/g, '');   // Keep letters, numbers, spaces, hyphens
+      .replace(/[^a-z0-9\s-]/g, ''); // Keep letters, numbers, spaces, hyphens
   }
   ```
 - **Acceptance criteria**:
@@ -1176,9 +1196,9 @@ Build the core game mechanics — the Wordle algorithm, the Wordle modal UI, the
   interface WordleModalProps {
     isOpen: boolean;
     player: LineupPlayer;
-    guesses: string[];         // Previous guesses
+    guesses: string[]; // Previous guesses
     attemptsRemaining: number; // Starting from 6, counting down
-    maxAttempts: number;       // 6 for Normal mode
+    maxAttempts: number; // 6 for Normal mode
     onGuess: (guess: string) => void;
     onClose: () => void;
   }
@@ -1209,14 +1229,14 @@ Build the core game mechanics — the Wordle algorithm, the Wordle modal UI, the
   type GameAction =
     | { type: 'SET_MATCH'; payload: MatchResponse }
     | { type: 'SELECT_TEAM'; payload: TeamSide }
-    | { type: 'OPEN_SHIRT'; payload: number }       // Set active shirt index
+    | { type: 'OPEN_SHIRT'; payload: number } // Set active shirt index
     | { type: 'CLOSE_SHIRT' }
-    | { type: 'SUBMIT_GUESS'; payload: string }      // Submit guess for active shirt
+    | { type: 'SUBMIT_GUESS'; payload: string } // Submit guess for active shirt
     | { type: 'RESTORE_SESSION'; payload: GameState } // Restore from localStorage
-    | { type: 'NEW_GAME' }                           // Reset state
+    | { type: 'NEW_GAME' }; // Reset state
   ```
 - **Reducer logic**:
-  - `SUBMIT_GUESS`: 
+  - `SUBMIT_GUESS`:
     1. Normalize guess and compare against active shirt's `displayName`
     2. Add guess to shirt's `guesses[]`
     3. Decrement `attemptsRemaining`
@@ -1295,7 +1315,7 @@ Build the core game mechanics — the Wordle algorithm, the Wordle modal UI, the
     } else {
       dispatch({ type: 'SET_LOADING' });
       fetchRandomMatch()
-        .then(data => dispatch({ type: 'SET_MATCH', payload: data }))
+        .then((data) => dispatch({ type: 'SET_MATCH', payload: data }))
         .catch(() => dispatch({ type: 'SET_ERROR' }));
     }
   }, []);
@@ -1342,6 +1362,7 @@ Build the core game mechanics — the Wordle algorithm, the Wordle modal UI, the
 **M (3-5 days)**
 
 Breakdown:
+
 - Task 5.1 (Wordle algorithm): 0.5 day
 - Task 5.2 (WordleModal): 1 day
 - Task 5.3 (Game state machine): 1 day
@@ -1352,12 +1373,12 @@ Breakdown:
 
 #### 2.5.6 Risk Factors
 
-| Risk | Likelihood | Impact | Mitigation |
-|------|-----------|--------|------------|
-| Wordle duplicate letter handling edge cases | Medium | Medium | Follow classic Wordle algorithm exactly. Test with 20+ cases including edge cases (triple letters, all same letter). |
-| Game state localStorage serialization issues | Low | Medium | Store only serializable state. Validate on restore (check required fields exist, discard if corrupted). |
-| Integration bugs between components | Medium | Medium | Systematic scenario testing (Task 5.6). Each component was tested individually in Dev 4. |
-| Player names with special characters | Medium | Low | Normalization function handles most cases. Log if issues found during testing. |
+| Risk                                         | Likelihood | Impact | Mitigation                                                                                                           |
+| -------------------------------------------- | ---------- | ------ | -------------------------------------------------------------------------------------------------------------------- |
+| Wordle duplicate letter handling edge cases  | Medium     | Medium | Follow classic Wordle algorithm exactly. Test with 20+ cases including edge cases (triple letters, all same letter). |
+| Game state localStorage serialization issues | Low        | Medium | Store only serializable state. Validate on restore (check required fields exist, discard if corrupted).              |
+| Integration bugs between components          | Medium     | Medium | Systematic scenario testing (Task 5.6). Each component was tested individually in Dev 4.                             |
+| Player names with special characters         | Medium     | Low    | Normalization function handles most cases. Log if issues found during testing.                                       |
 
 #### 2.5.7 "Done" Checklist
 
@@ -1387,6 +1408,7 @@ Package the full application stack for production deployment. By the end of this
 **Docker strategy**: Multi-stage Dockerfiles for both frontend and backend to minimize image size. Frontend uses Next.js standalone output. Backend uses Prisma generate + build in separate stages. Both images are built for `linux/arm64` platform.
 
 **Production stack**: Five services managed by `docker-compose.yml`:
+
 1. `frontend` — Next.js standalone server (port 3000)
 2. `backend` — Express API (port 4000)
 3. `postgres` — PostgreSQL 16 (internal port 5432)
@@ -1396,6 +1418,7 @@ Package the full application stack for production deployment. By the end of this
 **Nginx configuration**: Reverse proxy that serves frontend at `/` and proxies `/api/*` to the backend. Static assets cached with far-future expiry headers. SSL termination with certificates managed by certbot.
 
 **CI/CD pipeline**: GitHub Actions workflow triggered on push to `main`:
+
 1. Build frontend Docker image (with `--platform linux/arm64`)
 2. Build backend Docker image (with `--platform linux/arm64`)
 3. Run linting
@@ -1407,6 +1430,7 @@ Package the full application stack for production deployment. By the end of this
 9. Health check against public URL
 
 **Oracle Cloud provisioning**: Script to:
+
 1. Create an Oracle Cloud Free Tier ARM instance (Ampere A1, 2 OCPUs, 4 GB RAM)
 2. Install Docker + Docker Compose
 3. Configure firewall (ports 22, 80, 443)
@@ -1429,14 +1453,14 @@ Package the full application stack for production deployment. By the end of this
   WORKDIR /app
   COPY package.json package-lock.json ./
   RUN npm ci --only=production
-  
+
   # Stage 2: Build
   FROM --platform=linux/arm64 node:20-alpine AS build
   WORKDIR /app
   COPY --from=deps /app/node_modules ./node_modules
   COPY . .
   RUN npm run build
-  
+
   # Stage 3: Production
   FROM --platform=linux/arm64 node:20-alpine AS runner
   WORKDIR /app
@@ -1467,7 +1491,7 @@ Package the full application stack for production deployment. By the end of this
   WORKDIR /app
   COPY package.json package-lock.json ./
   RUN npm ci --only=production
-  
+
   # Stage 2: Build
   FROM --platform=linux/arm64 node:20-alpine AS build
   WORKDIR /app
@@ -1475,7 +1499,7 @@ Package the full application stack for production deployment. By the end of this
   COPY . .
   RUN npx prisma generate
   RUN npm run build
-  
+
   # Stage 3: Production
   FROM --platform=linux/arm64 node:20-alpine AS runner
   WORKDIR /app
@@ -1507,28 +1531,28 @@ Package the full application stack for production deployment. By the end of this
       server_name footplay.example.com;  # Replace with actual domain
       return 301 https://$server_name$request_uri;
   }
-  
+
   server {
       listen 443 ssl;
       server_name footplay.example.com;
-      
+
       ssl_certificate /etc/letsencrypt/live/footplay.example.com/fullchain.pem;
       ssl_certificate_key /etc/letsencrypt/live/footplay.example.com/privkey.pem;
-      
+
       # Frontend
       location / {
           proxy_pass http://frontend:3000;
           proxy_set_header Host $host;
           proxy_set_header X-Real-IP $remote_addr;
       }
-      
+
       # API
       location /api/ {
           proxy_pass http://backend:4000;
           proxy_set_header Host $host;
           proxy_set_header X-Real-IP $remote_addr;
       }
-      
+
       # Static assets (long cache)
       location /_next/static/ {
           proxy_pass http://frontend:3000;
@@ -1583,7 +1607,7 @@ Package the full application stack for production deployment. By the end of this
   on:
     push:
       branches: [main]
-  
+
   jobs:
     build:
       runs-on: ubuntu-latest
@@ -1597,7 +1621,7 @@ Package the full application stack for production deployment. By the end of this
           run: docker build --platform linux/arm64 -t footplay-backend ./backend
         - name: Lint
           run: npm run lint
-    
+
     deploy:
       needs: build
       runs-on: ubuntu-latest
@@ -1647,7 +1671,7 @@ Package the full application stack for production deployment. By the end of this
   docker compose run --rm certbot certonly --webroot \
     --webroot-path=/var/www/html \
     -d footplay.example.com
-  
+
   # Auto-renewal: cron job runs monthly
   0 0 1 * * docker compose run --rm certbot renew && docker compose exec nginx nginx -s reload
   ```
@@ -1690,6 +1714,7 @@ Package the full application stack for production deployment. By the end of this
 **M (3-5 days)**
 
 Breakdown:
+
 - Task 6.1 (Frontend Dockerfile): 0.5 day
 - Task 6.2 (Backend Dockerfile): 0.5 day
 - Task 6.3 (Nginx config): 0.5 day
@@ -1701,13 +1726,13 @@ Breakdown:
 
 #### 2.6.6 Risk Factors
 
-| Risk | Likelihood | Impact | Mitigation |
-|------|-----------|--------|------------|
-| ARM64 Docker build failures in CI | Medium | High | Test ARM64 build locally with emulation first. Use Docker Buildx with QEMU. Pin base images to arm64-compatible tags. |
-| SSL certificate setup complexity | Medium | Medium | Use certbot with webroot method. Document exact steps. Test on staging domain first. |
-| Oracle Cloud Free Tier resource limits (4 GB RAM) | Low | Medium | Monitor resource usage. Consider splitting PostgreSQL to external service if needed. |
-| DNS propagation delay | Low | Low | Document DNS setup. Use Cloudflare for fast propagation. Test with IP directly first. |
-| CI/CD secrets management | Low | Low | Use GitHub Actions secrets. Never commit secrets to repo. |
+| Risk                                              | Likelihood | Impact | Mitigation                                                                                                            |
+| ------------------------------------------------- | ---------- | ------ | --------------------------------------------------------------------------------------------------------------------- |
+| ARM64 Docker build failures in CI                 | Medium     | High   | Test ARM64 build locally with emulation first. Use Docker Buildx with QEMU. Pin base images to arm64-compatible tags. |
+| SSL certificate setup complexity                  | Medium     | Medium | Use certbot with webroot method. Document exact steps. Test on staging domain first.                                  |
+| Oracle Cloud Free Tier resource limits (4 GB RAM) | Low        | Medium | Monitor resource usage. Consider splitting PostgreSQL to external service if needed.                                  |
+| DNS propagation delay                             | Low        | Low    | Document DNS setup. Use Cloudflare for fast propagation. Test with IP directly first.                                 |
+| CI/CD secrets management                          | Low        | Low    | Use GitHub Actions secrets. Never commit secrets to repo.                                                             |
 
 #### 2.6.7 "Done" Checklist
 
@@ -1732,6 +1757,7 @@ Breakdown:
 
 ```markdown
 ## Task Contract
+
 - **Branch convention**: Each development is an independent branch with prefix `dev-N/`, where N is the development number (e.g., `dev-1/scaffold`, `dev-5/game-loop`).
 - **Do not merge downstream** developments before their dependencies (see Dependency Graph below). Dev 4 can merge to main before Dev 2/3 (it uses mock data), but Dev 5 must wait for both Dev 3 and Dev 4.
 - **Run `npm run lint`** before every commit. No lint warnings or errors.
@@ -1813,15 +1839,15 @@ Dev 1 (Repo Scaffold & Prisma Schema)
 
 ## Appendix A: Effort Summary per Development
 
-| Dev | Name | Effort | Min Days | Max Days |
-|-----|------|--------|----------|----------|
-| 1 | Repo Scaffold & Prisma Schema | S | 2 | 3 |
-| 2 | Data Pipeline | M | 3 | 5 |
-| 3 | Core REST API | M | 2 | 4 |
-| 4 | Frontend Shell & Layout | S | 2 | 3 |
-| 5 | Wordle Algorithm & Game Loop | M | 3 | 5 |
-| 6 | Docker, CI/CD & Deploy | M | 3 | 5 |
-| **Total** | | | **15** | **25** |
+| Dev       | Name                          | Effort | Min Days | Max Days |
+| --------- | ----------------------------- | ------ | -------- | -------- |
+| 1         | Repo Scaffold & Prisma Schema | S      | 2        | 3        |
+| 2         | Data Pipeline                 | M      | 3        | 5        |
+| 3         | Core REST API                 | M      | 2        | 4        |
+| 4         | Frontend Shell & Layout       | S      | 2        | 3        |
+| 5         | Wordle Algorithm & Game Loop  | M      | 3        | 5        |
+| 6         | Docker, CI/CD & Deploy        | M      | 3        | 5        |
+| **Total** |                               |        | **15**   | **25**   |
 
 **Estimated calendar duration**: 3-5 weeks (full-time solo). Parallel execution of Dev 2 + Dev 4 can reduce wall-clock time by 2-3 days.
 
@@ -1829,14 +1855,14 @@ Dev 1 (Repo Scaffold & Prisma Schema)
 
 ## Appendix B: Files Created/Modified per Development
 
-| Dev | New Files | Modified Files |
-|-----|-----------|----------------|
-| 1 | `package.json` (root), `.eslintrc.json`, `.prettierrc`, `tsconfig.base.json`, `.gitignore`, `.env.example`, `frontend/` (scaffold), `backend/` (scaffold), `backend/prisma/schema.prisma`, `docker-compose.yml` | None |
-| 2 | `scripts/package.json`, `scripts/tsconfig.json`, `scripts/src/download-data.ts`, `scripts/src/name-cleaning.ts`, `scripts/src/name-overrides.ts`, `backend/prisma/seed.ts`, `backend/src/services/positionMapping.ts`, `scripts/src/verify-data.ts` | `.gitignore`, `backend/package.json` |
-| 3 | `backend/src/middleware/errorHandler.ts`, `backend/src/middleware/logger.ts`, `backend/src/middleware/validate.ts`, `backend/src/routes/matches.ts`, `backend/src/routes/players.ts`, `backend/src/services/matchService.ts`, `backend/src/services/playerService.ts` | `backend/src/index.ts` |
-| 4 | `frontend/src/components/Layout.tsx`, `frontend/src/components/Navbar.tsx`, `frontend/src/components/Footer.tsx`, `frontend/src/types/index.ts`, `frontend/src/lib/api.ts`, `frontend/src/lib/mockData.ts`, `frontend/src/components/TacticBoard.tsx`, `frontend/src/components/Shirt.tsx`, `frontend/src/components/MatchInfo.tsx`, `frontend/src/app/missing-eleven/page.tsx` | `frontend/src/app/layout.tsx`, `frontend/src/app/page.tsx`, `frontend/tailwind.config.ts` |
-| 5 | `frontend/src/lib/wordle.ts`, `frontend/src/components/WordleModal.tsx`, `frontend/src/lib/gameState.ts`, `frontend/src/components/GameComplete.tsx` | `frontend/src/app/missing-eleven/page.tsx` |
-| 6 | `frontend/Dockerfile`, `backend/Dockerfile`, `nginx/nginx.conf`, `nginx/conf.d/default.conf`, `.github/workflows/deploy.yml`, `scripts/provision-oracle.sh`, `docs/deployment.md` | `backend/src/index.ts` (health check), `frontend/next.config.js` (standalone output) |
+| Dev | New Files                                                                                                                                                                                                                                                                                                                                                                       | Modified Files                                                                            |
+| --- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------- |
+| 1   | `package.json` (root), `.eslintrc.json`, `.prettierrc`, `tsconfig.base.json`, `.gitignore`, `.env.example`, `frontend/` (scaffold), `backend/` (scaffold), `backend/prisma/schema.prisma`, `docker-compose.yml`                                                                                                                                                                 | None                                                                                      |
+| 2   | `scripts/package.json`, `scripts/tsconfig.json`, `scripts/src/download-data.ts`, `scripts/src/name-cleaning.ts`, `scripts/src/name-overrides.ts`, `backend/prisma/seed.ts`, `backend/src/services/positionMapping.ts`, `scripts/src/verify-data.ts`                                                                                                                             | `.gitignore`, `backend/package.json`                                                      |
+| 3   | `backend/src/middleware/errorHandler.ts`, `backend/src/middleware/logger.ts`, `backend/src/middleware/validate.ts`, `backend/src/routes/matches.ts`, `backend/src/routes/players.ts`, `backend/src/services/matchService.ts`, `backend/src/services/playerService.ts`                                                                                                           | `backend/src/index.ts`                                                                    |
+| 4   | `frontend/src/components/Layout.tsx`, `frontend/src/components/Navbar.tsx`, `frontend/src/components/Footer.tsx`, `frontend/src/types/index.ts`, `frontend/src/lib/api.ts`, `frontend/src/lib/mockData.ts`, `frontend/src/components/TacticBoard.tsx`, `frontend/src/components/Shirt.tsx`, `frontend/src/components/MatchInfo.tsx`, `frontend/src/app/missing-eleven/page.tsx` | `frontend/src/app/layout.tsx`, `frontend/src/app/page.tsx`, `frontend/tailwind.config.ts` |
+| 5   | `frontend/src/lib/wordle.ts`, `frontend/src/components/WordleModal.tsx`, `frontend/src/lib/gameState.ts`, `frontend/src/components/GameComplete.tsx`                                                                                                                                                                                                                            | `frontend/src/app/missing-eleven/page.tsx`                                                |
+| 6   | `frontend/Dockerfile`, `backend/Dockerfile`, `nginx/nginx.conf`, `nginx/conf.d/default.conf`, `.github/workflows/deploy.yml`, `scripts/provision-oracle.sh`, `docs/deployment.md`                                                                                                                                                                                               | `backend/src/index.ts` (health check), `frontend/next.config.js` (standalone output)      |
 
 ---
 
@@ -1844,19 +1870,19 @@ Dev 1 (Repo Scaffold & Prisma Schema)
 
 These decisions should be recorded as ADRs in `docs/decisions/` as each development proceeds. They are documented here so the developer can write them alongside implementation.
 
-| Decision | When to Write | Rationale |
-|----------|---------------|-----------|
-| ADR-001: npm workspaces for monorepo | Dev 1 | Core architectural choice |
-| ADR-002: Prisma schema design (internal + source IDs) | Dev 1 | Data model foundation |
-| ADR-003: Client-side game state (localStorage) | Dev 1 | Game state decision |
-| ADR-004: Name display with display_name override | Dev 2 | Player name strategy |
-| ADR-005: Position coordinate mapping | Dev 2 | Tactic board placement |
-| ADR-006: REST API design (three endpoints) | Dev 3 | API contract |
-| ADR-007: Wordle algorithm duplicate-letter rules | Dev 5 | Game logic |
-| ADR-008: ARM64 Docker strategy | Dev 6 | Deployment architecture |
-| ADR-009: Oracle Cloud Free Tier deployment | Dev 6 | Hosting decision |
-| ADR-010: Nginx reverse proxy + Let's Encrypt SSL | Dev 6 | Production networking |
+| Decision                                              | When to Write | Rationale                 |
+| ----------------------------------------------------- | ------------- | ------------------------- |
+| ADR-001: npm workspaces for monorepo                  | Dev 1         | Core architectural choice |
+| ADR-002: Prisma schema design (internal + source IDs) | Dev 1         | Data model foundation     |
+| ADR-003: Client-side game state (localStorage)        | Dev 1         | Game state decision       |
+| ADR-004: Name display with display_name override      | Dev 2         | Player name strategy      |
+| ADR-005: Position coordinate mapping                  | Dev 2         | Tactic board placement    |
+| ADR-006: REST API design (three endpoints)            | Dev 3         | API contract              |
+| ADR-007: Wordle algorithm duplicate-letter rules      | Dev 5         | Game logic                |
+| ADR-008: ARM64 Docker strategy                        | Dev 6         | Deployment architecture   |
+| ADR-009: Oracle Cloud Free Tier deployment            | Dev 6         | Hosting decision          |
+| ADR-010: Nginx reverse proxy + Let's Encrypt SSL      | Dev 6         | Production networking     |
 
 ---
 
-*End of v1.0 decomposition plan. Start with Development 1.*
+_End of v1.0 decomposition plan. Start with Development 1._

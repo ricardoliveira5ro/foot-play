@@ -146,24 +146,24 @@ Build the three Express API endpoints that power the Missing Eleven game. By the
 
 **M (2-4 days)**
 
-| Task | Estimate |
-|------|----------|
-| Task 3.1 (middleware) | 0.5 day |
-| Task 3.2 (matches/random) | 1 day |
-| Task 3.3 (matches/:id) | 0.5 day |
-| Task 3.4 (players search) | 0.5 day |
-| Task 3.5 (validation + error consistency) | 0.5 day |
-| Buffer | 0.5 day |
+| Task                                      | Estimate |
+| ----------------------------------------- | -------- |
+| Task 3.1 (middleware)                     | 0.5 day  |
+| Task 3.2 (matches/random)                 | 1 day    |
+| Task 3.3 (matches/:id)                    | 0.5 day  |
+| Task 3.4 (players search)                 | 0.5 day  |
+| Task 3.5 (validation + error consistency) | 0.5 day  |
+| Buffer                                    | 0.5 day  |
 
 ---
 
 ## Risk Factors
 
-| Risk | Likelihood | Impact | Mitigation |
-|------|-----------|--------|------------|
-| Random match query performance | Low | Medium | `ORDER BY RANDOM()` acceptable for 35k rows. Use `OFFSET` approach if slow. |
-| Player search under 300ms with 37k records | Medium | Medium | Add DB index on `display_name`. Add trigram index if needed. |
-| Large response payloads | Low | Low | Response ~5-10 KB per match. Acceptable. |
+| Risk                                       | Likelihood | Impact | Mitigation                                                                  |
+| ------------------------------------------ | ---------- | ------ | --------------------------------------------------------------------------- |
+| Random match query performance             | Low        | Medium | `ORDER BY RANDOM()` acceptable for 35k rows. Use `OFFSET` approach if slow. |
+| Player search under 300ms with 37k records | Medium     | Medium | Add DB index on `display_name`. Add trigram index if needed.                |
+| Large response payloads                    | Low        | Low    | Response ~5-10 KB per match. Acceptable.                                    |
 
 ---
 
