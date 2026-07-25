@@ -183,26 +183,26 @@ Build the core game mechanics — the Wordle algorithm, the Wordle modal UI, the
 
 **M (3-5 days)**
 
-| Task | Estimate |
-|------|----------|
-| Task 5.1 (Wordle algorithm) | 0.5 day |
-| Task 5.2 (WordleModal) | 1 day |
-| Task 5.3 (Game state machine) | 1 day |
-| Task 5.4 (GameComplete) | 0.5 day |
-| Task 5.5 (Integration) | 1 day |
-| Task 5.6 (Test and polish) | 0.5 day |
-| Buffer | 0.5 day |
+| Task                          | Estimate |
+| ----------------------------- | -------- |
+| Task 5.1 (Wordle algorithm)   | 0.5 day  |
+| Task 5.2 (WordleModal)        | 1 day    |
+| Task 5.3 (Game state machine) | 1 day    |
+| Task 5.4 (GameComplete)       | 0.5 day  |
+| Task 5.5 (Integration)        | 1 day    |
+| Task 5.6 (Test and polish)    | 0.5 day  |
+| Buffer                        | 0.5 day  |
 
 ---
 
 ## Risk Factors
 
-| Risk | Likelihood | Impact | Mitigation |
-|------|-----------|--------|------------|
-| Wordle duplicate letter edge cases | Medium | Medium | Follow classic algorithm exactly. Test 20+ cases. |
-| Game state localStorage serialization issues | Low | Medium | Validate on restore. Discard if corrupted. |
-| Integration bugs between components | Medium | Medium | Systematic scenario testing (Task 5.6). |
-| Player names with special characters | Medium | Low | Normalization handles most cases. Log if issues found. |
+| Risk                                         | Likelihood | Impact | Mitigation                                             |
+| -------------------------------------------- | ---------- | ------ | ------------------------------------------------------ |
+| Wordle duplicate letter edge cases           | Medium     | Medium | Follow classic algorithm exactly. Test 20+ cases.      |
+| Game state localStorage serialization issues | Low        | Medium | Validate on restore. Discard if corrupted.             |
+| Integration bugs between components          | Medium     | Medium | Systematic scenario testing (Task 5.6).                |
+| Player names with special characters         | Medium     | Low    | Normalization handles most cases. Log if issues found. |
 
 ---
 

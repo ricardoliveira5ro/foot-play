@@ -15,6 +15,7 @@ Create the monorepo foundation that all future development builds upon. By the e
 ## Approach
 
 **Monorepo structure**: npm workspaces with three packages:
+
 - `frontend/` — Next.js (App Router) + TypeScript + Tailwind CSS
 - `backend/` — Express 4 + TypeScript + Prisma
 - `scripts/` — TypeScript scripts for data pipeline (no framework)
@@ -26,6 +27,7 @@ Create the monorepo foundation that all future development builds upon. By the e
 **Prisma schema** models the five core entities (Player, Club, Competition, Game, Appearance) directly from the transfermarkt-datasets source CSV columns, with internal auto-increment IDs plus source IDs for traceability.
 
 **Key decisions**:
+
 - **Game-focused schema**: Only fields needed for the Missing Eleven game are modeled. Extra columns from the source CSVs are ignored — they can be added later if the game evolves.
 - Entity names match the source CSV files: **Club** (not Team), **Game** (not Match). This avoids translation overhead in the data pipeline.
 - `name` on Player stores the full name (`"Cristiano Ronaldo"`). `displayName` is optional for a shorter display variant.
@@ -132,13 +134,13 @@ Create the monorepo foundation that all future development builds upon. By the e
 
 - **Source CSV mapping**:
 
-  | Model | Source CSV | Key columns used |
-  |-------|-----------|-----------------|
-  | Competition | `competitions.csv` | competition_id, name |
-  | Club | `clubs.csv` | club_id, name |
-  | Player | `players.csv` | player_id, name, position, sub_position |
-  | Game | `games.csv` | game_id, competition_id, season, round, date, home_club_id, away_club_id, home_club_goals, away_club_goals, home_club_formation, away_club_formation, stadium |
-  | Appearance | `game_lineups.csv` + `appearances.csv` | game_id, player_id, type, position, number, team_captain, goals, assists, red_cards |
+  | Model       | Source CSV                             | Key columns used                                                                                                                                              |
+  | ----------- | -------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+  | Competition | `competitions.csv`                     | competition_id, name                                                                                                                                          |
+  | Club        | `clubs.csv`                            | club_id, name                                                                                                                                                 |
+  | Player      | `players.csv`                          | player_id, name, position, sub_position                                                                                                                       |
+  | Game        | `games.csv`                            | game_id, competition_id, season, round, date, home_club_id, away_club_id, home_club_goals, away_club_goals, home_club_formation, away_club_formation, stadium |
+  | Appearance  | `game_lineups.csv` + `appearances.csv` | game_id, player_id, type, position, number, team_captain, goals, assists, red_cards                                                                           |
 
   **Note**: Appearance is populated by joining `game_lineups.csv` (lineup data: type, position, number, team_captain) and `appearances.csv` (stats: goals, assists, red_cards) on `game_id` + `player_id` during Dev 2.
 
@@ -157,12 +159,12 @@ Create the monorepo foundation that all future development builds upon. By the e
   - `.env.example` — update with PostgreSQL connection string
 - **Docker Compose**:
   ```yaml
-  version: "3.8"
+  version: '3.8'
   services:
     postgres:
       image: postgres:16-alpine
       ports:
-        - "5432:5432"
+        - '5432:5432'
       environment:
         POSTGRES_USER: footplay
         POSTGRES_PASSWORD: footplay_dev
@@ -200,26 +202,26 @@ None. This is the foundation.
 
 **S (2-3 days)**
 
-| Task | Estimate |
-|------|----------|
-| Task 1.1 (monorepo init) | 0.5 day |
-| Task 1.2 (Next.js scaffold) | 0.5 day |
-| Task 1.3 (Express scaffold) | 0.5 day |
-| Task 1.4 (dev scripts) | 0.25 day |
-| Task 1.5 (Prisma schema) | 0.5 day |
-| Task 1.6 (Docker Compose) | 0.25 day |
-| Task 1.7 (linting) | 0.25 day |
-| Buffer | 0.25 day |
+| Task                        | Estimate |
+| --------------------------- | -------- |
+| Task 1.1 (monorepo init)    | 0.5 day  |
+| Task 1.2 (Next.js scaffold) | 0.5 day  |
+| Task 1.3 (Express scaffold) | 0.5 day  |
+| Task 1.4 (dev scripts)      | 0.25 day |
+| Task 1.5 (Prisma schema)    | 0.5 day  |
+| Task 1.6 (Docker Compose)   | 0.25 day |
+| Task 1.7 (linting)          | 0.25 day |
+| Buffer                      | 0.25 day |
 
 ---
 
 ## Risk Factors
 
-| Risk | Likelihood | Impact | Mitigation |
-|------|-----------|--------|------------|
-| npm workspaces dependency resolution conflicts | Low | Medium | Use exact versions in initial install. Test `npm install` on clean clone. |
-| Prisma schema misalignment with transfermarkt-datasets | Low | Medium | Schema designed from verified source CSV columns. Validate during Dev 2 seeding. |
-| PostgreSQL Docker port conflict (5432 already in use) | Low | Low | Document port change procedure in README. |
+| Risk                                                   | Likelihood | Impact | Mitigation                                                                       |
+| ------------------------------------------------------ | ---------- | ------ | -------------------------------------------------------------------------------- |
+| npm workspaces dependency resolution conflicts         | Low        | Medium | Use exact versions in initial install. Test `npm install` on clean clone.        |
+| Prisma schema misalignment with transfermarkt-datasets | Low        | Medium | Schema designed from verified source CSV columns. Validate during Dev 2 seeding. |
+| PostgreSQL Docker port conflict (5432 already in use)  | Low        | Low    | Document port change procedure in README.                                        |
 
 ---
 

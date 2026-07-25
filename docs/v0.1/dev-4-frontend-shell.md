@@ -15,6 +15,7 @@ Build the frontend foundation — shared layout, page structure, and all game co
 ## Approach
 
 **Component tree**:
+
 ```
 Layout
 ├── Navbar
@@ -30,6 +31,7 @@ Layout
 **Mock data**: A static mock object in `frontend/src/lib/mockData.ts` mimics the API response shape from Dev 3.
 
 **Shirt component states**:
+
 1. **Default**: Shirt color with player number
 2. **In progress**: Below shirt, guessed letters displayed (e.g., `..R...`)
 3. **Correct**: Full player name below shirt in default color
@@ -178,26 +180,26 @@ Layout
 
 **S (2-3 days)**
 
-| Task | Estimate |
-|------|----------|
-| Task 4.1 (Layout, Navbar, Footer) | 0.5 day |
-| Task 4.2 (TypeScript types) | 0.25 day |
-| Task 4.3 (API client + mock data) | 0.5 day |
-| Task 4.4 (TacticBoard) | 0.75 day |
-| Task 4.5 (Shirt) | 0.5 day |
-| Task 4.6 (MatchInfo) | 0.25 day |
-| Task 4.7 (/missing-eleven page) | 0.5 day |
+| Task                                    | Estimate |
+| --------------------------------------- | -------- |
+| Task 4.1 (Layout, Navbar, Footer)       | 0.5 day  |
+| Task 4.2 (TypeScript types)             | 0.25 day |
+| Task 4.3 (API client + mock data)       | 0.5 day  |
+| Task 4.4 (TacticBoard)                  | 0.75 day |
+| Task 4.5 (Shirt)                        | 0.5 day  |
+| Task 4.6 (MatchInfo)                    | 0.25 day |
+| Task 4.7 (/missing-eleven page)         | 0.5 day  |
 | Task 4.8 (Tailwind config + responsive) | 0.25 day |
 
 ---
 
 ## Risk Factors
 
-| Risk | Likelihood | Impact | Mitigation |
-|------|-----------|--------|------------|
-| Shirt positioning overlaps for some formations | Medium | Medium | Test with 5 common formations. Add minimum distance constraint. |
-| Pitch SVG markings complex to render | Low | Low | Use simplified markings. SVG overlay well-documented. |
-| Responsive layout breaks on very small screens | Low | Low | Set minimum container width, allow horizontal scroll. |
+| Risk                                           | Likelihood | Impact | Mitigation                                                      |
+| ---------------------------------------------- | ---------- | ------ | --------------------------------------------------------------- |
+| Shirt positioning overlaps for some formations | Medium     | Medium | Test with 5 common formations. Add minimum distance constraint. |
+| Pitch SVG markings complex to render           | Low        | Low    | Use simplified markings. SVG overlay well-documented.           |
+| Responsive layout breaks on very small screens | Low        | Low    | Set minimum container width, allow horizontal scroll.           |
 
 ---
 

@@ -11,11 +11,15 @@
   "scripts": {
     "dev": "concurrently \"npm run dev -w frontend\" \"npm run dev -w backend\"",
     "build": "echo 'Build will be wired per workspace'",
-    "lint": "echo 'Task 1.7 will wire ESLint here'",
-    "format": "echo 'Task 1.7 will wire Prettier here'"
+    "lint": "npm run lint -w frontend && ESLINT_USE_FLAT_CONFIG=false eslint backend/src/",
+    "format": "prettier --write ."
   },
   "devDependencies": {
-    "concurrently": "^10.0.3"
+    "concurrently": "^10.0.3",
+    "eslint": "^9",
+    "@typescript-eslint/parser": "^8",
+    "@typescript-eslint/eslint-plugin": "^8",
+    "prettier": "^3"
   },
   "engines": {
     "node": ">=18.0.0"

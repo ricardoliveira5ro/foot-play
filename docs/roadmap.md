@@ -24,11 +24,11 @@
 
 FootPlay follows **SemVer 2.0.0** with the following mapping:
 
-| Bump | Trigger | Examples |
-|------|---------|---------|
+| Bump      | Trigger                                                                     | Examples                                                                  |
+| --------- | --------------------------------------------------------------------------- | ------------------------------------------------------------------------- |
 | **Major** | New game added, platform-identity change, breaking API change for consumers | Adding Guess the Formation (v1.x → 2.0.0), adding Kit Quiz (v2.x → 3.0.0) |
-| **Minor** | New platform feature, new shared capability, new game-independent feature | Auth/user system (v1.0.x → 1.2.0), filters & difficulty (v1.2.x → 1.3.0) |
-| **Patch** | Bugfix, performance, infrastructure hardening, dependency update | Testing setup (v1.0.0 → 1.0.1), logging/backup improvements |
+| **Minor** | New platform feature, new shared capability, new game-independent feature   | Auth/user system (v1.0.x → 1.2.0), filters & difficulty (v1.2.x → 1.3.0)  |
+| **Patch** | Bugfix, performance, infrastructure hardening, dependency update            | Testing setup (v1.0.0 → 1.0.1), logging/backup improvements               |
 
 **Rationale**: Major bumps signal "the platform has grown" to users and stakeholders. Minor bumps add user-visible features without changing the game set. Patches are invisible to users but improve quality.
 
@@ -40,13 +40,13 @@ FootPlay follows **SemVer 2.0.0** with the following mapping:
 
 ### v1.0 — Missing Eleven MVP
 
-| Field | Value |
-|-------|-------|
-| **Version** | `1.0.0` |
-| **Theme** | "One game, working, public" |
-| **Goal** | Single playable game deployed to a public URL |
-| **Duration** | 3–5 weeks (full-time solo) |
-| **Branch prefix** | `v1.0/*` |
+| Field             | Value                                         |
+| ----------------- | --------------------------------------------- |
+| **Version**       | `1.0.0`                                       |
+| **Theme**         | "One game, working, public"                   |
+| **Goal**          | Single playable game deployed to a public URL |
+| **Duration**      | 3–5 weeks (full-time solo)                    |
+| **Branch prefix** | `v1.0/*`                                      |
 
 #### In Scope
 
@@ -117,13 +117,13 @@ FootPlay follows **SemVer 2.0.0** with the following mapping:
 
 ### v1.1 — Infrastructure & Quality
 
-| Field | Value |
-|-------|-------|
-| **Version** | `1.1.0` |
-| **Theme** | "Solid foundation" |
-| **Goal** | Production hardening before adding complexity |
-| **Duration** | 1–2 weeks |
-| **Branch prefix** | `v1.1/*` |
+| Field              | Value                                           |
+| ------------------ | ----------------------------------------------- |
+| **Version**        | `1.1.0`                                         |
+| **Theme**          | "Solid foundation"                              |
+| **Goal**           | Production hardening before adding complexity   |
+| **Duration**       | 1–2 weeks                                       |
+| **Branch prefix**  | `v1.1/*`                                        |
 | **Parallelizable** | Yes — can start as soon as v1.0 scaffold exists |
 
 #### In Scope
@@ -159,13 +159,13 @@ FootPlay follows **SemVer 2.0.0** with the following mapping:
 
 ### v1.2 — User Features
 
-| Field | Value |
-|-------|-------|
-| **Version** | `1.2.0` |
-| **Theme** | "Your progress, your way" |
-| **Goal** | Retention mechanics — user accounts, stats, personal progress |
-| **Duration** | 2–3 weeks |
-| **Branch prefix** | `v1.2/*` |
+| Field             | Value                                                         |
+| ----------------- | ------------------------------------------------------------- |
+| **Version**       | `1.2.0`                                                       |
+| **Theme**         | "Your progress, your way"                                     |
+| **Goal**          | Retention mechanics — user accounts, stats, personal progress |
+| **Duration**      | 2–3 weeks                                                     |
+| **Branch prefix** | `v1.2/*`                                                      |
 
 #### In Scope
 
@@ -207,13 +207,13 @@ FootPlay follows **SemVer 2.0.0** with the following mapping:
 
 ### v1.3 — Filters & Difficulty
 
-| Field | Value |
-|-------|-------|
-| **Version** | `1.3.0` |
-| **Theme** | "Your game, your rules" |
-| **Goal** | Player agency over match selection and difficulty |
-| **Duration** | 1–2 weeks |
-| **Branch prefix** | `v1.3/*` |
+| Field             | Value                                             |
+| ----------------- | ------------------------------------------------- |
+| **Version**       | `1.3.0`                                           |
+| **Theme**         | "Your game, your rules"                           |
+| **Goal**          | Player agency over match selection and difficulty |
+| **Duration**      | 1–2 weeks                                         |
+| **Branch prefix** | `v1.3/*`                                          |
 
 #### In Scope
 
@@ -252,17 +252,18 @@ FootPlay follows **SemVer 2.0.0** with the following mapping:
 
 ### v2.0 — Guess the Formation
 
-| Field | Value |
-|-------|-------|
-| **Version** | `2.0.0` |
-| **Theme** | "Two games" |
-| **Goal** | Validate multi-game architecture with a second game |
-| **Duration** | ~1 week |
-| **Branch prefix** | `v2.0/*` |
+| Field             | Value                                               |
+| ----------------- | --------------------------------------------------- |
+| **Version**       | `2.0.0`                                             |
+| **Theme**         | "Two games"                                         |
+| **Goal**          | Validate multi-game architecture with a second game |
+| **Duration**      | ~1 week                                             |
+| **Branch prefix** | `v2.0/*`                                            |
 
 #### Why This Justifies a Major Version Bump
 
 Adding a second game changes the product identity from "a game" (single-purpose app) to "a platform" (multi-game hub). The architecture must support:
+
 - Multiple game types, each with its own route
 - Shared vs game-specific components
 - A game hub landing page (`/`) that lists available games
@@ -304,13 +305,13 @@ This is a product-identity boundary, not just a feature addition.
 
 ### v2.1 — Transfer Links
 
-| Field | Value |
-|-------|-------|
-| **Version** | `2.1.0` |
-| **Theme** | "Chain puzzle" |
-| **Goal** | Add the most architecturally distinct game |
-| **Duration** | 2–3 weeks |
-| **Branch prefix** | `v2.1/*` |
+| Field             | Value                                      |
+| ----------------- | ------------------------------------------ |
+| **Version**       | `2.1.0`                                    |
+| **Theme**         | "Chain puzzle"                             |
+| **Goal**          | Add the most architecturally distinct game |
+| **Duration**      | 2–3 weeks                                  |
+| **Branch prefix** | `v2.1/*`                                   |
 
 #### In Scope
 
@@ -352,13 +353,13 @@ This is a product-identity boundary, not just a feature addition.
 
 ### v2.2 — Career Path
 
-| Field | Value |
-|-------|-------|
-| **Version** | `2.2.0` |
-| **Theme** | "Progressive reveal" |
-| **Goal** | Add a career guessing game using transfer data |
-| **Duration** | ~2 weeks |
-| **Branch prefix** | `v2.2/*` |
+| Field             | Value                                          |
+| ----------------- | ---------------------------------------------- |
+| **Version**       | `2.2.0`                                        |
+| **Theme**         | "Progressive reveal"                           |
+| **Goal**          | Add a career guessing game using transfer data |
+| **Duration**      | ~2 weeks                                       |
+| **Branch prefix** | `v2.2/*`                                       |
 
 #### In Scope
 
@@ -398,13 +399,13 @@ This is a product-identity boundary, not just a feature addition.
 
 ### v3.0 — Kit Quiz + Monetization
 
-| Field | Value |
-|-------|-------|
-| **Version** | `3.0.0` |
-| **Theme** | "Kit Quiz + platform sustainability" |
-| **Goal** | Add the most visually distinct game. Begin monetization. |
-| **Duration** | 3–4 weeks (high uncertainty — depends on data sourcing) |
-| **Branch prefix** | `v3.0/*` |
+| Field             | Value                                                    |
+| ----------------- | -------------------------------------------------------- |
+| **Version**       | `3.0.0`                                                  |
+| **Theme**         | "Kit Quiz + platform sustainability"                     |
+| **Goal**          | Add the most visually distinct game. Begin monetization. |
+| **Duration**      | 3–4 weeks (high uncertainty — depends on data sourcing)  |
+| **Branch prefix** | `v3.0/*`                                                 |
 
 #### In Scope
 
@@ -493,15 +494,15 @@ CI/CD pipeline
 
 ### Strict Blockers
 
-| Item | Blocked By | Reason |
-|------|-----------|--------|
-| Any game | v1.0 scaffold + Prisma + data pipeline | No game can exist without data |
-| Second game | v1.0 core API (match endpoints) | Game needs match data to display |
-| User stats per game | v1.2 auth system | Stats require user identity |
-| Cross-game stats dashboard | v1.2 auth + all games | Dashboard needs all games collecting stats |
-| Difficulty modes | v1.3 backend filter support | Difficulty changes query and game logic |
-| Kit Quiz | v3.0 data sourcing decision | No kit images available in dataset |
-| Monetization | Platform must have traffic + game content | Ads need audience first |
+| Item                       | Blocked By                                | Reason                                     |
+| -------------------------- | ----------------------------------------- | ------------------------------------------ |
+| Any game                   | v1.0 scaffold + Prisma + data pipeline    | No game can exist without data             |
+| Second game                | v1.0 core API (match endpoints)           | Game needs match data to display           |
+| User stats per game        | v1.2 auth system                          | Stats require user identity                |
+| Cross-game stats dashboard | v1.2 auth + all games                     | Dashboard needs all games collecting stats |
+| Difficulty modes           | v1.3 backend filter support               | Difficulty changes query and game logic    |
+| Kit Quiz                   | v3.0 data sourcing decision               | No kit images available in dataset         |
+| Monetization               | Platform must have traffic + game content | Ads need audience first                    |
 
 ---
 
@@ -550,42 +551,42 @@ If v1.1 is bundled into v1.0: subtract 1-2 weeks → **~15-18 weeks total**.
 
 ### Decisions Required Before v1.0
 
-| # | Decision | Status | Choice | Rationale |
-|---|----------|--------|--------|-----------|
-| D1 | Monorepo tool | **Open** | npm workspaces (recommended) | Simplest option for 2-package monorepo. Turborepo/Nx are overkill at this scale. |
-| D2 | Player name matching field | **Closed** | `display_name` column + manual override table | MVP spec decision. Do not reopen. |
-| D3 | Player autocomplete source | **Closed** | Server-side debounced search | MVP spec decision. `GET /api/players?q=`. |
-| D4 | Game session persistence | **Closed** | localStorage | MVP spec decision. Do not reopen. |
-| D5 | Formations to support | **Closed** | 5 common: 4-3-3, 4-4-2, 4-2-3-1, 3-5-2, 4-1-4-1 | MVP spec decision. Do not reopen. |
-| D6 | Data refresh strategy | **Closed** | One-time seed only for MVP | MVP spec decision. Do not reopen. |
-| D7 | Filter/Auth deferral | **Closed** | Deferred from v1.0 | MVP spec decision. Do not reopen. |
-| D8 | Name display derivation | **Open** | Use `name` field (full name) as primary, `last_name` as fallback, `display_name` override table for known shortening rules | Must be decided before data pipeline. See research Section 7. |
+| #   | Decision                   | Status     | Choice                                                                                                                     | Rationale                                                                        |
+| --- | -------------------------- | ---------- | -------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------- |
+| D1  | Monorepo tool              | **Open**   | npm workspaces (recommended)                                                                                               | Simplest option for 2-package monorepo. Turborepo/Nx are overkill at this scale. |
+| D2  | Player name matching field | **Closed** | `display_name` column + manual override table                                                                              | MVP spec decision. Do not reopen.                                                |
+| D3  | Player autocomplete source | **Closed** | Server-side debounced search                                                                                               | MVP spec decision. `GET /api/players?q=`.                                        |
+| D4  | Game session persistence   | **Closed** | localStorage                                                                                                               | MVP spec decision. Do not reopen.                                                |
+| D5  | Formations to support      | **Closed** | 5 common: 4-3-3, 4-4-2, 4-2-3-1, 3-5-2, 4-1-4-1                                                                            | MVP spec decision. Do not reopen.                                                |
+| D6  | Data refresh strategy      | **Closed** | One-time seed only for MVP                                                                                                 | MVP spec decision. Do not reopen.                                                |
+| D7  | Filter/Auth deferral       | **Closed** | Deferred from v1.0                                                                                                         | MVP spec decision. Do not reopen.                                                |
+| D8  | Name display derivation    | **Open**   | Use `name` field (full name) as primary, `last_name` as fallback, `display_name` override table for known shortening rules | Must be decided before data pipeline. See research Section 7.                    |
 
 ### Decisions Required Before v1.2
 
-| # | Decision | Status | Choice | Rationale |
-|---|----------|--------|--------|-----------|
-| D9 | JWT storage method | **Open** | httpOnly cookie | More secure (XSS-protected). Both API and frontend served through same Nginx proxy, so CSRF risk is minimal. |
-| D10 | Anonymous play support | **Open** | Allow anonymous + prompt to save | Maximizes adoption funnel. Login required before play would reduce conversion. |
-| D11 | Password hashing | **Open** | bcrypt | Simpler, well-supported, sufficient for this project. argon2 is more modern but adds complexity. |
+| #   | Decision                    | Status   | Choice                                    | Rationale                                                                                                      |
+| --- | --------------------------- | -------- | ----------------------------------------- | -------------------------------------------------------------------------------------------------------------- |
+| D9  | JWT storage method          | **Open** | httpOnly cookie                           | More secure (XSS-protected). Both API and frontend served through same Nginx proxy, so CSRF risk is minimal.   |
+| D10 | Anonymous play support      | **Open** | Allow anonymous + prompt to save          | Maximizes adoption funnel. Login required before play would reduce conversion.                                 |
+| D11 | Password hashing            | **Open** | bcrypt                                    | Simpler, well-supported, sufficient for this project. argon2 is more modern but adds complexity.               |
 | D12 | Anonymous-to-auth migration | **Open** | Prompt to save only after game completion | Mid-game login adds complexity. Keep it simple: save anonymous data as a session, link to account on creation. |
 
 ### Decisions Required Before v2.1 / v2.2
 
-| # | Decision | Status | Choice | Rationale |
-|---|----------|--------|--------|-----------|
-| D13 | Chain generation strategy | **Open** | BFS with minimum length filter + curated seed chains | Multi-strategy approach gives best puzzle quality. BFS alone produces trivial chains. |
-| D14 | Transfer links guess format | **Open** | Player-to-player | Club info shown as clues, but guesses are player names. Simpler UX than club-to-club. |
-| D15 | Career path clue difficulty | **Open** | Obscure-to-famous progression | Early clues are less informative (smaller clubs, early years). Later clues reveal famous clubs. |
-| D16 | Minimum career length for puzzles | **Open** | Minimum 3 clubs in transfer history | Ensures enough clues for interesting gameplay. Filter players with few transfers. |
+| #   | Decision                          | Status   | Choice                                               | Rationale                                                                                       |
+| --- | --------------------------------- | -------- | ---------------------------------------------------- | ----------------------------------------------------------------------------------------------- |
+| D13 | Chain generation strategy         | **Open** | BFS with minimum length filter + curated seed chains | Multi-strategy approach gives best puzzle quality. BFS alone produces trivial chains.           |
+| D14 | Transfer links guess format       | **Open** | Player-to-player                                     | Club info shown as clues, but guesses are player names. Simpler UX than club-to-club.           |
+| D15 | Career path clue difficulty       | **Open** | Obscure-to-famous progression                        | Early clues are less informative (smaller clubs, early years). Later clues reveal famous clubs. |
+| D16 | Minimum career length for puzzles | **Open** | Minimum 3 clubs in transfer history                  | Ensures enough clues for interesting gameplay. Filter players with few transfers.               |
 
 ### Decisions Required Before v3.0
 
-| # | Decision | Status | Choice | Rationale |
-|---|----------|--------|--------|-----------|
-| D17 | Kit image source | **Blocking** | **UNRESOLVED** — must be decided before v3.0 starts | Highest-risk decision. Evaluate: Wikipedia Commons (free), third-party sports API (check licensing cost), manual asset creation (labor-intensive), text-only fallback (no images). |
-| D18 | Kit Quiz game format | **Open** | Multiple choice (4 options) | Simplest format. Open-ended text input for kit identification would be too ambiguous. |
-| D19 | Ad provider | **Open** | Carbon Ads / EthicalAds / Google AdSense | Must be non-intrusive. Carbon Ads is developer-friendly but may not be football-relevant. Research when approaching v3.0. |
+| #   | Decision             | Status       | Choice                                              | Rationale                                                                                                                                                                          |
+| --- | -------------------- | ------------ | --------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| D17 | Kit image source     | **Blocking** | **UNRESOLVED** — must be decided before v3.0 starts | Highest-risk decision. Evaluate: Wikipedia Commons (free), third-party sports API (check licensing cost), manual asset creation (labor-intensive), text-only fallback (no images). |
+| D18 | Kit Quiz game format | **Open**     | Multiple choice (4 options)                         | Simplest format. Open-ended text input for kit identification would be too ambiguous.                                                                                              |
+| D19 | Ad provider          | **Open**     | Carbon Ads / EthicalAds / Google AdSense            | Must be non-intrusive. Carbon Ads is developer-friendly but may not be football-relevant. Research when approaching v3.0.                                                          |
 
 ### Decision Log Legend
 
@@ -599,45 +600,45 @@ If v1.1 is bundled into v1.0: subtract 1-2 weeks → **~15-18 weeks total**.
 
 ### Per-Milestone Risk Table
 
-| ID | Milestone | Risk | Probability | Impact | Mitigation |
-|----|-----------|------|------------|--------|------------|
-| R01 | v1.0 | ARM64 Docker compatibility surprises | Medium | High | Pin Docker images to ARM-compatible tags. Test with `--platform linux/arm64` emulation locally. |
-| R02 | v1.0 | Name matching ambiguity (shared last names) | High | Medium | `display_name` + manual override table (spec decision). Test with real data. Seed at least 50 known edge cases. |
-| R03 | v1.0 | Random match returns incomplete lineup | Medium | High | SQL query must filter for matches where all 11 starting lineup players exist. Add validation query in data pipeline. |
-| R04 | v1.0 | Player autocomplete performance too slow | Medium | Medium | Server-side debounced search. Test response time with 37k seeded players. Add index on `name` column. |
-| R05 | v1.0 | Data pipeline name cleaning scope larger than expected | Medium | Medium | The biggest estimation risk. Budget 3 days for name cleaning + override table seeding. |
-| R06 | v1.0 | Oracle Cloud Free Tier ARM Docker build slow in CI | Medium | Medium | Use Docker buildx + caching. Consider GitHub Actions ARM runner. |
-| R07 | v1.0 | transfermarkt-datasets schema changes | Low | Medium | Pin to specific release version. Write schema validation in pipeline. |
-| R08 | v1.1 | Data refresh breaks existing game references | Medium | Medium | Use stable `game_id` references. Don't cascade deletes on seed refresh. Document refresh procedure. |
-| R09 | v1.2 | User session security issue | Low | High | Use httpOnly cookies for JWT. Test CSRF protection. |
-| R10 | v1.3 | Filter query performance with multiple joins | Medium | Medium | Add database indexes on `competition_id`, `date`, `home_club_id`, `away_club_id`. Test with worst-case queries. |
-| R11 | v1.3 | Filter combination returns zero matches | Low | Low | Graceful UI fallback: "No matches found. Try relaxing your filters." |
-| R12 | v2.0 | Formation string normalization edge cases | Low | Low | Handle variant names ("4-4-2 diamond" → "4-4-2"). Test against real formation data distribution. |
-| R13 | v2.1 | Transfer chain algorithm produces boring puzzles | High | Medium | Minimum chain length filter (3+ steps). Add curated seed chains. Test algorithm against 87k transfers before shipping. |
-| R14 | v2.1 | BFS graph traversal performance | Medium | Medium | In-memory graph loaded on server start. Refresh periodically. Handle disconnected subgraphs gracefully. |
-| R15 | v2.1 | Chain impossible to solve (no connection) | Medium | Low | Regenerate until valid chain found. Pre-generate pool of verified chains at server start. |
-| R16 | v2.2 | Career path too easy (famous players) | Medium | Medium | Filter by minimum 3 transfers. Avoid currently famous players. Add difficulty scoring. |
-| R17 | v3.0 | Kit image external data sourcing fails | **High** | **High** | Defer to v3.0 (last game). Research alternatives early. Fallback: text-only kit quiz with descriptive text. |
-| R18 | v3.0 | Kit image licensing/copyright issues | Medium | High | Verify license per image. Wikipedia Commons is generally free. Document all image sources. Have text-only fallback ready. |
-| R19 | v3.0 | Ad integration breaks UX | Low | Medium | Non-intrusive placement only (static banner, no video/auto-play). Test on mobile. A/B test ad placement. |
-| R20 | Cross-cutting | Oracle Cloud Free Tier account termination (inactivity) | Low | High | Set up periodic health check ping (e.g., GitHub Actions weekly). Document recovery procedure. |
-| R21 | Cross-cutting | transfermarkt-datasets discontinued | Low | High | One-time seed sufficient for MVP. For ongoing updates, fork dataset or cache locally. |
+| ID  | Milestone     | Risk                                                    | Probability | Impact   | Mitigation                                                                                                                |
+| --- | ------------- | ------------------------------------------------------- | ----------- | -------- | ------------------------------------------------------------------------------------------------------------------------- |
+| R01 | v1.0          | ARM64 Docker compatibility surprises                    | Medium      | High     | Pin Docker images to ARM-compatible tags. Test with `--platform linux/arm64` emulation locally.                           |
+| R02 | v1.0          | Name matching ambiguity (shared last names)             | High        | Medium   | `display_name` + manual override table (spec decision). Test with real data. Seed at least 50 known edge cases.           |
+| R03 | v1.0          | Random match returns incomplete lineup                  | Medium      | High     | SQL query must filter for matches where all 11 starting lineup players exist. Add validation query in data pipeline.      |
+| R04 | v1.0          | Player autocomplete performance too slow                | Medium      | Medium   | Server-side debounced search. Test response time with 37k seeded players. Add index on `name` column.                     |
+| R05 | v1.0          | Data pipeline name cleaning scope larger than expected  | Medium      | Medium   | The biggest estimation risk. Budget 3 days for name cleaning + override table seeding.                                    |
+| R06 | v1.0          | Oracle Cloud Free Tier ARM Docker build slow in CI      | Medium      | Medium   | Use Docker buildx + caching. Consider GitHub Actions ARM runner.                                                          |
+| R07 | v1.0          | transfermarkt-datasets schema changes                   | Low         | Medium   | Pin to specific release version. Write schema validation in pipeline.                                                     |
+| R08 | v1.1          | Data refresh breaks existing game references            | Medium      | Medium   | Use stable `game_id` references. Don't cascade deletes on seed refresh. Document refresh procedure.                       |
+| R09 | v1.2          | User session security issue                             | Low         | High     | Use httpOnly cookies for JWT. Test CSRF protection.                                                                       |
+| R10 | v1.3          | Filter query performance with multiple joins            | Medium      | Medium   | Add database indexes on `competition_id`, `date`, `home_club_id`, `away_club_id`. Test with worst-case queries.           |
+| R11 | v1.3          | Filter combination returns zero matches                 | Low         | Low      | Graceful UI fallback: "No matches found. Try relaxing your filters."                                                      |
+| R12 | v2.0          | Formation string normalization edge cases               | Low         | Low      | Handle variant names ("4-4-2 diamond" → "4-4-2"). Test against real formation data distribution.                          |
+| R13 | v2.1          | Transfer chain algorithm produces boring puzzles        | High        | Medium   | Minimum chain length filter (3+ steps). Add curated seed chains. Test algorithm against 87k transfers before shipping.    |
+| R14 | v2.1          | BFS graph traversal performance                         | Medium      | Medium   | In-memory graph loaded on server start. Refresh periodically. Handle disconnected subgraphs gracefully.                   |
+| R15 | v2.1          | Chain impossible to solve (no connection)               | Medium      | Low      | Regenerate until valid chain found. Pre-generate pool of verified chains at server start.                                 |
+| R16 | v2.2          | Career path too easy (famous players)                   | Medium      | Medium   | Filter by minimum 3 transfers. Avoid currently famous players. Add difficulty scoring.                                    |
+| R17 | v3.0          | Kit image external data sourcing fails                  | **High**    | **High** | Defer to v3.0 (last game). Research alternatives early. Fallback: text-only kit quiz with descriptive text.               |
+| R18 | v3.0          | Kit image licensing/copyright issues                    | Medium      | High     | Verify license per image. Wikipedia Commons is generally free. Document all image sources. Have text-only fallback ready. |
+| R19 | v3.0          | Ad integration breaks UX                                | Low         | Medium   | Non-intrusive placement only (static banner, no video/auto-play). Test on mobile. A/B test ad placement.                  |
+| R20 | Cross-cutting | Oracle Cloud Free Tier account termination (inactivity) | Low         | High     | Set up periodic health check ping (e.g., GitHub Actions weekly). Document recovery procedure.                             |
+| R21 | Cross-cutting | transfermarkt-datasets discontinued                     | Low         | High     | One-time seed sufficient for MVP. For ongoing updates, fork dataset or cache locally.                                     |
 
 ### Risk Probability Scale
 
-| Term | Likelihood |
-|------|-----------|
-| Low | < 20% |
-| Medium | 20-60% |
-| High | > 60% |
+| Term   | Likelihood |
+| ------ | ---------- |
+| Low    | < 20%      |
+| Medium | 20-60%     |
+| High   | > 60%      |
 
 ### Risk Impact Scale
 
-| Term | Effect |
-|------|--------|
-| Low | Inconvenience, minor delay (< 1 day) |
-| Medium | Moderate delay (1-5 days), feature impact |
-| High | Critical delay (> 1 week), feature blocked or fundamentally changed |
+| Term   | Effect                                                              |
+| ------ | ------------------------------------------------------------------- |
+| Low    | Inconvenience, minor delay (< 1 day)                                |
+| Medium | Moderate delay (1-5 days), feature impact                           |
+| High   | Critical delay (> 1 week), feature blocked or fundamentally changed |
 
 ---
 
@@ -805,37 +806,37 @@ v3.0/monetization      ✓
 
 ## Appendix A: Effort Summary
 
-| Milestone | Version | Effort | Relative to v1.0 |
-|-----------|---------|--------|-------------------|
-| Missing Eleven MVP | 1.0.0 | **L** (3-5 weeks) | Baseline |
-| Infrastructure & Quality | 1.1.0 | **M** (1-2 weeks) | ~40% |
-| User Features | 1.2.0 | **M** (2-3 weeks) | ~50% |
-| Filters & Difficulty | 1.3.0 | **M** (1-2 weeks) | ~35% |
-| Guess the Formation | 2.0.0 | **S** (~1 week) | ~15% |
-| Transfer Links | 2.1.0 | **M** (2-3 weeks) | ~40% |
-| Career Path | 2.2.0 | **M** (~2 weeks) | ~35% |
-| Kit Quiz + Monetization | 3.0.0 | **L** (3-4 weeks) | ~60% (high uncertainty) |
+| Milestone                | Version | Effort            | Relative to v1.0        |
+| ------------------------ | ------- | ----------------- | ----------------------- |
+| Missing Eleven MVP       | 1.0.0   | **L** (3-5 weeks) | Baseline                |
+| Infrastructure & Quality | 1.1.0   | **M** (1-2 weeks) | ~40%                    |
+| User Features            | 1.2.0   | **M** (2-3 weeks) | ~50%                    |
+| Filters & Difficulty     | 1.3.0   | **M** (1-2 weeks) | ~35%                    |
+| Guess the Formation      | 2.0.0   | **S** (~1 week)   | ~15%                    |
+| Transfer Links           | 2.1.0   | **M** (2-3 weeks) | ~40%                    |
+| Career Path              | 2.2.0   | **M** (~2 weeks)  | ~35%                    |
+| Kit Quiz + Monetization  | 3.0.0   | **L** (3-4 weeks) | ~60% (high uncertainty) |
 
 **Total estimated timeline**: ~16-20 weeks (full-time solo), ~10-14 weeks (dual-track parallel)
 
 ## Appendix B: Open Decision Register
 
-| ID | Decision | Blocks | Deadline | Recommended |
-|----|----------|--------|----------|-------------|
-| D1 | Monorepo tool | v1.0 scaffold | Before v1.0 dev start | npm workspaces |
-| D8 | Name display field | v1.0 data pipeline | Before v1.0 data pipeline | Use `name` field with `display_name` override |
-| D9 | JWT storage | v1.2 auth | Before v1.2 dev start | httpOnly cookie |
-| D10 | Anonymous play | v1.2 auth | Before v1.2 dev start | Allow anonymous + prompt to save |
-| D11 | Password hashing | v1.2 auth | Before v1.2 dev start | bcrypt |
-| D12 | Anonymous-to-auth migration | v1.2 auth | Before v1.2 dev start | Save after completion |
-| D13 | Chain generation strategy | v2.1 dev | Before v2.1 dev start | BFS + min length + curated seeds |
-| D14 | Transfer guess format | v2.1 dev | Before v2.1 dev start | Player-to-player |
-| D15 | Career clue difficulty | v2.2 dev | Before v2.2 dev start | Obscure-to-famous |
-| D16 | Min career length | v2.2 dev | Before v2.2 dev start | 3 transfers |
-| D17 | Kit image source | **v3.0 start** | **Before v3.0** | **UNRESOLVED** — research needed |
-| D18 | Kit Quiz format | v3.0 dev | Before v3.0 dev start | Multiple choice (4 options) |
-| D19 | Ad provider | v3.0 monetization | Before v3.0 monetization | Research when approaching v3.0 |
+| ID  | Decision                    | Blocks             | Deadline                  | Recommended                                   |
+| --- | --------------------------- | ------------------ | ------------------------- | --------------------------------------------- |
+| D1  | Monorepo tool               | v1.0 scaffold      | Before v1.0 dev start     | npm workspaces                                |
+| D8  | Name display field          | v1.0 data pipeline | Before v1.0 data pipeline | Use `name` field with `display_name` override |
+| D9  | JWT storage                 | v1.2 auth          | Before v1.2 dev start     | httpOnly cookie                               |
+| D10 | Anonymous play              | v1.2 auth          | Before v1.2 dev start     | Allow anonymous + prompt to save              |
+| D11 | Password hashing            | v1.2 auth          | Before v1.2 dev start     | bcrypt                                        |
+| D12 | Anonymous-to-auth migration | v1.2 auth          | Before v1.2 dev start     | Save after completion                         |
+| D13 | Chain generation strategy   | v2.1 dev           | Before v2.1 dev start     | BFS + min length + curated seeds              |
+| D14 | Transfer guess format       | v2.1 dev           | Before v2.1 dev start     | Player-to-player                              |
+| D15 | Career clue difficulty      | v2.2 dev           | Before v2.2 dev start     | Obscure-to-famous                             |
+| D16 | Min career length           | v2.2 dev           | Before v2.2 dev start     | 3 transfers                                   |
+| D17 | Kit image source            | **v3.0 start**     | **Before v3.0**           | **UNRESOLVED** — research needed              |
+| D18 | Kit Quiz format             | v3.0 dev           | Before v3.0 dev start     | Multiple choice (4 options)                   |
+| D19 | Ad provider                 | v3.0 monetization  | Before v3.0 monetization  | Research when approaching v3.0                |
 
 ---
 
-*Roadmap prepared from `research-roadmap.md` (Section 1-9). This is a living document — update as decisions are made and milestones are shipped.*
+_Roadmap prepared from `research-roadmap.md` (Section 1-9). This is a living document — update as decisions are made and milestones are shipped._
