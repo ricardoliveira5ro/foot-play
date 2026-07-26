@@ -12,7 +12,8 @@
     "dev": "concurrently \"npm run dev -w frontend\" \"npm run dev -w backend\"",
     "build": "echo 'Build will be wired per workspace'",
     "lint": "npm run lint -w frontend && ESLINT_USE_FLAT_CONFIG=false eslint backend/src/",
-    "format": "prettier --write ."
+    "format": "prettier --write .",
+    "data-pipeline": "npx -w scripts ts-node src/download-data.ts"
   },
   "devDependencies": {
     "concurrently": "^10.0.3",

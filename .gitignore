@@ -10,6 +10,9 @@ dist/
 .env
 .env.local
 
+# Data cache (downloaded CSVs)
+scripts/data/
+
 # Prisma
 .prisma/
 
