@@ -23,12 +23,13 @@ Download, parse, clean, and seed real football data from transfermarkt-datasets 
 3. Caches them locally for reproducibility
 4. Validates column presence before proceeding
 
-**Name cleaning**: The critical and riskiest step. Strategy:
+**Name cleaning**: Simple approach. Strategy:
 
-1. Use `last_name` as the default `display_name` for most players
-2. For players known by a single name (Pelé, Neymar), use `name` field
-3. For players with common short forms, build a manual override mapping in `scripts/name-overrides.ts`
-4. Log all players where auto-extraction produces ambiguous results for manual review
+1. Use `last_name` as `display_name` — the data already has clean `first_name` / `last_name` split
+2. If `last_name` is empty, fall back to `first_name`
+3. If both are empty, fall back to `name`
+4. **Normalize accents and diacritics** — convert characters like á, é, í, ó, ú, ü, ñ, ç to their ASCII equivalents (a, e, i, o, u, u, n, c). This way users can type "Di Maria" and find "Ángel Di María". Use `unicode.normalize('NFD')` + regex to strip combining marks.
+5. No manual override mapping needed
 
 **Position mapping**: Convert `sub_position` values to tactic-board x/y coordinates. Lives in `backend/src/services/positionMapping.ts`.
 
@@ -63,24 +64,25 @@ Download, parse, clean, and seed real football data from transfermarkt-datasets 
   - [ ] Logs progress and errors to console
 - **Validation**: `npx ts-node scripts/src/download-data.ts` completes. `ls scripts/data/` shows 5 CSV files.
 
-### Task 2.2: Implement name cleaning utility
+### Task 2.2: Implement display name normalization
 
-- **Description**: Create the name-cleaning logic that populates `display_name`. Default to `last_name`, with override mappings for known special cases.
+**Note on order**: This task creates a **utility function** (`cleanDisplayName()`) used by Task 2.3's seed script. It does NOT run against the database or modify the CSV files. The seed script (Task 2.3) imports this function and applies it to each player row during the database import — so the cleaning happens in memory as data flows from CSV → DB.
+
+- **Description**: Create a utility that populates `display_name` using `last_name` and normalizes accents/diacritics to plain ASCII. No manual override mapping needed — the CSV data already has a proper `first_name` / `last_name` split.
 - **Files to create/modify**:
-  - `scripts/src/name-cleaning.ts` — core logic + override map
-  - `scripts/src/name-overrides.ts` — seed manual override map (start with 20-30 known cases)
+  - `scripts/src/name-cleaning.ts` — core logic: pick `last_name`, normalize diacritics
 - **Strategy**:
-  1. Check exact match against `NAME_OVERRIDES` map by `name`
-  2. If no override found, use `last_name` as `display_name`
-  3. If `last_name` is empty, use `first_name`
-  4. If both are empty, fall back to `name`
-  5. Log all players where `display_name` is not distinct
+  1. Use `last_name` as `display_name`
+  2. If `last_name` is empty, use `first_name`
+  3. If both are empty, fall back to `name`
+  4. **Normalize**: apply Unicode NFD normalization + strip combining diacritical marks. Then keep only ASCII letters. This turns `"Ángel Di María"` into `"Angel Di Maria"`.
+  5. No manual override mapping, no ambiguity logging — the data is clean enough
 - **Acceptance criteria**:
   - [ ] Every player receives a non-null `display_name`
-  - [ ] Known overrides (Messi, Ronaldo, Neymar, Pelé) are correctly applied
-  - [ ] Ambiguous cases are logged to a file for review
-  - [ ] No two players share the same `display_name` after dedup logic
-- **Validation**: Run with a sample of players. Verify output.
+  - [ ] Diacritics are removed: `"Ángel Di María"` → `"Angel Di Maria"`, `"Vitória"` → `"Vitoria"`, `"Jérémy"` → `"Jeremy"`
+  - [ ] ASCII letters and spaces are preserved unchanged
+  - [ ] `last_name` alone is sufficient for > 99% of players
+- **Validation**: `npx ts-node scripts/src/name-cleaning.ts` outputs a sample of cleaned names.
 
 ### Task 2.3: Create Prisma seed script with lineup filtering
 
@@ -155,7 +157,7 @@ Download, parse, clean, and seed real football data from transfermarkt-datasets 
 | Task                                      | Estimate                       |
 | ----------------------------------------- | ------------------------------ |
 | Task 2.1 (download script)                | 0.5 day                        |
-| Task 2.2 (name cleaning)                  | 1-2 days (RISK: unknown scope) |
+| Task 2.2 (name normalization)             | 0.25 day                       |
 | Task 2.3 (seed script + lineup filtering) | 1.5 days                       |
 | Task 2.4 (position mapping)               | 0.25 day                       |
 | Task 2.5 (verification)                   | 0.25 day                       |
@@ -167,7 +169,7 @@ Download, parse, clean, and seed real football data from transfermarkt-datasets 
 
 | Risk                                         | Likelihood | Impact | Mitigation                                                            |
 | -------------------------------------------- | ---------- | ------ | --------------------------------------------------------------------- |
-| **Name cleaning scope larger than expected** | **High**   | Medium | Budget 2 days. Log edge cases. Defer to v1.2 name override table.     |
+| **Name normalization scope**                  | Low        | Low    | Trivial — just Unicode NFD + strip combining marks.                    |
 | CSV parsing edge cases (encoding, commas)    | Medium     | Medium | Use `csv-parse` with `relax_column_count: true`. Validate row counts. |
 | Large dataset memory issues                  | Medium     | Medium | Batch inserts (500-1000 rows). Use streaming CSV parser.              |
 | Lineup filtering eliminates too many matches | Medium     | Medium | Test filtering early with a sample. Report filtering stats.           |
@@ -180,10 +182,8 @@ Download, parse, clean, and seed real football data from transfermarkt-datasets 
 - [ ] `npx prisma db seed` completes within 10 minutes
 - [ ] Database reports expected row counts (37k+ players, 10k+ teams, ~300 competitions, 30k+ matches, 700k+ appearances)
 - [ ] Every player has a non-null `display_name`
-- [ ] Known name overrides work (Messi → "Messi", Ronaldo → "Ronaldo", etc.)
 - [ ] No orphaned records (all foreign keys reference valid rows)
 - [ ] Every match has at least 11 starting lineup appearances
 - [ ] Position mapping covers all commonly occurring `sub_position` values
 - [ ] `scripts/src/verify-data.ts` passes all checks
-- [ ] Ambiguous names logged to file for manual override seeding
 - [ ] All changes committed to `dev-2/*` branch
