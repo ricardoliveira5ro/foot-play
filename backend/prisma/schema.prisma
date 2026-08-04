@@ -55,7 +55,8 @@ model Game {
 
 model Appearance {
   id                      Int           @id @default(autoincrement())
-  gameId                  Int       
+  gameId                  Int
+  clubId                  Int       
   playerId                Int       
   number                  Int?
   type                    String
