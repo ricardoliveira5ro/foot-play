@@ -107,7 +107,7 @@ async function processGamesDataset(allowedTeamIds: Set<Number>, candidateGames: 
     }
 }
 
-async function processGameLineups(candidateGames: Game[], candidateGameIds: Set<number>, appearances: Appearance[], games: Game[]) {
+async function processGameLineupsDataset(candidateGames: Game[], candidateGameIds: Set<number>, appearances: Appearance[], games: Game[]) {
     const counts = new Map<string, number>();            
     
     const parser = createReadStream(path.join(__dirname, '../../scripts/data/game_lineups.csv')).pipe(
@@ -165,7 +165,7 @@ function processOpponentTeams(games: Game[], opponents: Team[], candidateClubOpp
     });
 }
 
-async function processCompetitions(games: Game[], competitions: Competition[]) {
+async function processCompetitionsDataset(games: Game[], competitions: Competition[]) {
     const finalCompetitionIds = new Set<string>();
 
     games.forEach(g => {
@@ -215,7 +215,7 @@ async function main(): Promise<void> {
     const appearances: Appearance[] = [];
     const games: Game[] = [];
     
-    await processGameLineups(candidateGames, candidateGameIds, appearances, games);
+    await processGameLineupsDataset(candidateGames, candidateGameIds, appearances, games);
 
     const opponents: Team[] = [];
     
@@ -223,7 +223,7 @@ async function main(): Promise<void> {
 
     const competitions: Competition[] = [];
 
-    await processCompetitions(games, competitions);
+    await processCompetitionsDataset(games, competitions);
 }
 
 main();
