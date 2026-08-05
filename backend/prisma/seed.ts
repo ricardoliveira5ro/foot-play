@@ -30,6 +30,16 @@ interface Game {
     stadium: string;
 }
 
+interface Appearance { 
+    gameId: number;
+    clubId: number;
+    playerId: number;
+    number: number;
+    type: string;
+    position: string;
+    isCaptain: boolean;
+}
+
 async function getCuratedTeams() {
     const data = JSON.parse(await readFile(path.join(__dirname, '../../scripts/curated-teams.json'), 'utf8')) as CuratedTeams;
 
@@ -92,7 +102,7 @@ async function processGamesDataset(allowedTeamIds: Set<Number>, candidateGames: 
     }
 }
 
-async function processGameLineups(candidateGames: Game[], candidateGameIds: Set<number>, appearances: {}[], games: Game[]) {
+async function processGameLineups(candidateGames: Game[], candidateGameIds: Set<number>, appearances: Appearance[], games: Game[]) {
     const counts = new Map<string, number>();            
     
     const parser = createReadStream(path.join(__dirname, '../../scripts/data/game_lineups.csv')).pipe(
@@ -171,7 +181,7 @@ async function main(): Promise<void> {
 
     await processGamesDataset(allowedTeamIds, candidateGames, candidateGameIds);
 
-    const appearances: { gameId: number; clubId: number; playerId: number }[] = [];
+    const appearances: Appearance[] = [];
     const games: Game[] = [];
     
     await processGameLineups(candidateGames, candidateGameIds, appearances, games);
