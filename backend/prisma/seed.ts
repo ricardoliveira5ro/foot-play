@@ -40,6 +40,11 @@ interface Appearance {
     isCaptain: boolean;
 }
 
+interface Competition {
+    competitionId: string;
+    name: string;
+}
+
 async function getCuratedTeams() {
     const data = JSON.parse(await readFile(path.join(__dirname, '../../scripts/curated-teams.json'), 'utf8')) as CuratedTeams;
 
@@ -157,7 +162,33 @@ function processOpponentTeams(games: Game[], opponents: Team[], candidateClubOpp
             const oppTeamName = candidateClubOpponentsNameById.get(oppTeamId) || candidateNationOpponentsNameById.get(oppTeamId) || "";
             opponents.push({ clubId: oppTeamId, name: oppTeamName });
         }
-    });;
+    });
+}
+
+async function processCompetitions(games: Game[], competitions: Competition[]) {
+    const finalCompetitionIds = new Set<string>();
+
+    games.forEach(g => {
+        const competitionId = g.competitionId;
+
+        if (!finalCompetitionIds.has(competitionId))
+            finalCompetitionIds.add(competitionId);
+    })
+    
+    const parser = createReadStream(path.join(__dirname, '../../scripts/data/competitions.csv')).pipe(
+        parse({ columns: true, relax_column_count: true })
+    );
+    
+    for await (const row of parser) {
+        const competitionId = row.competition_id;
+
+        if (finalCompetitionIds.has(competitionId)) {
+            competitions.push({
+                competitionId, 
+                name: row.name
+            })
+        }
+    }
 }
 
 async function main(): Promise<void> {
@@ -190,7 +221,9 @@ async function main(): Promise<void> {
     
     processOpponentTeams(games, opponents, candidateClubOpponentsNameById, candidateNationOpponentsNameById);
 
-    
+    const competitions: Competition[] = [];
+
+    await processCompetitions(games, competitions);
 }
 
 main();
