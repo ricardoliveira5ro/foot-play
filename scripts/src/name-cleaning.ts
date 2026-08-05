@@ -1,10 +1,10 @@
-export function cleanDisplayName(player: {
-    lastName?: string | null;
-    name?: string | null;
-    firstName?: string | null;
-}): string {
+export function cleanDisplayName(
+    lastName?: string | null,
+    name?: string | null,
+    firstName?: string | null,
+): string {
     
-    const displayName = player.lastName || player.name || player.firstName || "";
+    const displayName = lastName || name || firstName || "";
 
     return displayName
         .normalize("NFD")

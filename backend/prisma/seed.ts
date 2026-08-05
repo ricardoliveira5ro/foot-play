@@ -1,6 +1,7 @@
 import { readFile } from 'fs/promises';
 import { createReadStream } from 'fs';
 import { parse } from 'csv-parse';
+import { cleanDisplayName } from '../../scripts/src/name-cleaning';
 import path from 'path';
 
 interface CuratedTeams {                                                  
@@ -43,6 +44,14 @@ interface Appearance {
 interface Competition {
     competitionId: string;
     name: string;
+}
+
+interface Player {
+    playerId: number;
+    name: string;
+    displayName: string;
+    position: string;
+    subPosition: string;
 }
 
 async function getCuratedTeams() {
@@ -191,6 +200,35 @@ async function processCompetitionsDataset(games: Game[], competitions: Competiti
     }
 }
 
+async function processPlayersDataset(players: Player[], appearances: Appearance[]) {
+    const finalPlayerIds = new Set<number>();
+
+    appearances.forEach(a => {
+        const playerId = a.playerId;
+
+        if (!finalPlayerIds.has(playerId))
+            finalPlayerIds.add(playerId);
+    });
+
+    const parser = createReadStream(path.join(__dirname, '../../scripts/data/players.csv')).pipe(
+        parse({ columns: true, relax_column_count: true })
+    );
+
+    for await (const row of parser) {
+        const playerId = Number(row.player_id);
+
+        if (finalPlayerIds.has(playerId)) {
+            players.push({
+                playerId,
+                name: row.name,
+                displayName: cleanDisplayName(row.last_name, row.name, row.first_name),
+                position: row.position,
+                subPosition: row.sub_position
+            })
+        }
+    }
+}
+
 async function main(): Promise<void> {
     const curatedTeams = await getCuratedTeams();
 
@@ -224,6 +262,10 @@ async function main(): Promise<void> {
     const competitions: Competition[] = [];
 
     await processCompetitionsDataset(games, competitions);
+
+    const players: Player[] = [];
+
+    await processPlayersDataset(players, appearances);
 }
 
 main();
