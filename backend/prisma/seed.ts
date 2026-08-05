@@ -8,7 +8,7 @@ interface CuratedTeams {
     nationalTeamIds: { id: number; name: string }[];                      
 }
 
-interface Club {
+interface Team {
     clubId: number;
     name: string;
 }
@@ -43,7 +43,7 @@ async function getCuratedTeams() {
     }; 
 }
 
-async function processClubsDataset(clubIds: Set<Number>, clubs: Club[], candidateClubOpponentsNameById: Map<number, string>): Promise<void> {
+async function processClubsDataset(clubIds: Set<Number>, clubs: Team[], candidateClubOpponentsNameById: Map<number, string>): Promise<void> {
     const parser = createReadStream(path.join(__dirname, '../../scripts/data/clubs.csv')).pipe(
         parse({ columns: true, relax_column_count: true })
     );
@@ -58,7 +58,7 @@ async function processClubsDataset(clubIds: Set<Number>, clubs: Club[], candidat
     }
 }
 
-async function processNationsDataset(nationsIds: Set<Number>, nations: Club[], candidateNationOpponentsNameById: Map<number, string>): Promise<void> {
+async function processNationsDataset(nationsIds: Set<Number>, nations: Team[], candidateNationOpponentsNameById: Map<number, string>): Promise<void> {
     const parser = createReadStream(path.join(__dirname, '../../scripts/data/national_teams.csv')).pipe(
         parse({ columns: true, relax_column_count: true })
     );
@@ -135,7 +135,7 @@ async function processGameLineups(candidateGames: Game[], candidateGameIds: Set<
     }
 }
 
-function processOpponentTeams(games: Game[], opponents: Club[], candidateClubOpponentsNameById: Map<number, string>, candidateNationOpponentsNameById: Map<number, string>) {
+function processOpponentTeams(games: Game[], opponents: Team[], candidateClubOpponentsNameById: Map<number, string>, candidateNationOpponentsNameById: Map<number, string>) {
     const finalOpponentsIds = new Set<number>();
     
     games.forEach(g => {
@@ -157,8 +157,8 @@ async function main(): Promise<void> {
     const nationsIds = new Set<number>(curatedTeams.nationsIds);
     const allowedTeamIds = new Set<number>(curatedTeams.allowedTeamIds);
 
-    const clubs: Club[] = [];
-    const nations: Club[] = [];
+    const clubs: Team[] = [];
+    const nations: Team[] = [];
 
     const candidateClubOpponentsNameById = new Map<number, string>();
     const candidateNationOpponentsNameById = new Map<number, string>();
@@ -176,7 +176,7 @@ async function main(): Promise<void> {
     
     await processGameLineups(candidateGames, candidateGameIds, appearances, games);
 
-    const opponents: Club[] = [];
+    const opponents: Team[] = [];
     
     processOpponentTeams(games, opponents, candidateClubOpponentsNameById, candidateNationOpponentsNameById);
 
