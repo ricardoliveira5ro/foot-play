@@ -20,6 +20,7 @@ interface Game {
     round: string;
     date: string;
     targetTeamId: number;
+    opponentTeamId: number;
     homeClubId: number;
     awayClubId: number;
     homeClubGoals: number;
@@ -42,7 +43,7 @@ async function getCuratedTeams() {
     }; 
 }
 
-async function processClubsDataset(clubIds: Set<Number>, clubs: Club[], clubNameById: Map<number, string>): Promise<void> {
+async function processClubsDataset(clubIds: Set<Number>, clubs: Club[], candidateClubOpponentsNameById: Map<number, string>): Promise<void> {
     const parser = createReadStream(path.join(__dirname, '../../scripts/data/clubs.csv')).pipe(
         parse({ columns: true, relax_column_count: true })
     );
@@ -50,15 +51,14 @@ async function processClubsDataset(clubIds: Set<Number>, clubs: Club[], clubName
     for await (const row of parser) {
         const clubId = Number(row.club_id);
 
-        if (clubIds.has(clubId)) {
+        if (clubIds.has(clubId))
             clubs.push({ clubId, name: row.name })
-        }
-
-        clubNameById.set(clubId, row.name);
+        else
+            candidateClubOpponentsNameById.set(clubId, row.name);
     }
 }
 
-async function processNationsDataset(nationsIds: Set<Number>, nations: Club[], nationNameById: Map<number, string>): Promise<void> {
+async function processNationsDataset(nationsIds: Set<Number>, nations: Club[], candidateNationOpponentsNameById: Map<number, string>): Promise<void> {
     const parser = createReadStream(path.join(__dirname, '../../scripts/data/national_teams.csv')).pipe(
         parse({ columns: true, relax_column_count: true })
     );
@@ -66,11 +66,10 @@ async function processNationsDataset(nationsIds: Set<Number>, nations: Club[], n
     for await (const row of parser) {
         const nationId = Number(row.national_team_id);
 
-        if (nationsIds.has(nationId)) {
+        if (nationsIds.has(nationId))
             nations.push({ clubId: nationId, name: row.name })
-        }
-
-        nationNameById.set(nationId, row.name);
+        else
+            candidateNationOpponentsNameById.set(nationId, row.name);
     }
 }
 
@@ -84,10 +83,10 @@ async function processGamesDataset(allowedTeamIds: Set<Number>, candidateGames: 
         const awayClubId = Number(row.away_club_id);
 
         if (allowedTeamIds.has(homeClubId)) {
-            candidateGames.push({ gameId: row.game_id, competitionId: row.competition_id, season: row.season || null, round: row.round || null, date: row.date || null, targetTeamId: homeClubId, homeClubId, awayClubId, homeClubGoals: row.home_club_goals || null, awayClubGoals: row.away_club_goals || null, homeClubFormation: row.home_club_formation || null, awayClubFormation: row.away_club_formation || null, stadium: row.stadium || null })
+            candidateGames.push({ gameId: row.game_id, competitionId: row.competition_id, season: row.season || null, round: row.round || null, date: row.date || null, targetTeamId: homeClubId, opponentTeamId: awayClubId, homeClubId, awayClubId, homeClubGoals: row.home_club_goals || null, awayClubGoals: row.away_club_goals || null, homeClubFormation: row.home_club_formation || null, awayClubFormation: row.away_club_formation || null, stadium: row.stadium || null })
             candidateGameIds.add(Number(row.game_id));
         } else if (allowedTeamIds.has(awayClubId)) {
-            candidateGames.push({ gameId: row.game_id, competitionId: row.competition_id, season: row.season || null, round: row.round || null, date: row.date || null, targetTeamId: awayClubId, homeClubId, awayClubId, homeClubGoals: row.home_club_goals || null, awayClubGoals: row.away_club_goals || null, homeClubFormation: row.home_club_formation || null, awayClubFormation: row.away_club_formation || null, stadium: row.stadium || null })
+            candidateGames.push({ gameId: row.game_id, competitionId: row.competition_id, season: row.season || null, round: row.round || null, date: row.date || null, targetTeamId: awayClubId, opponentTeamId: homeClubId, homeClubId, awayClubId, homeClubGoals: row.home_club_goals || null, awayClubGoals: row.away_club_goals || null, homeClubFormation: row.home_club_formation || null, awayClubFormation: row.away_club_formation || null, stadium: row.stadium || null })
             candidateGameIds.add(Number(row.game_id));
         }
     }
@@ -136,6 +135,21 @@ async function processGameLineups(candidateGames: Game[], candidateGameIds: Set<
     }
 }
 
+function processOpponentTeams(games: Game[], opponents: Club[], candidateClubOpponentsNameById: Map<number, string>, candidateNationOpponentsNameById: Map<number, string>) {
+    const finalOpponentsIds = new Set<number>();
+    
+    games.forEach(g => {
+        const oppTeamId = g.opponentTeamId;
+
+        if (!finalOpponentsIds.has(oppTeamId)) {
+            finalOpponentsIds.add(oppTeamId);
+
+            const oppTeamName = candidateClubOpponentsNameById.get(oppTeamId) || candidateNationOpponentsNameById.get(oppTeamId) || "";
+            opponents.push({ clubId: oppTeamId, name: oppTeamName });
+        }
+    });;
+}
+
 async function main(): Promise<void> {
     const curatedTeams = await getCuratedTeams();
 
@@ -144,12 +158,13 @@ async function main(): Promise<void> {
     const allowedTeamIds = new Set<number>(curatedTeams.allowedTeamIds);
 
     const clubs: Club[] = [];
-    const clubNameById = new Map<number, string>();
     const nations: Club[] = [];
-    const nationNameById = new Map<number, string>();
+
+    const candidateClubOpponentsNameById = new Map<number, string>();
+    const candidateNationOpponentsNameById = new Map<number, string>();
     
-    await processClubsDataset(clubIds, clubs, clubNameById);
-    await processNationsDataset(nationsIds, nations, nationNameById);
+    await processClubsDataset(clubIds, clubs, candidateClubOpponentsNameById);
+    await processNationsDataset(nationsIds, nations, candidateNationOpponentsNameById);
 
     const candidateGames: Game[] = [];
     const candidateGameIds = new Set<number>();
@@ -160,6 +175,12 @@ async function main(): Promise<void> {
     const games: Game[] = [];
     
     await processGameLineups(candidateGames, candidateGameIds, appearances, games);
+
+    const opponents: Club[] = [];
+    
+    processOpponentTeams(games, opponents, candidateClubOpponentsNameById, candidateNationOpponentsNameById);
+
+    
 }
 
 main();
