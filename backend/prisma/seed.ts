@@ -107,10 +107,10 @@ async function processGamesDataset(allowedTeamIds: Set<Number>, candidateGames: 
         const awayClubId = Number(row.away_club_id);
 
         if (allowedTeamIds.has(homeClubId)) {
-            candidateGames.push({ gameId: row.game_id, competitionId: row.competition_id, season: row.season || null, round: row.round || null, date: row.date || null, targetTeamId: homeClubId, opponentTeamId: awayClubId, homeClubId, awayClubId, homeClubGoals: row.home_club_goals || null, awayClubGoals: row.away_club_goals || null, homeClubFormation: row.home_club_formation || null, awayClubFormation: row.away_club_formation || null, stadium: row.stadium || null })
+            candidateGames.push({ gameId: Number(row.game_id), competitionId: row.competition_id, season: row.season || null, round: row.round || null, date: row.date || null, targetTeamId: homeClubId, opponentTeamId: awayClubId, homeClubId, awayClubId, homeClubGoals: row.home_club_goals || null, awayClubGoals: row.away_club_goals || null, homeClubFormation: row.home_club_formation || null, awayClubFormation: row.away_club_formation || null, stadium: row.stadium || null })
             candidateGameIds.add(Number(row.game_id));
         } else if (allowedTeamIds.has(awayClubId)) {
-            candidateGames.push({ gameId: row.game_id, competitionId: row.competition_id, season: row.season || null, round: row.round || null, date: row.date || null, targetTeamId: awayClubId, opponentTeamId: homeClubId, homeClubId, awayClubId, homeClubGoals: row.home_club_goals || null, awayClubGoals: row.away_club_goals || null, homeClubFormation: row.home_club_formation || null, awayClubFormation: row.away_club_formation || null, stadium: row.stadium || null })
+            candidateGames.push({ gameId: Number(row.game_id), competitionId: row.competition_id, season: row.season || null, round: row.round || null, date: row.date || null, targetTeamId: awayClubId, opponentTeamId: homeClubId, homeClubId, awayClubId, homeClubGoals: row.home_club_goals || null, awayClubGoals: row.away_club_goals || null, homeClubFormation: row.home_club_formation || null, awayClubFormation: row.away_club_formation || null, stadium: row.stadium || null })
             candidateGameIds.add(Number(row.game_id));
         }
     }
@@ -143,7 +143,11 @@ async function processGameLineupsDataset(candidateGames: Game[], candidateGameId
 
     games.push(...(candidateGames.filter(cg => finalGameIds.has(cg.gameId))));
 
-    for await (const row of parser) {
+    const parser2 = createReadStream(path.join(__dirname, '../../scripts/data/game_lineups.csv')).pipe(
+        parse({ columns: true, relax_column_count: true })
+    );
+
+    for await (const row of parser2) {
         const key = `${row.game_id}:${row.club_id}`;
         if (!fullXiKeys.has(key)) continue;
 
