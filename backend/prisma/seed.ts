@@ -2,6 +2,7 @@ import { readFile } from 'fs/promises';
 import { createReadStream } from 'fs';
 import { parse } from 'csv-parse';
 import { cleanDisplayName } from '../../scripts/src/name-cleaning';
+import { normalizeCompetitionName, MISSING_COMPETITIONS } from '../../scripts/src/competition-names';
 import path from 'path';
 
 interface CuratedTeams {                                                  
@@ -198,9 +199,14 @@ async function processCompetitionsDataset(games: Game[], competitions: Competiti
         if (finalCompetitionIds.has(competitionId)) {
             competitions.push({
                 competitionId, 
-                name: row.name
+                name: normalizeCompetitionName(competitionId, row.name)
             })
         }
+    }
+
+    for (const [id, name] of Object.entries(MISSING_COMPETITIONS)) {
+        if (finalCompetitionIds.has(id))
+            competitions.push({ competitionId: id, name });
     }
 }
 
