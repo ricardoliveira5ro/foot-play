@@ -160,6 +160,7 @@ async function processGameLineupsDataset(candidateGames: Game[], candidateGameId
     );
 
     for await (const row of parser2) {
+        if (row.type !== 'starting_lineup') continue;
         const key = `${row.game_id}:${row.club_id}`;
         if (!fullXiKeys.has(key)) continue;
 
