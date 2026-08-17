@@ -18,7 +18,12 @@ model Competition {
 model Club {
   id                      Int           @id @default(autoincrement())
   clubId                  Int           @unique
-  name                    String 
+  name                    String
+  isNationalTeam          Boolean?
+
+  homeGames               Game[]        @relation("HomeClub")
+  awayGames               Game[]        @relation("AwayClub")
+  appearances             Appearance[]
 }
 
 model Player {
@@ -50,6 +55,8 @@ model Game {
   stadium                 String?
 
   competition             Competition   @relation(fields: [competitionId], references: [competitionId])
+  homeClub                Club?         @relation("HomeClub", fields: [homeClubId], references: [clubId])
+  awayClub                Club?         @relation("AwayClub", fields: [awayClubId], references: [clubId])
   appearances             Appearance[]
 
   @@index([competitionId])
@@ -70,6 +77,7 @@ model Appearance {
 
   match                   Game          @relation(fields: [gameId], references: [gameId])
   player                  Player        @relation(fields: [playerId], references: [playerId])
+  club                    Club          @relation(fields: [clubId], references: [clubId])
 
   @@unique([gameId, playerId])
   @@index([gameId])
