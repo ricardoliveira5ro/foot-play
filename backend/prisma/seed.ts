@@ -16,6 +16,7 @@ interface CuratedTeams {
 interface Team {
     clubId: number;
     name: string;
+    isNationalTeam?: boolean;
 }
 
 interface Game { 
@@ -84,7 +85,7 @@ async function processClubsDataset(clubIds: Set<Number>, clubs: Team[], candidat
         const clubId = Number(row.club_id);
 
         if (clubIds.has(clubId))
-            clubs.push({ clubId, name: row.name })
+            clubs.push({ clubId, name: row.name, isNationalTeam: false })
         else
             candidateClubOpponentsNameById.set(clubId, row.name);
     }
@@ -99,7 +100,7 @@ async function processNationsDataset(nationsIds: Set<Number>, nations: Team[], c
         const nationId = Number(row.national_team_id);
 
         if (nationsIds.has(nationId))
-            nations.push({ clubId: nationId, name: row.name })
+            nations.push({ clubId: nationId, name: row.name, isNationalTeam: true })
         else
             candidateNationOpponentsNameById.set(nationId, row.name);
     }
@@ -195,7 +196,7 @@ function processOpponentTeams(games: Game[], opponents: Team[], candidateClubOpp
             else if (!oppTeamName)
                 console.warn(`Opponent team ${oppTeamId}: no name found in clubs.csv, national_teams.csv or games.csv; inserting empty name`);
 
-            opponents.push({ clubId: oppTeamId, name: oppTeamName });
+            opponents.push({ clubId: oppTeamId, name: oppTeamName, isNationalTeam: false });
         }
     });
 }
@@ -293,6 +294,7 @@ function toClubData(rows: Team[]): Prisma.ClubCreateManyInput[] {
     return rows.map(t => ({
         clubId: t.clubId,
         name: t.name,
+        isNationalTeam: t.isNationalTeam,
     }));
 }
 
@@ -402,10 +404,20 @@ async function main(): Promise<void> {
 
     await processPlayersDataset(players, appearances);
 
-    const seenClubIds = new Set<number>();
-    const uniqueClubs = [...clubs, ...nations, ...opponents].filter(c =>
-        seenClubIds.has(c.clubId) ? false : (seenClubIds.add(c.clubId), true)
-    );
+    // Dedupe across clubs/nations/opponents: first occurrence wins for the
+    // name (previous behavior), but a duplicate row flagged as a national
+    // team never loses the flag (a curated id can appear in both lists or
+    // re-appear as an opponent).
+    const uniqueClubsMap = new Map<number, Team>();
+    for (const t of [...clubs, ...nations, ...opponents]) {
+        const existing = uniqueClubsMap.get(t.clubId);
+        if (existing === undefined) {
+            uniqueClubsMap.set(t.clubId, t);
+        } else if (t.isNationalTeam) {
+            existing.isNationalTeam = true;
+        }
+    }
+    const uniqueClubs = [...uniqueClubsMap.values()];
 
     const seededPlayerIds = new Set<number>(players.map(p => p.playerId));
     const keptAppearances = appearances.filter(a => seededPlayerIds.has(a.playerId));
