@@ -3,6 +3,7 @@ dotenv.config({ path: '../.env' });
 
 import express from 'express';
 import cors from 'cors';
+import { errorHandler } from './middleware/errorHandler';
 
 const app = express();
 const port = process.env.BACKEND_PORT ? parseInt(process.env.BACKEND_PORT, 10) : 4000;
@@ -15,6 +16,8 @@ app.use(express.json());
 app.get('/api/health', (_req, res) => {
   res.json({ status: 'ok' });
 });
+
+app.use(errorHandler)
 
 // Start server
 app.listen(port, () => {
