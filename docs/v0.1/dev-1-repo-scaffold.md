@@ -192,6 +192,20 @@ Create the monorepo foundation that all future development builds upon. By the e
 
 ---
 
+## Schema Evolution Note (planned for Dev 2)
+
+The Dev 1 schema above is the initial scaffold. Dev 2 (Data Pipeline) amends it in **Task 2.6 "Schema amendment for curated seeding"** (must land before Task 2.3's seed run):
+
+- **`Appearance.clubId` (Int) + relation to Club — required.** The Dev 1 schema has no way to place a player on a team (confirmed gap). The board needs to know which team an appearance belongs to.
+- **`Game.homeClub` / `Game.awayClub` optional relations to Club — recommended but optional.** `homeClubId`/`awayClubId` exist as plain Ints with no Prisma relation; relations give FK integrity.
+- **`Club.isNationalTeam` (Boolean, optional)** to distinguish national teams from clubs.
+- **National teams reuse the Club table**: `clubId = national_team_id` (124 teams; zero id collisions with `clubs.csv` club ids verified).
+- **Appearance stats fields** (`goals`, `assists`, `redCards`) stay at their defaults in v1 — `appearances.csv` is NOT extracted for v1; lineups come from `game_lineups.csv` only.
+
+Migration + regenerated Prisma client are part of Task 2.6.
+
+---
+
 ## Dependencies
 
 None. This is the foundation.

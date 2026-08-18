@@ -38,6 +38,8 @@ CREATE TABLE "Game" (
     "date" TIMESTAMP(3),
     "homeClubId" INTEGER NOT NULL,
     "awayClubId" INTEGER NOT NULL,
+    "targetTeamId" INTEGER NOT NULL,
+    "opponentTeamId" INTEGER NOT NULL,
     "homeClubGoals" INTEGER,
     "awayClubGoals" INTEGER,
     "homeClubFormation" TEXT,
@@ -51,6 +53,7 @@ CREATE TABLE "Game" (
 CREATE TABLE "Appearance" (
     "id" SERIAL NOT NULL,
     "gameId" INTEGER NOT NULL,
+    "clubId" INTEGER NOT NULL,
     "playerId" INTEGER NOT NULL,
     "number" INTEGER,
     "type" TEXT NOT NULL,

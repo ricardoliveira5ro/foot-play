@@ -308,121 +308,114 @@ Breakdown:
 
 ### Development 2: Data Pipeline
 
+**Revision note**: Dev 2 was revised (2026-08-01) after real CSV analysis of `scripts/data/` — the seed now uses a **curated subset** approach (config-driven filter-first) instead of "seed everything then delete". Counts below are the verified example config (top-5 leagues + national comps); exact counts are config-dependent. Full detail: `docs/v0.1/dev-2-data-pipeline.md`.
+
 #### 2.2.1 Objective
 
-Download, parse, clean, and seed real football data from transfermarkt-datasets into the PostgreSQL database. By the end of this development, the database contains players, teams, competitions, matches, and appearances with cleaned display names and position mappings. Only matches with complete starting XIs (11 players) are seeded. This is the riskiest development because name cleaning scope is unknown until real data is inspected.
+Download, parse, clean, and seed a **curated subset** of transfermarkt-datasets into the PostgreSQL database. By the end of this development, the database contains exactly the clubs, national teams, players, competitions, matches, and appearances that the Missing Eleven game needs, with cleaned display names and position mappings. Seeding is filtered top-down from a configurable team/nation set (`scripts/curated-teams.json`); only matches with complete starting XIs (11 players) are seeded. This is the riskiest development because the real dataset has verified data traps (lineups reference more clubs/players than `clubs.csv`/`players.csv` contain) that the seed must handle explicitly.
 
 #### 2.2.2 Approach
 
-**Data source**: [transfermarkt-datasets](https://github.com/dcaribou/transfermarkt-datasets) — a stable, well-maintained open dataset of football transfers, matches, lineups, and player data. We download the latest CSV release and parse it.
+**Data source**: [transfermarkt-datasets](https://github.com/dcaribou/transfermarkt-datasets) — stable, weekly release (includes live WC2026 data). Verified scale: 796 clubs, 65 competitions, 88,958 games, 50,149 players, 3,178,530 lineup rows (1,780,759 starting_lineup).
 
 **Download strategy**: The `scripts/` workspace contains a TypeScript script (`download-data.ts`) that:
 
 1. Fetches the latest release archive from GitHub
-2. Extracts relevant CSVs (`players.csv`, `clubs.csv`, `games.csv`, `game_lineups.csv`, `competitions.csv`)
+2. Extracts the 6 relevant CSVs (`players.csv`, `clubs.csv`, `games.csv`, `game_lineups.csv`, `competitions.csv`, `national_teams.csv`)
 3. Caches them locally for reproducibility
 4. Validates column presence before proceeding
 
-**Name cleaning**: The critical and riskiest step. Strategy:
+`countries.csv` (confederation vocabulary mismatch), `game_events.csv`, `club_games.csv`, `appearances.csv`, `player_valuations.csv`, `transfers.csv` are **NOT needed for v1** (future minigames only — YAGNI).
 
-1. Use `last_name` as the default `display_name` for most players
-2. For players known by a single name (Pelé, Neymar), the dataset's `name` field already stores just that — use `name`
-3. For players with common short forms, build a manual override mapping seeded from `scripts/name-overrides.ts`
-4. Log all players where auto-extraction produces ambiguous results (e.g., multiple players sharing the same `last_name`) for manual review
+**Curated-set config**: `scripts/curated-teams.json` defines the teams/nations in the game: explicit `clubIds`, explicit `nationalTeamIds`, and optionally `leagueCodes` for rule-based inclusion. Exact v1 composition is an OPEN decision (user fills it later); suggested example: top-5 leagues (GB1/ES1/IT1/FR1/L1) + national comps (FIWC/EURO/COPA). "Change config → re-seed" per minigame.
 
-**Position mapping**: Convert `sub_position` values (Centre-Back, Left Winger, etc.) to tactic-board x/y coordinates. The mapping utility lives in `backend/src/services/positionMapping.ts` (used by the API) and is also used during seed to validate position data quality.
+**Name cleaning**: Verified simple — the data has a clean `first_name`/`last_name` split, no manual override map needed. Use `last_name` as `display_name`, fall back to `first_name` then `name`, and normalize diacritics via Unicode NFD + strip combining marks ("Ángel Di María" → "Angel Di Maria").
 
-**Lineup filtering algorithm**:
+**Position mapping**: Convert `sub_position` values (Centre-Back, Left Winger, etc.) to tactic-board x/y coordinates. Lives in `backend/src/services/positionMapping.ts` (used by the API).
 
-1. Load all appearances with `type = "starting_lineup"`
-2. Group by `(game_id, club_id)`
-3. Filter groups where count = 11
-4. Collect all unique `game_id` values that have at least one valid club lineup (home or away)
-5. Only seed appearances belonging to these filtered games
-6. Log excluded games with reason (count != 11, missing player references)
+**Filter chain** (filter-first — nothing invalid is ever inserted; replaces "seed everything then delete"):
 
-**Data integrity verification**: After seeding, run validation queries:
+1. Filter `clubs.csv` by curated `clubIds` → base club set.
+2. Filter `national_teams.csv` by curated `nationalTeamIds` → seeded into the same Club table (`clubId = national_team_id`; zero collisions with clubs.csv verified). 11 national teams are missing from `national_teams.csv` — fallback to `games.csv` `home_club_name`/`away_club_name`.
+3. Filter `games.csv`: keep games where `home_club_id` OR `away_club_id` ∈ (curated clubs ∪ national teams); when `leagueCodes` are configured, filter by `competition_id ∈ leagueCodes` instead.
+4. Filter `game_lineups.csv` by `game_id` ∈ kept games (both teams' lineups kept — dev-3 API needs both), then apply the full-XI filter: `starting_lineup` only, groups of 11 per `(game_id, club_id)`, keep games with ≥ 1 full-XI group.
+5. Kept clubs = all `club_id`s in kept lineups (curated + opponents); names from `clubs.csv` else `games.csv` — handles the trap that lineups reference 3,144 distinct clubs while `clubs.csv` has only 796.
+6. Filter `players.csv` by `player_id` ∈ kept lineups (lineups reference 114,893 players vs 50,149 in players.csv — missing players deferred, never block seeding).
+7. Filter competitions by `competition_id` ∈ (kept games' competition_id ∪ kept clubs' domestic_competition_id) — deliberately keeps cup + national-team competitions.
 
-- `SELECT COUNT(*) FROM matches` — should match filtered game count
-- Random match query returns 11 appearances
-- No orphaned appearance rows (every `game_id`, `club_id`, `player_id` references existing rows)
-- `display_name` is non-null for every player
+**Verified curated example** (top-5 leagues + national comps): 25,880 games → 23,464 games with ≥ 1 full XI; 46,927 full-XI groups → 516,197 appearances; 226 distinct clubs (172 in clubs.csv, 54 name-fallback); 8,988 players needed (8,967 in players.csv, 21 missing); 8 competitions.
+
+**Data integrity verification**: After seeding, run validation queries (see Task 2.5): row counts, no orphans (incl. `Appearance.clubId`), every game has ≥ 1 complete XI, chain-provenance spot-checks, and raw-vs-kept filtering stats.
 
 #### 2.2.3 Detailed Tasks
 
 ##### Task 2.1: Create data download script
 
-- **Description**: Write a TypeScript script that downloads transfermarkt-datasets CSVs, extracts them, validates column headers, and caches them in a local `data/` directory.
+- **Description**: Write a TypeScript script that downloads transfermarkt-datasets CSVs, extracts them, validates column headers, and caches them in a local `data/` directory. Extend `REQUIRED_FILES` with `national_teams.csv` (6 files total); document the not-needed files (countries.csv, game_events.csv, club_games.csv, appearances.csv, player_valuations.csv, transfers.csv).
 - **Files to create/modify**:
   - `scripts/package.json` — typescript, ts-node, axios (or node-fetch), csv-parse, adm-zip (or tar)
   - `scripts/tsconfig.json` — extends base
   - `scripts/src/download-data.ts` — download, extract, validate, cache logic
   - `.gitignore` — add `data/` (cached CSVs, not committed)
 - **Acceptance criteria**:
-  - [ ] Script downloads CSVs from GitHub release
+  - [ ] Script downloads 6 CSVs from GitHub release (incl. `national_teams.csv`)
   - [ ] Extracts and caches files to `scripts/data/`
   - [ ] Validates that all required columns exist in each CSV
   - [ ] Skips download if cached data exists (idempotent)
   - [ ] Logs progress and errors to console
-- **Validation**: `npx ts-node scripts/src/download-data.ts` completes with "Download complete" message. `ls scripts/data/` shows 5 CSV files.
+- **Validation**: `npx ts-node scripts/src/download-data.ts` completes with "Download complete" message. `ls scripts/data/` shows 6 CSV files.
 
-##### Task 2.2: Implement name cleaning utility
+##### Task 2.2: Implement display name normalization
 
-- **Description**: Create the name-cleaning logic that populates `display_name`. Default to `last_name`, with override mappings for known special cases.
+- **Description**: Create a utility that populates `display_name` using `last_name` and normalizes accents/diacritics to plain ASCII. No manual override mapping needed — verified: the CSV data already has a proper `first_name` / `last_name` split.
 - **Files to create/modify**:
-  - `scripts/src/name-cleaning.ts` — core logic + override map
-  - `scripts/src/name-overrides.ts` — seed manual override map (start with 20-30 known cases)
-- **Name override examples**:
-  ```typescript
-  const NAME_OVERRIDES: Record<string, string> = {
-    'Cristiano Ronaldo dos Santos Aveiro': 'Ronaldo',
-    'Lionel Andrés Messi Cuccittini': 'Messi',
-    'Neymar da Silva Santos Júnior': 'Neymar',
-    'Edson Arantes do Nascimento': 'Pelé',
-    // ... expanded as discovered during data inspection
-  };
-  ```
+  - `scripts/src/name-cleaning.ts` — core logic: pick `last_name`, normalize diacritics
 - **Strategy**:
-  1. Check exact match against `NAME_OVERRIDES` map by `name` (full name)
-  2. If no override found, use `last_name` as `display_name`
-  3. If `last_name` is empty, use `first_name`
-  4. If both are empty, fall back to `name`
-  5. Log all players where `display_name` is not distinct within the dataset (same `display_name` maps to multiple `name` values) for manual review
+  1. Use `last_name` as `display_name`
+  2. If `last_name` is empty, use `first_name`
+  3. If both are empty, fall back to `name`
+  4. **Normalize**: apply Unicode NFD normalization + strip combining diacritical marks. Then keep only ASCII letters ("Ángel Di María" → "Angel Di Maria")
+  5. No manual override mapping, no ambiguity logging — the data is clean enough
 - **Acceptance criteria**:
   - [ ] Every player receives a non-null `display_name`
-  - [ ] Known overrides (Messi, Ronaldo, Neymar, Pelé) are correctly applied
-  - [ ] Ambiguous cases are logged to a file for review
-  - [ ] No two players (with different `name`) share the same `display_name` after dedup logic
+  - [ ] Diacritics are removed: `"Ángel Di María"` → `"Angel Di Maria"`, `"Vitória"` → `"Vitoria"`, `"Jérémy"` → `"Jeremy"`
+  - [ ] ASCII letters and spaces are preserved unchanged
+  - [ ] `last_name` alone is sufficient for > 99% of players
 - **Validation**: Run `npx ts-node scripts/src/name-cleaning.ts` with a sample of players. Verify output.
 
-##### Task 2.3: Create Prisma seed script with lineup filtering
+##### Task 2.3: Create Prisma seed script with curated filtering
 
-- **Description**: Write the main seed script that reads CSVs, cleans names, filters complete lineups, and inserts all data via Prisma. This is the biggest task in Dev 2.
+- **Description**: Write the main seed script that loads the curated config, filters the CSVs top-down, cleans names, and inserts only the curated subset via Prisma. This is the biggest task in Dev 2.
 - **Files to create/modify**:
   - `backend/prisma/seed.ts` — main seed entry point (called by `prisma db seed`)
-  - `scripts/src/seed.ts` — or use as shared import
+  - `scripts/curated-teams.json` — curated config (composition is an open decision; seed with the suggested example)
   - `backend/package.json` — add `"prisma": { "seed": "ts-node prisma/seed.ts" }`
 - **Seed flow**:
-  1. Call download script (ensure data exists)
-  2. Parse players CSV → create Player records (with cleaned display_name)
-  3. Parse clubs CSV → create Team records
-  4. Parse competitions CSV → create Competition records (populate name + competition_id)
-  5. Parse games CSV → create Match records
-  6. Parse game_lineups CSV → filter to complete starting XIs
-  7. Filter games to only those with valid lineups
-  8. Delete matches that failed the lineup filter (clean up)
-  9. Create Appearance records for filtered lineups
-  10. Run integrity checks
+  1. Ensure CSVs are cached (invoke Task 2.1 download script if needed)
+  2. Load curated config
+  3. Filter clubs.csv by curated `clubIds`
+  4. Filter national_teams.csv by curated `nationalTeamIds` (name fallback to games.csv for missing teams)
+  5. Filter games.csv (club-based and/or competition-based per config)
+  6. Filter game_lineups.csv by `game_id`, then apply the full-XI filter
+  7. Build kept-club set from kept lineups; names from clubs.csv else games.csv
+  8. Filter players.csv by `player_id` ∈ kept lineups; apply name cleaning
+  9. Filter competitions (kept games' competition_id ∪ kept clubs' domestic_competition_id)
+  10. `createMany` batch inserts (500-1000) in dependency order: competitions → clubs → players → games → appearances
+  11. Run integrity checks
+- **Note**: The old "delete matches that failed the lineup filter" step is removed — filter-first means nothing invalid is ever inserted.
 - **Batch size**: Insert in batches of 500-1000 to avoid memory issues. Use Prisma `createMany`.
-- **Acceptance criteria**:
+- **Acceptance criteria** (counts are **config-dependent**; verified example = leagueCodes GB1/ES1/IT1/FR1/L1 + national comps FIWC/EURO/COPA):
   - [ ] `npx prisma db seed` completes within reasonable time (< 10 minutes)
-  - [ ] Players table has 37,000+ records
-  - [ ] Teams table has 10,000+ records
-  - [ ] Competitions table has records for all leagues present in the dataset
-  - [ ] Matches table has 30,000+ records (filtered from 79k — only complete XI matches)
-  - [ ] Appearances table has 700,000+ records (30k matches × ~22 appearances per match)
+  - [ ] Matches table has ~23,464 records (games with ≥ 1 full XI; 25,880 in → 23,464 out)
+  - [ ] Appearances table has ~516,197 records (46,927 full-XI groups × 11)
+  - [ ] Players table has ~8,988 records (8,967 from players.csv; 21 missing deferred)
+  - [ ] Clubs table has ~250-400 records (~226 lineup clubs + ≤ 124 national teams)
+  - [ ] Competitions table has records for all competitions referenced by kept games ∪ kept clubs' domestic competition (8 for the verified example)
   - [ ] Every player has a non-null `display_name`
-  - [ ] Every appearance references valid match, club, and player
+  - [ ] Every appearance references valid match, club, and player (incl. `clubId`)
+  - [ ] Every game has ≥ 1 complete XI (11 starting appearances for at least one club)
+  - [ ] Every seeded team/player originates from the curated chain
+  - [ ] Seed reports filtering stats (raw vs kept counts per table)
 - **Validation**: Run `npx prisma db seed`. Then run:
   - `npx prisma studio` and inspect random rows
   - SQL: `SELECT COUNT(*) FROM players`, `SELECT COUNT(*) FROM matches`
@@ -488,16 +481,36 @@ Download, parse, clean, and seed real football data from transfermarkt-datasets 
 - **Files to create/modify**:
   - `scripts/src/verify-data.ts` — integrity checks
 - **Checks**:
-  1. Row counts within expected ranges
-  2. No orphaned appearances (join checks)
-  3. Every match has at least one lineup with 11 starting players
+  1. Row counts within expected (config-dependent) ranges
+  2. No orphaned appearances (join checks, incl. `clubId`)
+  3. Every kept game has ≥ 1 full-XI lineup group (11 starting players)
   4. `display_name` uniqueness check (log duplicates)
-  5. Random spot-check: query 5 random matches, verify each has 11+ appearances
+  5. Chain-provenance spot-check: sample a few seeded club/player ids and confirm they came from the curated config closure
+  6. Report filtering stats: raw vs kept counts per table
 - **Acceptance criteria**:
   - [ ] Script reports PASS/FAIL for each check
   - [ ] All checks pass on seeded data
   - [ ] Failed checks include actionable error messages
 - **Validation**: `npx ts-node scripts/src/verify-data.ts` shows "All checks passed".
+
+##### Task 2.6: Schema amendment for curated seeding
+
+**Note on order**: Numbered 2.6 because it was added after the original plan was written, but it must be implemented **before Task 2.3's seed run** (the seed writes the new `Appearance.clubId` column).
+
+- **Description**: Bring the Dev 1 scaffold schema (as specified in `dev-1-repo-scaffold.md`) in line with the schema block above — the scaffold was missing `Appearance.clubId` and the Game↔Club relations, so appearances had no way to place a player on a team (confirmed gap). Also enable national teams to live in the Club table.
+- **Files to create/modify**:
+  - `backend/prisma/schema.prisma` — schema amendments
+  - `backend/prisma/migrations/` — new migration
+- **Amendments**:
+  1. **`Appearance.clubId` (Int) — REQUIRED**: add column + relation to Club (the board must know which team an appearance belongs to).
+  2. **Game ↔ Club relations — RECOMMENDED, optional**: `Game.homeClubId`/`awayClubId` exist but are plain Ints with no Prisma relation to Club; add optional `homeClub`/`awayClub` relations for FK integrity.
+  3. **`Club.isNationalTeam` (Boolean, optional)**: flag to distinguish national teams from clubs.
+- **Acceptance criteria**:
+  - [ ] `npx prisma migrate dev` creates and applies the migration
+  - [ ] `npx prisma generate` regenerates the client (no stale types in backend/scripts)
+  - [ ] National teams seed into Club with `clubId = national_team_id` (no collisions)
+  - [ ] Every Appearance row has a valid `clubId`
+- **Validation**: `npx prisma validate` passes; seed (Task 2.3) completes against the amended schema.
 
 #### 2.2.4 Dependencies
 
@@ -510,33 +523,36 @@ Download, parse, clean, and seed real football data from transfermarkt-datasets 
 Breakdown:
 
 - Task 2.1 (download script): 0.5 day
-- Task 2.2 (name cleaning): 1-2 days (RISK: unknown scope)
-- Task 2.3 (seed script + lineup filtering): 1.5 days
+- Task 2.2 (name normalization): 0.25 day
+- Task 2.3 (seed script + curated filtering): 1.25 days
 - Task 2.4 (position mapping): 0.25 day
 - Task 2.5 (verification): 0.25 day
-- Buffer: 0.5-1 day
+- Task 2.6 (schema amendment): 0.25 day
+- Buffer: 0.5 day
 
 #### 2.2.6 Risk Factors
 
-| Risk                                               | Likelihood | Impact | Mitigation                                                                                                              |
-| -------------------------------------------------- | ---------- | ------ | ----------------------------------------------------------------------------------------------------------------------- |
-| **Name cleaning scope larger than expected**       | **High**   | Medium | Budget 2 days. Log ambiguous cases for manual review. Seed 50+ overrides. Defer edge cases to v1.2 name override table. |
-| CSV parsing edge cases (encoding, commas in names) | Medium     | Medium | Use robust CSV parser (`csv-parse` with `relax_column_count: true`). Validate row counts after parse.                   |
-| Large dataset causes memory issues                 | Medium     | Medium | Batch inserts (500-1000 rows). Use streaming CSV parser to avoid loading all rows into memory.                          |
-| Lineup filtering eliminates too many matches       | Medium     | Medium | Test filtering logic early with a sample. Report filtering stats (e.g., "79k games → 35k valid after lineup filter").   |
-| transfermarkt-datasets schema changes              | Low        | Medium | Pin to specific release tag. Validate columns before parsing.                                                           |
+| Risk                                                                 | Likelihood | Impact | Mitigation                                                                                |
+| -------------------------------------------------------------------- | ---------- | ------ | ----------------------------------------------------------------------------------------- |
+| National teams missing from `national_teams.csv` (11 known)          | Medium     | Low    | Fallback to `games.csv` `home_club_name`/`away_club_name`. Log all fallbacks during seed. |
+| Clubs/players referenced in lineups but absent from `clubs.csv`/`players.csv` | High | Medium | Kept-club set built from lineups themselves; names from clubs.csv else games.csv. Missing players deferred (open decision), never block seeding. |
+| Curated set too small → boring/few puzzles                           | Medium     | Medium | Config is easy to extend; "change config → re-seed" per minigame.                         |
+| Name normalization scope                                             | Low        | Low    | Trivial — Unicode NFD + strip combining marks. Verified against real data.                |
+| CSV parsing edge cases (encoding, commas in names)                   | Medium     | Medium | Use robust CSV parser (`csv-parse` with `relax_column_count: true`). Validate row counts after parse. |
+| Large dataset causes memory issues                                   | Medium     | Medium | Batch inserts (500-1000 rows). Use streaming CSV parser. Filter-first keeps memory small. |
+| transfermarkt-datasets schema changes                                | Low        | Medium | Pin to specific release tag. Validate columns before parsing.                             |
 
 #### 2.2.7 "Done" Checklist
 
 - [ ] `npx prisma db seed` completes within 10 minutes
-- [ ] Database reports expected row counts (37k+ players, 10k+ teams, ~300 competitions, 30k+ matches, 700k+ appearances) — these are estimates based on the current transfermarkt-datasets release; actual counts may vary
+- [ ] Database reports the verified curated-example row counts (~23.5k matches, ~516k appearances, ~9k players, ~250-400 clubs incl. ≤ 124 national teams, ~8 competitions) — counts are config-dependent
+- [ ] `national_teams.csv` downloaded by Task 2.1 (6 CSVs cached in `scripts/data/`)
 - [ ] Every player has a non-null `display_name`
-- [ ] Known name overrides work (Messi → "Messi", Ronaldo → "Ronaldo", etc.)
-- [ ] No orphaned records (all foreign keys reference valid rows)
+- [ ] No orphaned records (all foreign keys reference valid rows, incl. Appearance.clubId)
 - [ ] Every match has at least 11 starting lineup appearances
+- [ ] Every seeded team/player originates from the curated chain
 - [ ] Position mapping covers all commonly occurring `sub_position` values
-- [ ] `scripts/src/verify-data.ts` passes all checks
-- [ ] Ambiguous names logged to file for manual override seeding
+- [ ] `scripts/src/verify-data.ts` passes all checks (incl. filtering stats)
 - [ ] All changes committed to `dev-2/*` branch
 
 ---
@@ -1858,7 +1874,7 @@ Dev 1 (Repo Scaffold & Prisma Schema)
 | Dev | New Files                                                                                                                                                                                                                                                                                                                                                                       | Modified Files                                                                            |
 | --- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------- |
 | 1   | `package.json` (root), `.eslintrc.json`, `.prettierrc`, `tsconfig.base.json`, `.gitignore`, `.env.example`, `frontend/` (scaffold), `backend/` (scaffold), `backend/prisma/schema.prisma`, `docker-compose.yml`                                                                                                                                                                 | None                                                                                      |
-| 2   | `scripts/package.json`, `scripts/tsconfig.json`, `scripts/src/download-data.ts`, `scripts/src/name-cleaning.ts`, `scripts/src/name-overrides.ts`, `backend/prisma/seed.ts`, `backend/src/services/positionMapping.ts`, `scripts/src/verify-data.ts`                                                                                                                             | `.gitignore`, `backend/package.json`                                                      |
+| 2   | `scripts/package.json`, `scripts/tsconfig.json`, `scripts/src/download-data.ts`, `scripts/src/name-cleaning.ts`, `scripts/curated-teams.json`, `backend/prisma/seed.ts`, `backend/src/services/positionMapping.ts`, `scripts/src/verify-data.ts`                                                                                                                              | `.gitignore`, `backend/package.json`, `backend/prisma/schema.prisma`, `backend/prisma/migrations/` |
 | 3   | `backend/src/middleware/errorHandler.ts`, `backend/src/middleware/logger.ts`, `backend/src/middleware/validate.ts`, `backend/src/routes/matches.ts`, `backend/src/routes/players.ts`, `backend/src/services/matchService.ts`, `backend/src/services/playerService.ts`                                                                                                           | `backend/src/index.ts`                                                                    |
 | 4   | `frontend/src/components/Layout.tsx`, `frontend/src/components/Navbar.tsx`, `frontend/src/components/Footer.tsx`, `frontend/src/types/index.ts`, `frontend/src/lib/api.ts`, `frontend/src/lib/mockData.ts`, `frontend/src/components/TacticBoard.tsx`, `frontend/src/components/Shirt.tsx`, `frontend/src/components/MatchInfo.tsx`, `frontend/src/app/missing-eleven/page.tsx` | `frontend/src/app/layout.tsx`, `frontend/src/app/page.tsx`, `frontend/tailwind.config.ts` |
 | 5   | `frontend/src/lib/wordle.ts`, `frontend/src/components/WordleModal.tsx`, `frontend/src/lib/gameState.ts`, `frontend/src/components/GameComplete.tsx`                                                                                                                                                                                                                            | `frontend/src/app/missing-eleven/page.tsx`                                                |
@@ -1875,7 +1891,7 @@ These decisions should be recorded as ADRs in `docs/decisions/` as each developm
 | ADR-001: npm workspaces for monorepo                  | Dev 1         | Core architectural choice |
 | ADR-002: Prisma schema design (internal + source IDs) | Dev 1         | Data model foundation     |
 | ADR-003: Client-side game state (localStorage)        | Dev 1         | Game state decision       |
-| ADR-004: Name display with display_name override      | Dev 2         | Player name strategy      |
+| ADR-004: Display name normalization (last_name + diacritic stripping) | Dev 2         | Player name strategy      |
 | ADR-005: Position coordinate mapping                  | Dev 2         | Tactic board placement    |
 | ADR-006: REST API design (three endpoints)            | Dev 3         | API contract              |
 | ADR-007: Wordle algorithm duplicate-letter rules      | Dev 5         | Game logic                |
