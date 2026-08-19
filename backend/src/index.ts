@@ -4,6 +4,7 @@ dotenv.config({ path: '../.env' });
 import express from 'express';
 import cors from 'cors';
 import { errorHandler } from './middleware/errorHandler';
+import { logger } from './middleware/logger';
 
 const app = express();
 const port = process.env.BACKEND_PORT ? parseInt(process.env.BACKEND_PORT, 10) : 4000;
@@ -11,6 +12,7 @@ const port = process.env.BACKEND_PORT ? parseInt(process.env.BACKEND_PORT, 10) :
 // Middleware
 app.use(cors());
 app.use(express.json());
+app.use(logger);
 
 // Health check
 app.get('/api/health', (_req, res) => {
