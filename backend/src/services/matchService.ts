@@ -32,6 +32,20 @@ export async function getRandomMatch(): Promise<GameWithRelations | null> {
   return game as GameWithRelations | null;
 }
 
+export async function getMatchById(id: number) {
+  const game = await prisma.game.findUnique({
+    where: { id: id },
+    include: {
+      competition: true,
+      homeClub: true,
+      awayClub: true,
+      appearances: { include: { player: true } },
+    },
+  })
+
+  return game as GameWithRelations | null;
+}
+
 export function buildMatchResponse(game: GameWithRelations) {
   return {
     match: {
