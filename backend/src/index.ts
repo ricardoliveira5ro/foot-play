@@ -5,6 +5,7 @@ import express from 'express';
 import cors from 'cors';
 import { errorHandler } from './middleware/errorHandler';
 import { logger } from './middleware/logger';
+import matchesRouter from './routes/matches';
 
 const app = express();
 const port = process.env.BACKEND_PORT ? parseInt(process.env.BACKEND_PORT, 10) : 4000;
@@ -18,6 +19,9 @@ app.use(logger);
 app.get('/api/health', (_req, res) => {
   res.json({ status: 'ok' });
 });
+
+// API routes
+app.use('/api/matches', matchesRouter);
 
 // 404 catch-all Unknown routes
 app.use((_req, res) => res.status(404).json({ error: 'Not found', code: 'NOT_FOUND' }));
