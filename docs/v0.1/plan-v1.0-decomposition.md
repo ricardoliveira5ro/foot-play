@@ -154,6 +154,7 @@ Create the monorepo foundation that all future development builds upon. By the e
     appearances     Appearance[]
 
     @@map("players")
+    @@index([name])
   }
 
   model Team {
@@ -184,6 +185,8 @@ Create the monorepo foundation that all future development builds upon. By the e
     season          String?
     date            DateTime
     homeClubId      Int           @map("home_club_id")
+    targetTeamId    Int           @map("target_team_id")
+    opponentTeamId  Int           @map("opponent_team_id")
     awayClubId      Int           @map("away_club_id")
     homeClubGoals   Int?          @map("home_club_goals")
     awayClubGoals   Int?          @map("away_club_goals")
