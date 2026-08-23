@@ -6,7 +6,7 @@ import { getPlayers } from "../services/playerService";
 const router = Router();
 
 router.get('/', asyncHandler(async (req, res) => {
-  const validation = validateStringParam('name', req.query.name, { minLength: 2 });
+  const validation = validateStringParam('name', req.query.name, { minLength: 3 });
 
   if (typeof validation === 'object' && validation !== null && 'error' in validation) {
     return res.status(400).json(validation);
