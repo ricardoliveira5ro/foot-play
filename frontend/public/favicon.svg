@@ -1,0 +1,8 @@
+<svg width="64" height="64" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- Outer ring — turf -->
+  <circle cx="32" cy="32" r="28" stroke="#17603C" stroke-width="4" fill="none"/>
+  <!-- Inner ring — chalk line -->
+  <circle cx="32" cy="32" r="22" stroke="#F8FAF8" stroke-width="2.5" fill="none" stroke-opacity="0.9"/>
+  <!-- Centre spot — flare -->
+  <circle cx="32" cy="32" r="6" fill="#E8590C"/>
+</svg>
