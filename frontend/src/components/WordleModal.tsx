@@ -373,11 +373,7 @@ export default function WordleModal({
                   : tile.result
                   ? getResultBg(tile.result)
                   : 'var(--color-paper)';
-                const borderColor = tile.isCurrentRow && tile.isEmpty
-                  ? 'var(--color-ink/20)'
-                  : tile.isCurrentRow && !tile.isEmpty
-                  ? 'var(--color-ink/40)'
-                  : 'transparent';
+                const borderColor = tile.isCurrentRow ? 'var(--color-ink)' : 'transparent';
                 const textColor = isRevealed || isRevealRow
                   ? 'var(--color-chalk)'
                   : tile.letter
