@@ -2,6 +2,8 @@
 
 import type { CSSProperties } from 'react';
 import type { ShirtData, ShirtState } from '@/types';
+import type { GuessResult } from '@/lib/wordle';
+import { getCorrectLetters } from '@/lib/wordle';
 
 const SHIRT_PATH =
   'M20 8 L8 16 L14 28 L20 24 V56 H44 V24 L50 28 L56 16 L44 8 C41 12 37 14 32 14 C27 14 23 12 20 8 Z';
@@ -11,12 +13,8 @@ interface ShirtProps {
   /** Squad index, used to stagger the entrance animation. */
   index: number;
   onClick?: (playerId: number) => void;
-}
-
-/** Surname used for the in-progress letter slots (demo feedback). */
-function surnameOf(displayName: string): string {
-  const parts = displayName.trim().split(/\s+/);
-  return parts[parts.length - 1] ?? displayName;
+  /** Guess history for this shirt (used for LetterSlots preview) */
+  guessHistory?: GuessResult[][];
 }
 
 /** State-aware accessible name for the shirt button. */
@@ -38,19 +36,42 @@ function shirtAriaLabel(
   }
 }
 
-function LetterSlots({ name }: { name: string }) {
-  const target = surnameOf(name).slice(0, 12);
+function LetterSlots({
+  displayName,
+  guessHistory,
+}: {
+  displayName: string;
+  guessHistory?: GuessResult[][];
+}) {
+  const correctLetters = guessHistory
+    ? getCorrectLetters(guessHistory, displayName)
+    : [];
+
+  // If no guess history, show placeholder dots
+  if (correctLetters.every(l => l === null)) {
+    const len = displayName
+      .toLowerCase()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/[\s\-']/g, '').length;
+    return (
+      <span aria-hidden="true" className="font-mono text-xs tracking-[0.15em]">
+        {[...Array(Math.min(len, 12))].map((_, i) => (
+          <span key={i} className="text-ink/30">·</span>
+        ))}
+      </span>
+    );
+  }
+
   return (
     <span aria-hidden="true" className="font-mono text-xs tracking-[0.15em]">
-      {[...target].map((char, i) =>
-        i === 0 ? (
+      {correctLetters.slice(0, 12).map((letter, i) =>
+        letter ? (
           <span key={i} className="font-semibold text-correct">
-            {char.toUpperCase()}
+            {letter}
           </span>
         ) : (
-          <span key={i} className="text-ink/30">
-            ·
-          </span>
+          <span key={i} className="text-ink/30">·</span>
         ),
       )}
     </span>
@@ -88,7 +109,7 @@ function StateBadge({ state }: { state: Extract<ShirtState, 'correct' | 'failed'
  * Four states: default → in-progress → correct → failed.
  * The whole unit is a button with an expanded (>=44px) hit area.
  */
-export default function Shirt({ shirt, index, onClick }: ShirtProps) {
+export default function Shirt({ shirt, index, onClick, guessHistory }: ShirtProps) {
   const { playerId, displayName, shirtNumber, coords, state } = shirt;
 
   return (
@@ -135,7 +156,9 @@ export default function Shirt({ shirt, index, onClick }: ShirtProps) {
       {state !== 'default' && (
         <div className="pointer-events-none absolute left-1/2 top-full z-10 mt-1 max-w-[140px] -translate-x-1/2">
           <div className="inline-block max-w-full truncate rounded-md bg-paper px-2 py-1 shadow-sm">
-            {state === 'in-progress' && <LetterSlots name={displayName} />}
+            {state === 'in-progress' && (
+              <LetterSlots displayName={displayName} guessHistory={guessHistory} />
+            )}
             {state === 'correct' && (
               <span className="text-[13px] font-semibold text-ink">{displayName}</span>
             )}

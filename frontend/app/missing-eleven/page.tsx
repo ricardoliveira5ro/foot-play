@@ -151,7 +151,9 @@ export default function MissingElevenPage() {
     (state.teamSide === 'home' ? state.match.match.homeClub?.name : state.match.match.awayClub?.name) ?? 'Unknown team';
   const shirts: ShirtData[] = lineup.map((entry) => {
     const existing = state.shirts.find(s => s.playerId === entry.playerId);
-    return existing ? { ...entry, state: existing.state } : { ...entry, state: 'default' as const };
+    return existing
+      ? { ...entry, state: existing.state, guessHistory: existing.guessHistory }
+      : { ...entry, state: 'default' as const, guessHistory: [] };
   });
 
   return (

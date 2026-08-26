@@ -1,7 +1,8 @@
 'use client';
 
-import { useEffect, useRef, useState, useCallback } from 'react';
+import { useEffect, useRef, useState, useCallback, useMemo } from 'react';
 import type { GuessResult } from '@/lib/wordle';
+import { normalize } from '@/lib/wordle';
 
 interface WordleModalProps {
   /** The player's display name (target to guess) */
@@ -59,6 +60,56 @@ function getResultBg(result: GuessResult['result']): string {
   }
 }
 
+// --- On-screen keyboard ---
+
+const KEYBOARD_ROWS = [
+  ['Q', 'W', 'E', 'R', 'T', 'Y', 'U', 'I', 'O', 'P'],
+  ['A', 'S', 'D', 'F', 'G', 'H', 'J', 'K', 'L'],
+  ['Enter', 'Z', 'X', 'C', 'V', 'B', 'N', 'M', 'Backspace'],
+];
+
+type KeyState = 'unused' | 'correct' | 'present' | 'absent';
+
+const KEY_STATE_PRIORITY: Record<KeyState, number> = {
+  unused: 0,
+  absent: 1,
+  present: 2,
+  correct: 3,
+};
+
+function getKeyStates(guesses: GuessResult[][]): Map<string, KeyState> {
+  const states = new Map<string, KeyState>();
+
+  for (const guess of guesses) {
+    for (const { letter, result } of guess) {
+      if (!letter) continue;
+      const key = letter.toUpperCase();
+      const newState: KeyState = result;
+      const current = states.get(key) ?? 'unused';
+      if (KEY_STATE_PRIORITY[newState] > KEY_STATE_PRIORITY[current]) {
+        states.set(key, newState);
+      }
+    }
+  }
+
+  return states;
+}
+
+function getKeyStyle(state: KeyState): React.CSSProperties {
+  switch (state) {
+    case 'correct':
+      return { backgroundColor: 'var(--color-correct)', color: 'var(--color-chalk)' };
+    case 'present':
+      return { backgroundColor: '#E8A00C', color: 'var(--color-chalk)' };
+    case 'absent':
+      return { backgroundColor: '#374151', color: 'var(--color-chalk)' };
+    default:
+      return { backgroundColor: 'var(--color-ink/10)', color: 'var(--color-ink)' };
+  }
+}
+
+// --- Main component ---
+
 export default function WordleModal({
   targetName,
   shirtNumber,
@@ -70,123 +121,189 @@ export default function WordleModal({
   isGameOver = false,
   isCorrect = false,
 }: WordleModalProps) {
-  const inputRef = useRef<HTMLInputElement>(null);
+  const gridRef = useRef<HTMLDivElement>(null);
   const [inputValue, setInputValue] = useState('');
   const [inputError, setInputError] = useState<string | null>(null);
   const [shakeKey, setShakeKey] = useState(0);
 
-  const targetLength = targetName
-    .toLowerCase()
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .replace(/[\s\-']/g, '').length;
+  const targetLength = useMemo(
+    () => normalize(targetName).length,
+    [targetName],
+  );
   const attemptNumber = guesses.length;
   const canSubmit = inputValue.length === targetLength && !isGameOver;
+  const keyStates = useMemo(() => getKeyStates(guesses), [guesses]);
 
-  // Auto-focus input on mount
+  // Auto-focus grid on mount
   useEffect(() => {
-    inputRef.current?.focus();
+    gridRef.current?.focus();
   }, []);
 
-  // Handle input change - only allow letters, uppercase display
-  const handleInputChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-    const value = e.target.value.toUpperCase().replace(/[^A-Z]/g, '');
-    const truncated = value.slice(0, targetLength);
-    setInputValue(truncated);
-    setInputError(null);
-  }, [targetLength]);
-
-  // Handle form submit
-  const handleSubmit = useCallback((e: React.FormEvent) => {
-    e.preventDefault();
-    if (!canSubmit) {
-      // Trigger shake animation
-      setShakeKey(k => k + 1);
-      if (inputValue.length !== targetLength) {
-        setInputError(`Enter ${targetLength} letters`);
+  // Handle physical keyboard input
+  const handleKeyDown = useCallback(
+    (e: React.KeyboardEvent) => {
+      if (isGameOver) {
+        if (e.key === 'Escape') onClose();
+        return;
       }
-      return;
-    }
-    onGuess(inputValue);
-    setInputValue('');
-  }, [canSubmit, inputValue, onGuess, targetLength]);
 
-  // Handle key down for Enter
-  const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
-    if (e.key === 'Enter' && canSubmit) {
-      handleSubmit(e);
-    } else if (e.key === 'Escape') {
-      onClose();
-    }
-  }, [canSubmit, handleSubmit, onClose]);
+      if (e.key === 'Escape') {
+        onClose();
+        return;
+      }
+
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        if (inputValue.length === targetLength) {
+          onGuess(inputValue);
+          setInputValue('');
+          setInputError(null);
+        } else {
+          setShakeKey(k => k + 1);
+          setInputError(`Enter ${targetLength} letters`);
+        }
+        return;
+      }
+
+      if (e.key === 'Backspace') {
+        e.preventDefault();
+        setInputValue(v => v.slice(0, -1));
+        setInputError(null);
+        return;
+      }
+
+      // Only accept single letters A-Z
+      if (/^[a-zA-Z]$/.test(e.key)) {
+        e.preventDefault();
+        setInputValue(v => {
+          if (v.length >= targetLength) return v;
+          return v + e.key.toUpperCase();
+        });
+        setInputError(null);
+      }
+    },
+    [isGameOver, onClose, inputValue, targetLength, onGuess],
+  );
 
   // Handle overlay click to close
-  const handleOverlayClick = useCallback((e: React.MouseEvent) => {
-    if (e.target === e.currentTarget) {
-      onClose();
+  const handleOverlayClick = useCallback(
+    (e: React.MouseEvent) => {
+      if (e.target === e.currentTarget) onClose();
+    },
+    [onClose],
+  );
+
+  // Handle on-screen keyboard press
+  const handleKeyPress = useCallback(
+    (key: string) => {
+      if (isGameOver) return;
+
+      if (key === 'Enter') {
+        if (inputValue.length === targetLength) {
+          onGuess(inputValue);
+          setInputValue('');
+          setInputError(null);
+        } else {
+          setShakeKey(k => k + 1);
+          setInputError(`Enter ${targetLength} letters`);
+        }
+        return;
+      }
+
+      if (key === 'Backspace') {
+        setInputValue(v => v.slice(0, -1));
+        setInputError(null);
+        return;
+      }
+
+      // Single letter
+      if (inputValue.length < targetLength) {
+        setInputValue(v => v + key);
+        setInputError(null);
+      }
+    },
+    [isGameOver, inputValue, targetLength, onGuess],
+  );
+
+  // Build the grid rows
+  const gridRows = useMemo(() => {
+    const rows: {
+      key: string;
+      tiles: {
+        letter: string | null;
+        result: GuessResult['result'] | null;
+        isCurrentRow: boolean;
+        isEmpty: boolean;
+        isReveal?: boolean;
+      }[];
+    }[] = [];
+
+    // Previous guess rows
+    for (let r = 0; r < guesses.length; r++) {
+      const guess = guesses[r];
+      rows.push({
+        key: `guess-${r}`,
+        tiles: guess.map((g) => ({
+          letter: g.letter,
+          result: g.result,
+          isCurrentRow: false,
+          isEmpty: false,
+        })),
+      });
     }
-  }, [onClose]);
 
-  // Render a single letter box in the feedback grid
-  const renderLetterBox = (result: GuessResult, index: number) => {
-    const bg = getResultBg(result.result);
-    const isRevealed = index < attemptNumber || (isGameOver && index === attemptNumber);
+    // Current typing row (if not game over and attempts remain)
+    if (!isGameOver && attemptNumber < maxAttempts) {
+      const tiles: {
+        letter: string | null;
+        result: GuessResult['result'] | null;
+        isCurrentRow: boolean;
+        isEmpty: boolean;
+      }[] = [];
+      for (let i = 0; i < targetLength; i++) {
+        tiles.push({
+          letter: inputValue[i] ?? null,
+          result: null,
+          isCurrentRow: true,
+          isEmpty: !inputValue[i],
+        });
+      }
+      rows.push({
+        key: `current-${attemptNumber}`,
+        tiles,
+      });
+    }
 
-    return (
-      <div
-        key={`${index}-${result.letter}`}
-        className="relative flex h-10 w-10 items-center justify-center font-mono font-semibold text-[18px] select-none"
-        style={{
-          backgroundColor: isRevealed ? bg : 'var(--color-paper)',
-          borderColor: isRevealed ? 'transparent' : 'var(--color-ink/20)',
-          color: isRevealed ? 'var(--color-chalk)' : 'var(--color-ink)',
-          borderWidth: '2px',
-          borderStyle: 'solid',
-          borderRadius: '6px',
-          transition: 'all 150ms ease-out',
-          animation: isRevealed && index === attemptNumber - 1 ? 'flip-in 300ms ease-out' : 'none',
-        }}
-        aria-label={`${result.letter}, ${result.result}`}
-      >
-        {isRevealed && result.letter}
-      </div>
-    );
-  };
+    // Remaining empty rows
+    const filledRows = guesses.length + (isGameOver ? 0 : 1);
+    for (let r = filledRows; r < maxAttempts; r++) {
+      rows.push({
+        key: `empty-${r}`,
+        tiles: Array.from({ length: targetLength }, () => ({
+          letter: null,
+          result: null,
+          isCurrentRow: false,
+          isEmpty: true,
+        })),
+      });
+    }
 
-  // Render a row of letter boxes for a guess
-  const renderGuessRow = (guess: GuessResult[], rowIndex: number) => (
-    <div
-      key={rowIndex}
-      className="flex items-center justify-center gap-1.5"
-      style={{ animationDelay: `${rowIndex * 60}ms` }}
-    >
-      {guess.map((result, i) => renderLetterBox(result, i))}
-    </div>
-  );
+    // Game over reveal row
+    if (isGameOver && attemptNumber < maxAttempts) {
+      rows.push({
+        key: `reveal-${attemptNumber}`,
+        tiles: targetName.split('').slice(0, targetLength).map((char) => ({
+          letter: char.toUpperCase(),
+          result: null as GuessResult['result'] | null,
+          isCurrentRow: false,
+          isEmpty: false,
+          isReveal: true,
+        })),
+      });
+    }
 
-  // Render empty row placeholders
-  const renderEmptyRow = (rowIndex: number) => (
-    <div
-      key={`empty-${rowIndex}`}
-      className="flex items-center justify-center gap-1.5"
-      style={{ animationDelay: `${rowIndex * 60}ms` }}
-    >
-      {[...Array(targetLength)].map((_, i) => (
-        <div
-          key={i}
-          className="h-10 w-10 font-mono font-semibold text-[18px]"
-          style={{
-            backgroundColor: 'var(--color-paper)',
-            border: '2px solid var(--color-ink/15)',
-            borderRadius: '6px',
-            color: 'var(--color-ink/30)',
-          }}
-        >
-          {'\u00A0'}
-        </div>
-      ))}
-    </div>
-  );
+    return rows;
+  }, [guesses, inputValue, attemptNumber, targetLength, maxAttempts, isGameOver, targetName]);
 
   return (
     <div
@@ -234,98 +351,132 @@ export default function WordleModal({
           </button>
         </header>
 
-        {/* Feedback grid */}
-        <div className="p-4 pb-2 flex flex-col items-center gap-1.5">
-          {/* Previous guesses */}
-          {guesses.map((guess, i) => renderGuessRow(guess, i))}
+        {/* Grid */}
+        <div
+          ref={gridRef}
+          tabIndex={0}
+          onKeyDown={handleKeyDown}
+          className="p-4 pb-2 flex flex-col items-center gap-1.5 outline-none"
+          role="group"
+          aria-label="Guessing grid"
+        >
+          {gridRows.map((row) => (
+            <div
+              key={row.key}
+              className="flex items-center justify-center gap-1.5"
+            >
+              {row.tiles.map((tile, i) => {
+                const isRevealed = tile.result !== null || tile.isReveal;
+                const isRevealRow = tile.isReveal;
+                const bg = isRevealRow
+                  ? (isCorrect ? 'var(--color-correct)' : 'var(--color-failed)')
+                  : tile.result
+                  ? getResultBg(tile.result)
+                  : 'var(--color-paper)';
+                const borderColor = tile.isCurrentRow && tile.isEmpty
+                  ? 'var(--color-ink/20)'
+                  : tile.isCurrentRow && !tile.isEmpty
+                  ? 'var(--color-ink/40)'
+                  : 'transparent';
+                const textColor = isRevealed || isRevealRow
+                  ? 'var(--color-chalk)'
+                  : tile.letter
+                  ? 'var(--color-ink)'
+                  : 'transparent';
 
-          {/* Current guess (if in progress and not game over) */}
-          {!isGameOver && attemptNumber < maxAttempts && (
-            <div className="flex items-center justify-center gap-1.5" style={{ animationDelay: `${attemptNumber * 60}ms` }}>
-              {[...Array(targetLength)].map((_, i) => (
-                <div
-                  key={`current-${i}`}
-                  className="relative h-10 w-10 font-mono font-semibold text-[18px]"
-                  style={{
-                    backgroundColor: 'var(--color-paper)',
-                    border: '2px solid var(--color-ink/20)',
-                    borderRadius: '6px',
-                    color: 'var(--color-ink)',
-                    transition: 'border-color 150ms',
-                  }}
-                >
-                  {inputValue[i] && (
-                    <span className="absolute inset-0 flex items-center justify-center">{inputValue[i]}</span>
-                  )}
-                </div>
-              ))}
+                return (
+                  <div
+                    key={`${row.key}-${i}`}
+                    className="relative flex h-10 w-10 items-center justify-center font-mono font-semibold text-[18px] select-none"
+                    style={{
+                      backgroundColor: bg,
+                      borderWidth: '2px',
+                      borderStyle: 'solid',
+                      borderColor: isRevealed || isRevealRow ? 'transparent' : borderColor,
+                      borderRadius: '6px',
+                      color: textColor,
+                      transition: 'all 150ms ease-out',
+                      animation: isRevealed && row.key.startsWith('guess-')
+                        ? `flip-in 300ms ease-out ${i * 50}ms both`
+                        : isRevealRow
+                        ? `flip-in 300ms ease-out ${i * 50}ms both`
+                        : 'none',
+                    }}
+                    aria-label={
+                      tile.letter
+                        ? `${tile.letter}${tile.result ? `, ${tile.result}` : ''}`
+                        : 'empty'
+                    }
+                  >
+                    {tile.letter}
+                  </div>
+                );
+              })}
             </div>
-          )}
+          ))}
 
-          {/* Remaining empty rows */}
-          {[...Array(maxAttempts - guesses.length - (isGameOver ? 0 : 1))].map((_, i) =>
-            renderEmptyRow(guesses.length + (isGameOver ? 0 : 1) + i)
-          )}
-
-          {/* Game over reveal row */}
-          {isGameOver && attemptNumber < maxAttempts && (
-            <div className="flex items-center justify-center gap-1.5" style={{ animationDelay: `${attemptNumber * 60}ms` }}>
-              {targetName.split('').map((char, i) => (
-                <div
-                  key={`reveal-${i}`}
-                  className="h-10 w-10 font-mono font-semibold text-[18px] flex items-center justify-center"
-                  style={{
-                    backgroundColor: isCorrect ? 'var(--color-correct)' : 'var(--color-failed)',
-                    borderRadius: '6px',
-                    color: 'var(--color-chalk)',
-                    animation: 'flip-in 300ms ease-out',
-                    animationDelay: `${i * 50}ms`,
-                    animationFillMode: 'both',
-                  }}
-                >
-                  {char.toUpperCase()}
-                </div>
-              ))}
-            </div>
+          {/* Error message */}
+          {inputError && (
+            <p className="text-xs text-failed mt-1" role="alert">
+              {inputError}
+            </p>
           )}
         </div>
 
-        {/* Input area */}
-        <form onSubmit={handleSubmit} className="p-4 border-t border-ink/10">
-          <div className="relative mb-3">
-            <input
-              ref={inputRef}
-              type="text"
-              value={inputValue}
-              onChange={handleInputChange}
-              onKeyDown={handleKeyDown}
-              maxLength={targetLength}
-              disabled={isGameOver}
-              autoComplete="off"
-              spellCheck={false}
-              className={`w-full h-12 px-4 text-center font-mono text-[24px] uppercase tracking-[0.2em] rounded-lg border-2 transition-colors ${
-                isGameOver
-                  ? 'bg-ink/5 text-ink/40 cursor-not-allowed border-ink/10'
-                  : 'bg-paper text-ink border-ink/20 focus:border-flare focus:outline-none focus:ring-2 focus:ring-flare/20'
-              } ${inputError ? 'border-failed' : ''}`}
-              placeholder={targetLength > 0 ? Array(targetLength).fill('·').join(' ') : ''}
-              aria-label={`Enter ${targetLength} letter guess`}
-              aria-invalid={!!inputError}
-              aria-describedby={inputError ? 'input-error' : undefined}
-            />
-            {inputError && (
-              <p id="input-error" className="absolute -bottom-5 left-0 text-xs text-failed" role="alert">
-                {inputError}
-              </p>
-            )}
-          </div>
+        {/* On-screen keyboard */}
+        <div className="px-4 pb-3 flex flex-col items-center gap-1.5">
+          {KEYBOARD_ROWS.map((row, ri) => (
+            <div key={ri} className="flex gap-1.5">
+              {row.map((key) => {
+                const isWide = key === 'Enter' || key === 'Backspace';
+                const label = key === 'Backspace' ? '⌫' : key === 'Enter' ? '↵' : key;
+                const state = keyStates.get(key) ?? 'unused';
 
+                return (
+                  <button
+                    key={key}
+                    type="button"
+                    onClick={() => handleKeyPress(key)}
+                    disabled={isGameOver}
+                    className="flex items-center justify-center rounded-md font-mono font-semibold text-sm transition-all active:scale-95 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-flare disabled:opacity-50 disabled:cursor-not-allowed"
+                    style={{
+                      ...getKeyStyle(state),
+                      height: '42px',
+                      minWidth: isWide ? '56px' : '34px',
+                      padding: isWide ? '0 8px' : '0 4px',
+                    }}
+                    aria-label={key === 'Backspace' ? 'Delete' : key === 'Enter' ? 'Submit' : key}
+                  >
+                    {label}
+                  </button>
+                );
+              })}
+            </div>
+          ))}
+        </div>
+
+        {/* Action buttons */}
+        <div className="px-4 pb-4">
           <div className="flex items-center justify-between gap-3">
             <button
-              type="submit"
-              disabled={!canSubmit}
+              type="button"
+              onClick={() => {
+                if (canSubmit) {
+                  onGuess(inputValue);
+                  setInputValue('');
+                  setInputError(null);
+                } else {
+                  setShakeKey(k => k + 1);
+                  if (inputValue.length !== targetLength) {
+                    setInputError(`Enter ${targetLength} letters`);
+                  }
+                }
+              }}
+              disabled={isGameOver || !canSubmit}
               className={`flex-1 h-11 rounded-lg font-sans font-semibold text-sm transition-all focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-flare ${
-                canSubmit
+                isGameOver
+                  ? 'bg-ink/10 text-ink/40 cursor-not-allowed'
+                  : canSubmit
                   ? 'bg-ink text-chalk hover:bg-flare active:scale-[0.98]'
                   : 'bg-ink/10 text-ink/40 cursor-not-allowed'
               }`}
@@ -343,7 +494,7 @@ export default function WordleModal({
               </button>
             )}
           </div>
-        </form>
+        </div>
       </div>
 
       {/* Global styles for animations */}

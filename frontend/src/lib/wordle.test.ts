@@ -2,7 +2,7 @@
  * Test cases for the Wordle algorithm
  */
 
-import { evaluateGuess, isCorrectGuess, getTargetLength, normalize } from './wordle';
+import { evaluateGuess, isCorrectGuess, getTargetLength, normalize, getCorrectLetters } from './wordle';
 
 function assertEqual<T>(actual: T, expected: T, message: string): void {
   const actualStr = JSON.stringify(actual);
@@ -159,5 +159,48 @@ assertTrue(isCorrectGuess('messi', 'Messi'), 'isCorrectGuess: case insensitive')
 assertTrue(isCorrectGuess('Pele', 'Pelé'), 'isCorrectGuess: diacritics');
 assertFalse(isCorrectGuess('Messi', 'Ronaldo'), 'isCorrectGuess: different names');
 assertFalse(isCorrectGuess('Mess', 'Messi'), 'isCorrectGuess: too short');
+
+// --- getCorrectLetters tests ---
+console.log('\n--- getCorrectLetters tests ---');
+
+// No guesses → all null
+assertEqual(
+  getCorrectLetters([], 'RAFAEL'),
+  [null, null, null, null, null, null],
+  'getCorrectLetters: no guesses returns all null'
+);
+
+// One wrong guess → all null
+const wrongGuess1 = evaluateGuess('ALEXIS', 'RAFAEL');
+assertEqual(
+  getCorrectLetters([wrongGuess1], 'RAFAEL'),
+  [null, null, null, null, null, null],
+  'getCorrectLetters: wrong guess returns all null'
+);
+
+// One correct guess → all filled
+const correctGuess = evaluateGuess('RAFAEL', 'RAFAEL');
+assertEqual(
+  getCorrectLetters([correctGuess], 'RAFAEL'),
+  ['R', 'A', 'F', 'A', 'E', 'L'],
+  'getCorrectLetters: correct guess fills all'
+);
+
+// Partial correct → mix of letters and null
+const partialGuess = evaluateGuess('RFAELI', 'RAFAEL');
+assertEqual(
+  getCorrectLetters([partialGuess], 'RAFAEL'),
+  ['R', null, null, null, null, null],
+  'getCorrectLetters: only correct positions filled'
+);
+
+// Multiple guesses → accumulates correct letters
+const guess1 = evaluateGuess('ALEXIS', 'RAFAEL');
+const guess2 = evaluateGuess('RAFAEL', 'RAFAEL');
+assertEqual(
+  getCorrectLetters([guess1, guess2], 'RAFAEL'),
+  ['R', 'A', 'F', 'A', 'E', 'L'],
+  'getCorrectLetters: accumulates across guesses'
+);
 
 console.log('\n✅ All tests passed!');

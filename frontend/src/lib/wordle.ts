@@ -112,3 +112,27 @@ export function isCorrectGuess(guess: string, target: string): boolean {
 export function getTargetLength(target: string): number {
   return normalize(target).length;
 }
+
+/**
+ * Extract correct-position letters from guess history.
+ * Returns an array of length normalize(target).length with:
+ * - The letter (uppercase) if any guess marked that position as 'correct'
+ * - null if no guess has correctly identified that position
+ */
+export function getCorrectLetters(
+  guesses: GuessResult[][],
+  target: string,
+): (string | null)[] {
+  const len = getTargetLength(target);
+  const result: (string | null)[] = new Array(len).fill(null);
+
+  for (const guess of guesses) {
+    for (let i = 0; i < Math.min(guess.length, len); i++) {
+      if (guess[i].result === 'correct' && guess[i].letter) {
+        result[i] = guess[i].letter.toUpperCase();
+      }
+    }
+  }
+
+  return result;
+}

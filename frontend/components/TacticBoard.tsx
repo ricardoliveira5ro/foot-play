@@ -21,7 +21,7 @@ export default function TacticBoard({ teamName, formation, shirts, onShirtClick 
       </div>
       <Pitch>
         {shirts.map((shirt, index) => (
-          <Shirt key={shirt.playerId} shirt={shirt} index={index} onClick={onShirtClick} />
+          <Shirt key={shirt.playerId} shirt={shirt} index={index} onClick={onShirtClick} guessHistory={shirt.guessHistory} />
         ))}
       </Pitch>
     </section>
