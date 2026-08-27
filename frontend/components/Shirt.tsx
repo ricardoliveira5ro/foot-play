@@ -126,9 +126,7 @@ export default function Shirt({ shirt, index, onClick, guessHistory }: ShirtProp
         type="button"
         onClick={onClick ? () => onClick(playerId) : undefined}
         aria-label={shirtAriaLabel(state, shirtNumber, displayName)}
-        className={`-m-2 block w-[calc(100%+1rem)] rounded-md p-2 transition-[transform,filter] duration-150 ease-out hover:-translate-y-0.5 hover:drop-shadow-[0_4px_6px_rgba(16,24,32,0.35)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-flare ${
-          state === 'in-progress' ? 'ring-2 ring-flare ring-offset-2 ring-offset-transparent' : ''
-        } ${state === 'failed' ? 'opacity-60 saturate-[0.6]' : ''}`}
+        className={`-m-2 block w-[calc(100%+1rem)] rounded-md p-2 transition-[transform,filter] duration-150 ease-out hover:-translate-y-0.5 hover:drop-shadow-[0_4px_6px_rgba(16,24,32,0.35)] ${state === 'failed' ? 'opacity-60 saturate-[0.6]' : ''}`}
       >
         {/* Inner wrapper carries the entrance animation so positional and
             hover transforms on the button are never overridden. */}
@@ -153,21 +151,19 @@ export default function Shirt({ shirt, index, onClick, guessHistory }: ShirtProp
       </button>
 
       {/* Tag below the shirt — absolutely positioned so it never shifts neighbors. */}
-      {state !== 'default' && (
-        <div className="pointer-events-none absolute left-1/2 top-full z-10 mt-1 max-w-[140px] -translate-x-1/2">
-          <div className="inline-block max-w-full truncate rounded-md bg-paper px-2 py-1 shadow-sm">
-            {state === 'in-progress' && (
-              <LetterSlots displayName={displayName} guessHistory={guessHistory} />
-            )}
-            {state === 'correct' && (
-              <span className="text-[13px] font-semibold text-ink">{displayName}</span>
-            )}
-            {state === 'failed' && (
-              <span className="text-[13px] font-semibold text-failed">{displayName}</span>
-            )}
-          </div>
+      <div className="pointer-events-none absolute left-1/2 top-full z-10 mt-1 max-w-[140px] -translate-x-1/2">
+        <div className="inline-block max-w-full truncate rounded-md bg-paper px-2 py-1 shadow-sm">
+          {(state === 'default' || state === 'in-progress') && (
+            <LetterSlots displayName={displayName} guessHistory={guessHistory} />
+          )}
+          {state === 'correct' && (
+            <span className="text-[13px] font-semibold text-ink">{displayName}</span>
+          )}
+          {state === 'failed' && (
+            <span className="text-[13px] font-semibold text-failed">{displayName}</span>
+          )}
         </div>
-      )}
+      </div>
     </div>
   );
 }
