@@ -188,10 +188,10 @@ export default function Shirt({ shirt, index, onClick, guessHistory }: ShirtProp
             <LetterSlots displayName={displayName} guessHistory={guessHistory} />
           )}
           {state === 'correct' && (
-            <span className="block max-w-[140px] truncate text-[13px] font-semibold text-ink">{displayName}</span>
+            <span className="block max-w-35 truncate text-[13px] font-semibold text-ink">{displayName}</span>
           )}
           {state === 'failed' && (
-            <span className="block max-w-[140px] truncate text-[13px] font-semibold text-failed">{displayName}</span>
+            <span className="block max-w-35 truncate text-[13px] font-semibold text-failed">{displayName}</span>
           )}
         </div>
       </div>
