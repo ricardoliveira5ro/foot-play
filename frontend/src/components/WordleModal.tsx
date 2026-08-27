@@ -131,6 +131,25 @@ export default function WordleModal({
     [targetName],
   );
   const attemptNumber = guesses.length;
+
+  // Compute word boundary indices in the normalized string
+  const wordBoundaries = useMemo(() => {
+    const boundaries: number[] = [];
+    let normalizedIndex = 0;
+    
+    for (const char of targetName) {
+      if (char === ' ' || char === '-' || char === '\'') {
+        if (boundaries[boundaries.length - 1] !== normalizedIndex) {
+          boundaries.push(normalizedIndex);
+        }
+      } else if (/[\u0300-\u036f]/.test(char)) {
+        continue;
+      } else {
+        normalizedIndex++;
+      }
+    }
+    return boundaries;
+  }, [targetName]);
   const canSubmit = inputValue.length === targetLength && !isGameOver;
   const keyStates = useMemo(() => getKeyStates(guesses), [guesses]);
 
@@ -227,6 +246,41 @@ export default function WordleModal({
 
   // Build the grid rows
   const gridRows = useMemo(() => {
+    // Helper to insert spacer tiles at word boundaries
+    const buildTilesWithSpacers = (
+      baseTiles: {
+        letter: string | null;
+        result: GuessResult['result'] | null;
+        isCurrentRow: boolean;
+        isEmpty: boolean;
+        isReveal?: boolean;
+        isSpacer?: boolean;
+      }[]
+    ) => {
+      const tilesWithSpacers: {
+        letter: string | null;
+        result: GuessResult['result'] | null;
+        isCurrentRow: boolean;
+        isEmpty: boolean;
+        isReveal?: boolean;
+        isSpacer?: boolean;
+      }[] = [];
+      for (let i = 0; i < baseTiles.length; i++) {
+        // Insert spacer before this tile if there's a word boundary at this index
+        if (wordBoundaries.includes(i)) {
+          tilesWithSpacers.push({
+            letter: null,
+            result: null,
+            isCurrentRow: false,
+            isEmpty: true,
+            isSpacer: true,
+          });
+        }
+        tilesWithSpacers.push(baseTiles[i]);
+      }
+      return tilesWithSpacers;
+    };
+
     const rows: {
       key: string;
       tiles: {
@@ -235,33 +289,35 @@ export default function WordleModal({
         isCurrentRow: boolean;
         isEmpty: boolean;
         isReveal?: boolean;
+        isSpacer?: boolean;
       }[];
     }[] = [];
 
     // Previous guess rows
     for (let r = 0; r < guesses.length; r++) {
       const guess = guesses[r];
+      const baseTiles = guess.map((g) => ({
+        letter: g.letter,
+        result: g.result,
+        isCurrentRow: false,
+        isEmpty: false,
+      }));
       rows.push({
         key: `guess-${r}`,
-        tiles: guess.map((g) => ({
-          letter: g.letter,
-          result: g.result,
-          isCurrentRow: false,
-          isEmpty: false,
-        })),
+        tiles: buildTilesWithSpacers(baseTiles),
       });
     }
 
     // Current typing row (if not game over and attempts remain)
     if (!isGameOver && attemptNumber < maxAttempts) {
-      const tiles: {
+      const baseTiles: {
         letter: string | null;
         result: GuessResult['result'] | null;
         isCurrentRow: boolean;
         isEmpty: boolean;
       }[] = [];
       for (let i = 0; i < targetLength; i++) {
-        tiles.push({
+        baseTiles.push({
           letter: inputValue[i] ?? null,
           result: null,
           isCurrentRow: true,
@@ -270,40 +326,42 @@ export default function WordleModal({
       }
       rows.push({
         key: `current-${attemptNumber}`,
-        tiles,
+        tiles: buildTilesWithSpacers(baseTiles),
       });
     }
 
     // Remaining empty rows
     const filledRows = guesses.length + (isGameOver ? 0 : 1);
     for (let r = filledRows; r < maxAttempts; r++) {
+      const baseTiles = Array.from({ length: targetLength }, () => ({
+        letter: null,
+        result: null,
+        isCurrentRow: false,
+        isEmpty: true,
+      }));
       rows.push({
         key: `empty-${r}`,
-        tiles: Array.from({ length: targetLength }, () => ({
-          letter: null,
-          result: null,
-          isCurrentRow: false,
-          isEmpty: true,
-        })),
+        tiles: buildTilesWithSpacers(baseTiles),
       });
     }
 
     // Game over reveal row
     if (isGameOver && attemptNumber < maxAttempts) {
+      const baseTiles = targetName.split('').slice(0, targetLength).map((char) => ({
+        letter: char.toUpperCase(),
+        result: null as GuessResult['result'] | null,
+        isCurrentRow: false,
+        isEmpty: false,
+        isReveal: true,
+      }));
       rows.push({
         key: `reveal-${attemptNumber}`,
-        tiles: targetName.split('').slice(0, targetLength).map((char) => ({
-          letter: char.toUpperCase(),
-          result: null as GuessResult['result'] | null,
-          isCurrentRow: false,
-          isEmpty: false,
-          isReveal: true,
-        })),
+        tiles: buildTilesWithSpacers(baseTiles),
       });
     }
 
     return rows;
-  }, [guesses, inputValue, attemptNumber, targetLength, maxAttempts, isGameOver, targetName]);
+  }, [guesses, inputValue, attemptNumber, targetLength, maxAttempts, isGameOver, targetName, wordBoundaries]);
 
   return (
     <div
@@ -366,6 +424,17 @@ export default function WordleModal({
               className="flex items-center justify-center gap-1.5"
             >
               {row.tiles.map((tile, i) => {
+                // Spacer tiles render as empty space (visual word separator)
+                if (tile.isSpacer) {
+                  return (
+                    <div
+                      key={`${row.key}-${i}`}
+                      className="relative flex h-10 w-6 select-none"
+                      aria-hidden="true"
+                    />
+                  );
+                }
+
                 const isRevealed = tile.result !== null || tile.isReveal;
                 const isRevealRow = tile.isReveal;
                 const bg = isRevealRow

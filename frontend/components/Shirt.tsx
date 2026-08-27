@@ -47,6 +47,24 @@ function LetterSlots({
     ? getCorrectLetters(guessHistory, displayName)
     : [];
 
+  // Compute word boundary indices in the normalized string
+  const wordBoundaries = (() => {
+    const boundaries: number[] = [];
+    let normalizedIndex = 0;
+    for (const char of displayName) {
+      if (char === ' ' || char === '-' || char === "'") {
+        if (boundaries[boundaries.length - 1] !== normalizedIndex) {
+          boundaries.push(normalizedIndex);
+        }
+      } else if (/[\u0300-\u036f]/.test(char)) {
+        continue;
+      } else {
+        normalizedIndex++;
+      }
+    }
+    return boundaries;
+  })();
+
   // If no guess history, show placeholder dots
   if (correctLetters.every(l => l === null)) {
     const len = displayName
@@ -54,26 +72,39 @@ function LetterSlots({
       .normalize('NFD')
       .replace(/[\u0300-\u036f]/g, '')
       .replace(/[\s\-']/g, '').length;
+    const slots: React.ReactNode[] = [];
+    for (let i = 0; i < len; i++) {
+      if (wordBoundaries.includes(i)) {
+        slots.push(<span key={`spacer-${i}`} className="text-ink/30" aria-hidden="true"> </span>);
+      }
+      slots.push(<span key={i} className="text-ink/30">·</span>);
+    }
     return (
       <span aria-hidden="true" className="font-mono text-xs tracking-[0.15em]">
-        {[...Array(len)].map((_, i) => (
-          <span key={i} className="text-ink/30">·</span>
-        ))}
+        {slots}
       </span>
     );
   }
 
+  const slots: React.ReactNode[] = [];
+  for (let i = 0; i < correctLetters.length; i++) {
+    if (wordBoundaries.includes(i)) {
+      slots.push(<span key={`spacer-${i}`} className="text-ink/30" aria-hidden="true"> </span>);
+    }
+    const letter = correctLetters[i];
+    slots.push(
+      letter ? (
+        <span key={i} className="font-semibold text-correct">
+          {letter}
+        </span>
+      ) : (
+        <span key={i} className="text-ink/30">·</span>
+      ),
+    );
+  }
   return (
     <span aria-hidden="true" className="font-mono text-xs tracking-[0.15em]">
-      {correctLetters.map((letter, i) =>
-        letter ? (
-          <span key={i} className="font-semibold text-correct">
-            {letter}
-          </span>
-        ) : (
-          <span key={i} className="text-ink/30">·</span>
-        ),
-      )}
+      {slots}
     </span>
   );
 }
