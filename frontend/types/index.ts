@@ -3,6 +3,8 @@
  * Shapes mirror the REST API contract (see docs/v0.1/dev-4-frontend-shell.md).
  */
 
+import type { GuessResult } from '@/lib/wordle';
+
 export interface Club {
   id: number;
   name: string;
@@ -70,4 +72,6 @@ export type TeamSide = 'home' | 'away';
 /** A lineup entry plus its current game state, ready for the TacticBoard. */
 export interface ShirtData extends LineupPlayer {
   state: ShirtState;
+  /** Guess history for shirt preview (optional — only available when game is active) */
+  guessHistory?: GuessResult[][];
 }

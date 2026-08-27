@@ -4,13 +4,11 @@ import MOCK_MATCHES from './mockData';
 /**
  * API client for the FootPlay backend.
  *
- * While the backend is not wired up, USE_MOCK stays true and every function
- * resolves from the static mock dataset (with a small artificial delay so
- * loading states are exercised). Set NEXT_PUBLIC_USE_MOCK_API=false to hit
- * the real API at NEXT_PUBLIC_API_URL.
+ * Defaults to real API. Set NEXT_PUBLIC_USE_MOCK_API=true to use mock data
+ * for local development without a running backend.
  */
 
-export const USE_MOCK = (process.env.NEXT_PUBLIC_USE_MOCK_API ?? 'true') !== 'false';
+export const USE_MOCK = process.env.NEXT_PUBLIC_USE_MOCK_API === 'true';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:4000';
 
