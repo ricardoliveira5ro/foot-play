@@ -56,7 +56,7 @@ function LetterSlots({
       .replace(/[\s\-']/g, '').length;
     return (
       <span aria-hidden="true" className="font-mono text-xs tracking-[0.15em]">
-        {[...Array(Math.min(len, 12))].map((_, i) => (
+        {[...Array(len)].map((_, i) => (
           <span key={i} className="text-ink/30">·</span>
         ))}
       </span>
@@ -65,7 +65,7 @@ function LetterSlots({
 
   return (
     <span aria-hidden="true" className="font-mono text-xs tracking-[0.15em]">
-      {correctLetters.slice(0, 12).map((letter, i) =>
+      {correctLetters.map((letter, i) =>
         letter ? (
           <span key={i} className="font-semibold text-correct">
             {letter}
@@ -151,16 +151,16 @@ export default function Shirt({ shirt, index, onClick, guessHistory }: ShirtProp
       </button>
 
       {/* Tag below the shirt — absolutely positioned so it never shifts neighbors. */}
-      <div className="pointer-events-none absolute left-1/2 top-full z-10 mt-1 max-w-[140px] -translate-x-1/2">
-        <div className="inline-block max-w-full truncate rounded-md bg-paper px-2 py-1 shadow-sm">
+      <div className="pointer-events-none absolute left-1/2 top-full z-10 mt-1 w-max -translate-x-1/2">
+        <div className="inline-block rounded-md bg-paper px-2 py-1 shadow-sm">
           {(state === 'default' || state === 'in-progress') && (
             <LetterSlots displayName={displayName} guessHistory={guessHistory} />
           )}
           {state === 'correct' && (
-            <span className="text-[13px] font-semibold text-ink">{displayName}</span>
+            <span className="block max-w-[140px] truncate text-[13px] font-semibold text-ink">{displayName}</span>
           )}
           {state === 'failed' && (
-            <span className="text-[13px] font-semibold text-failed">{displayName}</span>
+            <span className="block max-w-[140px] truncate text-[13px] font-semibold text-failed">{displayName}</span>
           )}
         </div>
       </div>

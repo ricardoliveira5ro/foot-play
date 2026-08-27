@@ -323,7 +323,7 @@ export default function WordleModal({
 
       {/* Modal content */}
       <div
-        className="relative w-full max-w-md rounded-2xl bg-paper shadow-[0_32px_64px_-12px_rgba(16,24,32,0.5)] overflow-hidden"
+        className="relative mx-auto w-max min-w-[28rem] max-w-[calc(100vw-2rem)] shrink-0 rounded-2xl bg-paper shadow-[0_32px_64px_-12px_rgba(16,24,32,0.5)] overflow-hidden"
         style={{
           animation: `slide-up 200ms ease-out, shake ${shakeKey > 0 ? '300ms' : '0ms'} ease-out`,
         }}
