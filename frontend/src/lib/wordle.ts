@@ -1,9 +1,9 @@
 /**
  * Wordle algorithm for evaluating guesses against a target name.
- * Returns per-letter feedback: 'correct' | 'present' | 'absent'
+ * Returns per-letter feedback: 'CORRECT' | 'PRESENT' | 'ABSENT'
  */
 
-export type LetterResult = 'correct' | 'present' | 'absent';
+export type LetterResult = 'CORRECT' | 'PRESENT' | 'ABSENT';
 
 export interface GuessResult {
   letter: string;
@@ -54,7 +54,7 @@ export function evaluateGuess(guess: string, target: string): GuessResult[] {
   // First pass: mark correct positions (green)
   for (let i = 0; i < Math.min(guessLength, targetLength); i++) {
     if (normalizedGuess[i] === normalizedTarget[i]) {
-      results[i] = { letter: guess[i], result: 'correct' };
+      results[i] = { letter: guess[i], result: 'CORRECT' };
       targetMatched[i] = true;
       guessProcessed[i] = true;
     }
@@ -76,7 +76,7 @@ export function evaluateGuess(guess: string, target: string): GuessResult[] {
     }
     
     if (foundIndex !== -1) {
-      results[i] = { letter: guess[i], result: 'present' };
+      results[i] = { letter: guess[i], result: 'PRESENT' };
       targetMatched[foundIndex] = true;
       guessProcessed[i] = true;
     }
@@ -85,14 +85,14 @@ export function evaluateGuess(guess: string, target: string): GuessResult[] {
   // Third pass: remaining letters are absent (grey)
   for (let i = 0; i < guessLength; i++) {
     if (!guessProcessed[i]) {
-      results[i] = { letter: guess[i], result: 'absent' };
+      results[i] = { letter: guess[i], result: 'ABSENT' };
     }
   }
   
   // Handle case where guess is shorter than target (pad with absent)
   // Or longer than target (extra letters are absent)
   while (results.length < targetLength) {
-    results.push({ letter: '', result: 'absent' });
+    results.push({ letter: '', result: 'ABSENT' });
   }
   
   return results.slice(0, targetLength);
@@ -103,7 +103,7 @@ export function evaluateGuess(guess: string, target: string): GuessResult[] {
  */
 export function isCorrectGuess(guess: string, target: string): boolean {
   const results = evaluateGuess(guess, target);
-  return results.every(r => r.result === 'correct');
+  return results.every(r => r.result === 'CORRECT');
 }
 
 /**
@@ -128,7 +128,30 @@ export function getCorrectLetters(
 
   for (const guess of guesses) {
     for (let i = 0; i < Math.min(guess.length, len); i++) {
-      if (guess[i].result === 'correct' && guess[i].letter) {
+      if (guess[i].result === 'CORRECT' && guess[i].letter) {
+        result[i] = guess[i].letter.toUpperCase();
+      }
+    }
+  }
+
+  return result;
+}
+
+/**
+ * Extract correct-position letters from guess history by known length.
+ * Same as getCorrectLetters but does not require the target name — used
+ * when the frontend only knows the normalized name length (server-side
+ * validation).
+ */
+export function getCorrectLettersByLength(
+  guesses: GuessResult[][],
+  length: number,
+): (string | null)[] {
+  const result: (string | null)[] = new Array(length).fill(null);
+
+  for (const guess of guesses) {
+    for (let i = 0; i < Math.min(guess.length, length); i++) {
+      if (guess[i].result === 'CORRECT' && guess[i].letter) {
         result[i] = guess[i].letter.toUpperCase();
       }
     }

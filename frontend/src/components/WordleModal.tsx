@@ -2,11 +2,10 @@
 
 import { useEffect, useRef, useState, useCallback, useMemo } from 'react';
 import type { GuessResult } from '@/lib/wordle';
-import { normalize } from '@/lib/wordle';
 
 interface WordleModalProps {
-  /** The player's display name (target to guess) */
-  targetName: string;
+  /** The normalized length of the player's name (target to guess) */
+  nameLength: number;
   /** The player's shirt number */
   shirtNumber: number | null;
   /** The player's position (e.g., 'ST', 'CB', 'GK') */
@@ -51,11 +50,11 @@ function getPositionLabel(position: string | null): string {
 
 function getResultBg(result: GuessResult['result']): string {
   switch (result) {
-    case 'correct':
+    case 'CORRECT':
       return 'var(--color-correct)';
-    case 'present':
+    case 'PRESENT':
       return '#E8A00C';
-    case 'absent':
+    case 'ABSENT':
       return '#374151';
   }
 }
@@ -77,6 +76,17 @@ const KEY_STATE_PRIORITY: Record<KeyState, number> = {
   correct: 3,
 };
 
+/**
+ * Map the API's uppercase GuessResult values to the keyboard's internal
+ * lowercase KeyState. The keyboard state is a UI-internal concept, so it
+ * stays lowercase; only the boundary translation happens here.
+ */
+const RESULT_TO_KEY_STATE: Record<GuessResult['result'], KeyState> = {
+  CORRECT: 'correct',
+  PRESENT: 'present',
+  ABSENT: 'absent',
+};
+
 function getKeyStates(guesses: GuessResult[][]): Map<string, KeyState> {
   const states = new Map<string, KeyState>();
 
@@ -84,7 +94,7 @@ function getKeyStates(guesses: GuessResult[][]): Map<string, KeyState> {
     for (const { letter, result } of guess) {
       if (!letter) continue;
       const key = letter.toUpperCase();
-      const newState: KeyState = result;
+      const newState: KeyState = RESULT_TO_KEY_STATE[result];
       const current = states.get(key) ?? 'unused';
       if (KEY_STATE_PRIORITY[newState] > KEY_STATE_PRIORITY[current]) {
         states.set(key, newState);
@@ -111,7 +121,7 @@ function getKeyStyle(state: KeyState): React.CSSProperties {
 // --- Main component ---
 
 export default function WordleModal({
-  targetName,
+  nameLength,
   shirtNumber,
   position,
   guesses,
@@ -126,30 +136,9 @@ export default function WordleModal({
   const [inputError, setInputError] = useState<string | null>(null);
   const [shakeKey, setShakeKey] = useState(0);
 
-  const targetLength = useMemo(
-    () => normalize(targetName).length,
-    [targetName],
-  );
+  const targetLength = nameLength;
   const attemptNumber = guesses.length;
 
-  // Compute word boundary indices in the normalized string
-  const wordBoundaries = useMemo(() => {
-    const boundaries: number[] = [];
-    let normalizedIndex = 0;
-    
-    for (const char of targetName) {
-      if (char === ' ' || char === '-' || char === '\'') {
-        if (boundaries[boundaries.length - 1] !== normalizedIndex) {
-          boundaries.push(normalizedIndex);
-        }
-      } else if (/[\u0300-\u036f]/.test(char)) {
-        continue;
-      } else {
-        normalizedIndex++;
-      }
-    }
-    return boundaries;
-  }, [targetName]);
   const canSubmit = inputValue.length === targetLength && !isGameOver;
   const keyStates = useMemo(() => getKeyStates(guesses), [guesses]);
 
@@ -246,41 +235,6 @@ export default function WordleModal({
 
   // Build the grid rows
   const gridRows = useMemo(() => {
-    // Helper to insert spacer tiles at word boundaries
-    const buildTilesWithSpacers = (
-      baseTiles: {
-        letter: string | null;
-        result: GuessResult['result'] | null;
-        isCurrentRow: boolean;
-        isEmpty: boolean;
-        isReveal?: boolean;
-        isSpacer?: boolean;
-      }[]
-    ) => {
-      const tilesWithSpacers: {
-        letter: string | null;
-        result: GuessResult['result'] | null;
-        isCurrentRow: boolean;
-        isEmpty: boolean;
-        isReveal?: boolean;
-        isSpacer?: boolean;
-      }[] = [];
-      for (let i = 0; i < baseTiles.length; i++) {
-        // Insert spacer before this tile if there's a word boundary at this index
-        if (wordBoundaries.includes(i)) {
-          tilesWithSpacers.push({
-            letter: null,
-            result: null,
-            isCurrentRow: false,
-            isEmpty: true,
-            isSpacer: true,
-          });
-        }
-        tilesWithSpacers.push(baseTiles[i]);
-      }
-      return tilesWithSpacers;
-    };
-
     const rows: {
       key: string;
       tiles: {
@@ -288,80 +242,54 @@ export default function WordleModal({
         result: GuessResult['result'] | null;
         isCurrentRow: boolean;
         isEmpty: boolean;
-        isReveal?: boolean;
-        isSpacer?: boolean;
       }[];
     }[] = [];
 
     // Previous guess rows
     for (let r = 0; r < guesses.length; r++) {
       const guess = guesses[r];
-      const baseTiles = guess.map((g) => ({
+      const tiles = guess.map((g) => ({
         letter: g.letter,
         result: g.result,
         isCurrentRow: false,
         isEmpty: false,
       }));
-      rows.push({
-        key: `guess-${r}`,
-        tiles: buildTilesWithSpacers(baseTiles),
-      });
+      rows.push({ key: `guess-${r}`, tiles });
     }
 
     // Current typing row (if not game over and attempts remain)
     if (!isGameOver && attemptNumber < maxAttempts) {
-      const baseTiles: {
+      const tiles: {
         letter: string | null;
         result: GuessResult['result'] | null;
         isCurrentRow: boolean;
         isEmpty: boolean;
       }[] = [];
       for (let i = 0; i < targetLength; i++) {
-        baseTiles.push({
+        tiles.push({
           letter: inputValue[i] ?? null,
           result: null,
           isCurrentRow: true,
           isEmpty: !inputValue[i],
         });
       }
-      rows.push({
-        key: `current-${attemptNumber}`,
-        tiles: buildTilesWithSpacers(baseTiles),
-      });
+      rows.push({ key: `current-${attemptNumber}`, tiles });
     }
 
     // Remaining empty rows
     const filledRows = guesses.length + (isGameOver ? 0 : 1);
     for (let r = filledRows; r < maxAttempts; r++) {
-      const baseTiles = Array.from({ length: targetLength }, () => ({
+      const tiles = Array.from({ length: targetLength }, () => ({
         letter: null,
         result: null,
         isCurrentRow: false,
         isEmpty: true,
       }));
-      rows.push({
-        key: `empty-${r}`,
-        tiles: buildTilesWithSpacers(baseTiles),
-      });
-    }
-
-    // Game over reveal row
-    if (isGameOver && attemptNumber < maxAttempts) {
-      const baseTiles = targetName.split('').slice(0, targetLength).map((char) => ({
-        letter: char.toUpperCase(),
-        result: null as GuessResult['result'] | null,
-        isCurrentRow: false,
-        isEmpty: false,
-        isReveal: true,
-      }));
-      rows.push({
-        key: `reveal-${attemptNumber}`,
-        tiles: buildTilesWithSpacers(baseTiles),
-      });
+      rows.push({ key: `empty-${r}`, tiles });
     }
 
     return rows;
-  }, [guesses, inputValue, attemptNumber, targetLength, maxAttempts, isGameOver, targetName, wordBoundaries]);
+  }, [guesses, inputValue, attemptNumber, targetLength, maxAttempts, isGameOver]);
 
   return (
     <div
@@ -424,26 +352,12 @@ export default function WordleModal({
               className="flex items-center justify-center gap-1.5"
             >
               {row.tiles.map((tile, i) => {
-                // Spacer tiles render as empty space (visual word separator)
-                if (tile.isSpacer) {
-                  return (
-                    <div
-                      key={`${row.key}-${i}`}
-                      className="relative flex h-10 w-6 select-none"
-                      aria-hidden="true"
-                    />
-                  );
-                }
-
-                const isRevealed = tile.result !== null || tile.isReveal;
-                const isRevealRow = tile.isReveal;
-                const bg = isRevealRow
-                  ? (isCorrect ? 'var(--color-correct)' : 'var(--color-failed)')
-                  : tile.result
+                const isRevealed = tile.result !== null;
+                const bg = tile.result
                   ? getResultBg(tile.result)
                   : 'var(--color-paper)';
                 const borderColor = tile.isCurrentRow ? 'var(--color-ink)' : 'transparent';
-                const textColor = isRevealed || isRevealRow
+                const textColor = isRevealed
                   ? 'var(--color-chalk)'
                   : tile.letter
                   ? 'var(--color-ink)'
@@ -457,13 +371,11 @@ export default function WordleModal({
                       backgroundColor: bg,
                       borderWidth: '2px',
                       borderStyle: 'solid',
-                      borderColor: isRevealed || isRevealRow ? 'transparent' : borderColor,
+                      borderColor: isRevealed ? 'transparent' : borderColor,
                       borderRadius: '6px',
                       color: textColor,
                       transition: 'all 150ms ease-out',
                       animation: isRevealed && row.key.startsWith('guess-')
-                        ? `flip-in 300ms ease-out ${i * 50}ms both`
-                        : isRevealRow
                         ? `flip-in 300ms ease-out ${i * 50}ms both`
                         : 'none',
                     }}

@@ -3,8 +3,6 @@
  * Shapes mirror the REST API contract (see docs/v0.1/dev-4-frontend-shell.md).
  */
 
-import type { GuessResult } from '@/lib/wordle';
-
 export interface Club {
   id: number;
   name: string;
@@ -21,7 +19,8 @@ export interface PositionCoords {
 /** One starting-XI entry, as returned by the lineup endpoints. */
 export interface LineupPlayer {
   playerId: number;
-  displayName: string;
+  /** Normalized length of the player's name (no spaces/diacritics). */
+  nameLength: number;
   shirtNumber: number | null;
   /** Position code, e.g. 'GK' | 'CB' | 'LB' | 'CM' | 'ST'. */
   position: string | null;
@@ -74,4 +73,30 @@ export interface ShirtData extends LineupPlayer {
   state: ShirtState;
   /** Guess history for shirt preview (optional — only available when game is active) */
   guessHistory?: GuessResult[][];
+}
+
+/** Per-letter feedback for a single guess. */
+export interface GuessResult {
+  letter: string;
+  result: 'CORRECT' | 'PRESENT' | 'ABSENT';
+}
+
+/** POST /api/guess response — server-side wordle evaluation. */
+export interface GuessResponse {
+  results: GuessResult[];
+  isCorrect: boolean;
+  /** Only present when isCorrect is true. */
+  name?: string;
+}
+
+/** One entry of POST /api/reveal. */
+export interface RevealPlayer {
+  playerId: number;
+  name: string;
+  shirtNumber: number | null;
+}
+
+/** POST /api/reveal response — all player names for game completion. */
+export interface RevealResponse {
+  players: RevealPlayer[];
 }

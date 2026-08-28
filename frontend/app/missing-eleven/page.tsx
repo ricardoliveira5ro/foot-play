@@ -1,13 +1,13 @@
 'use client';
 
-import { useCallback, useEffect } from 'react';
-import { useGameState, evaluatePlayerGuess, MAX_ATTEMPTS } from '@/lib/gameState';
-import { fetchRandomMatch } from '@/lib/api';
+import { useCallback, useEffect, useState } from 'react';
+import { useGameState, MAX_ATTEMPTS } from '@/lib/gameState';
+import { fetchRandomMatch, submitGuess as submitGuessApi, fetchReveal } from '@/lib/api';
 import MatchInfo from '@/components/MatchInfo';
 import TacticBoard from '@/components/TacticBoard';
 import WordleModal from '@/components/WordleModal';
 import GameComplete from '@/components/GameComplete';
-import type { ShirtData } from '@/types';
+import type { ShirtData, RevealPlayer } from '@/types';
 
 function describeError(cause: unknown): string {
   return cause instanceof Error ? cause.message : 'Something went wrong.';
@@ -25,7 +25,9 @@ export default function MissingElevenPage() {
     setLoading,
   } = useGameState();
 
-  // Initialize game on mount or restore from localStorage
+  const [revealedPlayers, setRevealedPlayers] = useState<RevealPlayer[]>([]);
+
+  // Initialize game on mount (no localStorage restore — fixes hydration mismatch)
   useEffect(() => {
     if (state.gameStatus === 'idle' && !state.match) {
       setLoading(true);
@@ -39,12 +41,22 @@ export default function MissingElevenPage() {
         .finally(() => {
           setLoading(false);
         });
-    } else if (state.gameStatus === 'playing' && state.match) {
-      // Game restored from localStorage
-      setLoading(false);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []); // Only run once on mount
+
+  // Fetch revealed names when the game completes (won or lost)
+  useEffect(() => {
+    if ((state.gameStatus === 'won' || state.gameStatus === 'lost') && state.match) {
+      fetchReveal(state.match.match.id, state.teamSide)
+        .then((response) => {
+          setRevealedPlayers(response.players);
+        })
+        .catch((cause: unknown) => {
+          setError(describeError(cause));
+        });
+    }
+  }, [state.gameStatus, state.match, state.teamSide, setError]);
 
   // Derive modal state directly from game state - no local state needed
   const activeShirtIndex = state.activeShirtIndex;
@@ -69,21 +81,20 @@ export default function MissingElevenPage() {
     closeShirt();
   }, [closeShirt]);
 
-  const handleGuess = useCallback((guess: string) => {
-    if (!activeShirt) return;
-    
-    // Find the shirt in state to get current attempts
-    const shirtInState = state.shirts.find(s => s.playerId === activeShirt.playerId);
-    const currentAttempts = shirtInState?.attempts ?? 0;
-    
-    const evaluation = evaluatePlayerGuess(guess, activeShirt.displayName, currentAttempts);
-    
-    submitGuess(activeShirt.playerId, guess, evaluation.results);
-    
+  const handleGuess = useCallback(async (guess: string) => {
+    if (!activeShirt || !state.match) return;
+
+    try {
+      const response = await submitGuessApi(state.match.match.id, activeShirt.playerId, guess);
+      submitGuess(activeShirt.playerId, response.results, response.isCorrect);
+    } catch (cause: unknown) {
+      setError(describeError(cause));
+    }
     // Modal will close via state change if correct or failed
-  }, [activeShirt, state.shirts, submitGuess]);
+  }, [activeShirt, state.match, submitGuess, setError]);
 
   const handlePlayAgain = useCallback(() => {
+    setRevealedPlayers([]);
     newGame();
     // Fetch new match
     setLoading(true);
@@ -193,15 +204,15 @@ export default function MissingElevenPage() {
       {/* Wordle Modal */}
       {shouldShowModal && activeShirt && (
         <WordleModal
-          targetName={activeShirt.displayName}
+          nameLength={activeShirt.nameLength}
           shirtNumber={activeShirt.shirtNumber}
           position={activeShirt.position}
           guesses={guessHistory}
           maxAttempts={MAX_ATTEMPTS}
           onGuess={handleGuess}
           onClose={handleModalClose}
-          isGameOver={guessHistory.length >= MAX_ATTEMPTS || guessHistory.some(g => g.every(r => r.result === 'correct'))}
-          isCorrect={guessHistory.some(g => g.every(r => r.result === 'correct'))}
+          isGameOver={guessHistory.length >= MAX_ATTEMPTS || guessHistory.some(g => g.every(r => r.result === 'CORRECT'))}
+          isCorrect={guessHistory.some(g => g.every(r => r.result === 'CORRECT'))}
         />
       )}
 
@@ -212,6 +223,7 @@ export default function MissingElevenPage() {
           match={state.match.match}
           teamSide={state.teamSide}
           shirts={state.shirts}
+          revealedPlayers={revealedPlayers}
           onPlayAgain={handlePlayAgain}
         />
       )}

@@ -3,7 +3,7 @@
 import type { CSSProperties } from 'react';
 import type { ShirtData, ShirtState } from '@/types';
 import type { GuessResult } from '@/lib/wordle';
-import { getCorrectLetters } from '@/lib/wordle';
+import { getCorrectLettersByLength } from '@/lib/wordle';
 
 const SHIRT_PATH =
   'M28 10 L32 13 L36 10 L56 14 L62 15 L62 20 L51 22 L51 58 L13 58 L13 22 L2 20 L2 15 L8 14 L28 10 Z';
@@ -21,7 +21,6 @@ interface ShirtProps {
 function shirtAriaLabel(
   state: ShirtState,
   shirtNumber: number | null,
-  displayName: string,
 ): string {
   const number = shirtNumber ?? '?';
   switch (state) {
@@ -30,53 +29,27 @@ function shirtAriaLabel(
     case 'in-progress':
       return `Shirt ${number}, guessing in progress`;
     case 'correct':
-      return `${displayName}, guessed correctly`;
+      return `Shirt ${number}, guessed correctly`;
     case 'failed':
-      return `${displayName}, not guessed — correct answer shown`;
+      return `Shirt ${number}, not guessed`;
   }
 }
 
 function LetterSlots({
-  displayName,
+  nameLength,
   guessHistory,
 }: {
-  displayName: string;
+  nameLength: number;
   guessHistory?: GuessResult[][];
 }) {
   const correctLetters = guessHistory
-    ? getCorrectLetters(guessHistory, displayName)
+    ? getCorrectLettersByLength(guessHistory, nameLength)
     : [];
-
-  // Compute word boundary indices in the normalized string
-  const wordBoundaries = (() => {
-    const boundaries: number[] = [];
-    let normalizedIndex = 0;
-    for (const char of displayName) {
-      if (char === ' ' || char === '-' || char === "'") {
-        if (boundaries[boundaries.length - 1] !== normalizedIndex) {
-          boundaries.push(normalizedIndex);
-        }
-      } else if (/[\u0300-\u036f]/.test(char)) {
-        continue;
-      } else {
-        normalizedIndex++;
-      }
-    }
-    return boundaries;
-  })();
 
   // If no guess history, show placeholder dots
   if (correctLetters.every(l => l === null)) {
-    const len = displayName
-      .toLowerCase()
-      .normalize('NFD')
-      .replace(/[\u0300-\u036f]/g, '')
-      .replace(/[\s\-']/g, '').length;
     const slots: React.ReactNode[] = [];
-    for (let i = 0; i < len; i++) {
-      if (wordBoundaries.includes(i)) {
-        slots.push(<span key={`spacer-${i}`} className="text-ink/30" aria-hidden="true"> </span>);
-      }
+    for (let i = 0; i < nameLength; i++) {
       slots.push(<span key={i} className="text-ink/30">·</span>);
     }
     return (
@@ -88,9 +61,6 @@ function LetterSlots({
 
   const slots: React.ReactNode[] = [];
   for (let i = 0; i < correctLetters.length; i++) {
-    if (wordBoundaries.includes(i)) {
-      slots.push(<span key={`spacer-${i}`} className="text-ink/30" aria-hidden="true"> </span>);
-    }
     const letter = correctLetters[i];
     slots.push(
       letter ? (
@@ -141,7 +111,7 @@ function StateBadge({ state }: { state: Extract<ShirtState, 'correct' | 'failed'
  * The whole unit is a button with an expanded (>=44px) hit area.
  */
 export default function Shirt({ shirt, index, onClick, guessHistory }: ShirtProps) {
-  const { playerId, displayName, shirtNumber, coords, state } = shirt;
+  const { playerId, nameLength, shirtNumber, coords, state } = shirt;
 
   return (
     <div
@@ -156,7 +126,7 @@ export default function Shirt({ shirt, index, onClick, guessHistory }: ShirtProp
       <button
         type="button"
         onClick={onClick ? () => onClick(playerId) : undefined}
-        aria-label={shirtAriaLabel(state, shirtNumber, displayName)}
+        aria-label={shirtAriaLabel(state, shirtNumber)}
         className={`-m-2 block w-[calc(100%+1rem)] rounded-md p-2 transition-[transform,filter] duration-150 ease-out hover:-translate-y-0.5 hover:drop-shadow-[0_4px_6px_rgba(16,24,32,0.35)] ${state === 'failed' ? 'opacity-60 saturate-[0.6]' : ''}`}
       >
         {/* Inner wrapper carries the entrance animation so positional and
@@ -185,13 +155,17 @@ export default function Shirt({ shirt, index, onClick, guessHistory }: ShirtProp
       <div className="pointer-events-none absolute left-1/2 top-full z-10 mt-1 w-max -translate-x-1/2">
         <div className="inline-block rounded-md bg-paper px-2 py-1 shadow-sm">
           {(state === 'default' || state === 'in-progress') && (
-            <LetterSlots displayName={displayName} guessHistory={guessHistory} />
+            <LetterSlots nameLength={nameLength} guessHistory={guessHistory} />
           )}
           {state === 'correct' && (
-            <span className="block max-w-35 truncate text-[13px] font-semibold text-ink">{displayName}</span>
+            <span className="block max-w-35 truncate text-[13px] font-semibold text-correct">
+              {shirtNumber !== null ? `#${shirtNumber}` : 'Correct'}
+            </span>
           )}
           {state === 'failed' && (
-            <span className="block max-w-35 truncate text-[13px] font-semibold text-failed">{displayName}</span>
+            <span className="block max-w-35 truncate text-[13px] font-semibold text-failed">
+              {shirtNumber !== null ? `#${shirtNumber}` : 'Failed'}
+            </span>
           )}
         </div>
       </div>

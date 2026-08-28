@@ -1,12 +1,8 @@
 'use client';
 
-import { useReducer, useEffect, useCallback } from 'react';
-import type { MatchResponse, ShirtData, ShirtState, TeamSide, LineupPlayer } from '@/types';
-import { evaluateGuess } from './wordle';
+import { useReducer, useCallback } from 'react';
+import type { MatchResponse, ShirtData, ShirtState, TeamSide, LineupPlayer, GuessResult } from '@/types';
 
-const STORAGE_KEY = 'footplay-game-session';
-const STORAGE_VERSION = 2; // Increment to force migration
-const DEBOUNCE_MS = 300;
 const MAX_ATTEMPTS = 6;
 
 // --- Types ---
@@ -17,7 +13,7 @@ export interface ShirtGameData extends ShirtData {
   /** Number of guess attempts made for this shirt */
   attempts: number;
   /** History of guess results for this shirt */
-  guessHistory: ReturnType<typeof evaluateGuess>[];
+  guessHistory: GuessResult[][];
 }
 
 export interface GameState {
@@ -34,8 +30,7 @@ export type GameAction =
   | { type: 'SELECT_TEAM'; payload: TeamSide }
   | { type: 'OPEN_SHIRT'; payload: number }
   | { type: 'CLOSE_SHIRT' }
-  | { type: 'SUBMIT_GUESS'; payload: { playerId: number; guess: string; results: ReturnType<typeof evaluateGuess> } }
-  | { type: 'RESTORE_SESSION'; payload: GameState }
+  | { type: 'SUBMIT_GUESS'; payload: { playerId: number; results: GuessResult[]; isCorrect: boolean } }
   | { type: 'NEW_GAME' }
   | { type: 'SET_ERROR'; payload: string | null }
   | { type: 'SET_LOADING'; payload: boolean };
@@ -138,14 +133,13 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
     case 'SUBMIT_GUESS': {
       if (!state.match || state.gameStatus !== 'playing') return state;
 
-      const { playerId, results } = action.payload;
+      const { playerId, results, isCorrect } = action.payload;
       const shirtIndex = state.shirts.findIndex(s => s.playerId === playerId);
       if (shirtIndex === -1) return state;
 
       const shirt = state.shirts[shirtIndex];
       if (shirt.state === 'correct' || shirt.state === 'failed') return state;
 
-      const isCorrect = results.every(r => r.result === 'correct');
       const newAttempts = shirt.attempts + 1;
       const isLastAttempt = newAttempts >= MAX_ATTEMPTS;
 
@@ -204,24 +198,6 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
       }
     }
 
-    case 'RESTORE_SESSION': {
-      // Validate restored state
-      if (!action.payload.match || action.payload.shirts.length === 0) {
-        return initialState;
-      }
-      // Ensure all shirts have the new fields
-      const shirtsWithDefaults = action.payload.shirts.map(s => ({
-        ...s,
-        attempts: s.attempts ?? 0,
-        guessHistory: s.guessHistory ?? [],
-      }));
-      return {
-        ...action.payload,
-        shirts: shirtsWithDefaults,
-        error: null,
-      };
-    }
-
     case 'NEW_GAME': {
       return initialState;
     }
@@ -246,114 +222,6 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
   }
 }
 
-// --- LocalStorage Persistence ---
-
-interface PersistedState {
-  version: number;
-  match: MatchResponse | null;
-  teamSide: TeamSide;
-  shirts: ShirtGameData[];
-  activeShirtIndex: number | null;
-  gameStatus: GameStatus;
-  timestamp: number;
-}
-
-function serializeState(state: GameState): PersistedState {
-  return {
-    version: STORAGE_VERSION,
-    match: state.match,
-    teamSide: state.teamSide,
-    shirts: state.shirts,
-    activeShirtIndex: state.activeShirtIndex,
-    gameStatus: state.gameStatus,
-    timestamp: Date.now(),
-  };
-}
-
-function deserializeState(data: unknown): GameState | null {
-  if (!data || typeof data !== 'object') return null;
-  const d = data as Record<string, unknown>;
-  
-  // Version check - invalidate old sessions
-  if (d.version !== STORAGE_VERSION) {
-    return null;
-  }
-  
-  if (
-    typeof d.teamSide !== 'string' ||
-    !Array.isArray(d.shirts) ||
-    typeof d.gameStatus !== 'string' ||
-    typeof d.timestamp !== 'number'
-  ) {
-    return null;
-  }
-  // Check if session is too old (24 hours)
-  if (Date.now() - d.timestamp > 24 * 60 * 60 * 1000) {
-    return null;
-  }
-  // Ensure shirts have required fields
-  const shirts = (d.shirts as unknown[]).map(s => {
-    const shirt = s as Record<string, unknown>;
-    return {
-      ...shirt,
-      attempts: typeof shirt.attempts === 'number' ? shirt.attempts : 0,
-      guessHistory: Array.isArray(shirt.guessHistory) ? shirt.guessHistory : [],
-    };
-  });
-  return {
-    match: d.match as MatchResponse | null,
-    teamSide: d.teamSide as TeamSide,
-    shirts: shirts as ShirtGameData[],
-    activeShirtIndex: typeof d.activeShirtIndex === 'number' ? d.activeShirtIndex : null,
-    gameStatus: d.gameStatus as GameStatus,
-    error: null,
-  };
-}
-
-function loadInitialState(): GameState {
-  if (typeof window === 'undefined') return initialState;
-  try {
-    const stored = localStorage.getItem(STORAGE_KEY);
-    if (!stored) return initialState;
-    const parsed = JSON.parse(stored);
-    const restored = deserializeState(parsed);
-    return restored ?? initialState;
-  } catch {
-    return initialState;
-  }
-}
-
-export function saveToLocalStorage(state: GameState): void {
-  if (typeof window === 'undefined') return;
-  try {
-    const serialized = serializeState(state);
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(serialized));
-  } catch {
-    // Ignore storage errors (private browsing, quota exceeded, etc.)
-  }
-}
-
-export function loadFromLocalStorage(): GameState | null {
-  if (typeof window === 'undefined') return null;
-  try {
-    const stored = localStorage.getItem(STORAGE_KEY);
-    if (!stored) return null;
-    const parsed = JSON.parse(stored);
-    return deserializeState(parsed);
-  } catch {
-    return null;
-  }
-}
-
-export function clearLocalStorage(): void {
-  if (typeof window === 'undefined') return;
-  try {
-    localStorage.removeItem(STORAGE_KEY);
-  } catch {
-    // Ignore
-  }
-}
-
 // --- Hook ---
 
 interface UseGameStateReturn {
@@ -363,23 +231,14 @@ interface UseGameStateReturn {
   selectTeam: (side: TeamSide) => void;
   openShirt: (playerId: number) => void;
   closeShirt: () => void;
-  submitGuess: (playerId: number, guess: string, results: ReturnType<typeof evaluateGuess>) => void;
+  submitGuess: (playerId: number, results: GuessResult[], isCorrect: boolean) => void;
   newGame: () => void;
   setError: (error: string | null) => void;
   setLoading: (loading: boolean) => void;
 }
 
 export function useGameState(): UseGameStateReturn {
-  const [state, dispatch] = useReducer(gameReducer, initialState, loadInitialState);
-
-  // Debounced persistence
-  useEffect(() => {
-    if (state.gameStatus === 'idle' || state.gameStatus === 'loading') return;
-    const timer = setTimeout(() => {
-      saveToLocalStorage(state);
-    }, DEBOUNCE_MS);
-    return () => clearTimeout(timer);
-  }, [state]);
+  const [state, dispatch] = useReducer(gameReducer, initialState);
 
   // Action creators
   const startNewGame = useCallback((match: MatchResponse) => {
@@ -398,12 +257,11 @@ export function useGameState(): UseGameStateReturn {
     dispatch({ type: 'CLOSE_SHIRT' });
   }, []);
 
-  const submitGuess = useCallback((playerId: number, _guess: string, results: ReturnType<typeof evaluateGuess>) => {
-    dispatch({ type: 'SUBMIT_GUESS', payload: { playerId, guess: _guess, results } });
+  const submitGuess = useCallback((playerId: number, results: GuessResult[], isCorrect: boolean) => {
+    dispatch({ type: 'SUBMIT_GUESS', payload: { playerId, results, isCorrect } });
   }, []);
 
   const newGame = useCallback(() => {
-    clearLocalStorage();
     dispatch({ type: 'NEW_GAME' });
   }, []);
 
@@ -426,34 +284,6 @@ export function useGameState(): UseGameStateReturn {
     newGame,
     setError,
     setLoading,
-  };
-}
-
-// --- Utility: Evaluate guess and return detailed result ---
-
-export interface GuessEvaluation {
-  isCorrect: boolean;
-  isFailed: boolean;
-  results: ReturnType<typeof evaluateGuess>;
-  attemptNumber: number;
-  maxAttempts: number;
-}
-
-export function evaluatePlayerGuess(
-  guess: string,
-  targetName: string,
-  currentAttempt: number,
-  maxAttempts: number = MAX_ATTEMPTS
-): GuessEvaluation {
-  const results = evaluateGuess(guess, targetName);
-  const isCorrect = results.every(r => r.result === 'correct');
-  const isFailed = !isCorrect && currentAttempt >= maxAttempts - 1;
-  return {
-    isCorrect,
-    isFailed,
-    results,
-    attemptNumber: currentAttempt,
-    maxAttempts,
   };
 }
 

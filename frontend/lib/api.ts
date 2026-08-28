@@ -1,5 +1,6 @@
-import type { MatchResponse, PlayerSearchResult } from '@/types';
+import type { MatchResponse, PlayerSearchResult, GuessResponse, RevealResponse, TeamSide } from '@/types';
 import MOCK_MATCHES from './mockData';
+import { evaluateGuess } from '@/lib/wordle';
 
 /**
  * API client for the FootPlay backend.
@@ -67,12 +68,71 @@ export async function searchPlayers(query: string): Promise<PlayerSearchResult[]
     const byId = new Map<number, PlayerSearchResult>();
     for (const entry of MOCK_MATCHES) {
       for (const player of [...entry.homeLineup, ...entry.awayLineup]) {
-        if (!byId.has(player.playerId) && player.displayName.toLowerCase().includes(needle)) {
-          byId.set(player.playerId, { id: player.playerId, name: player.displayName });
+        const displayName = (player as unknown as { displayName?: string }).displayName;
+        if (displayName && !byId.has(player.playerId) && displayName.toLowerCase().includes(needle)) {
+          byId.set(player.playerId, { id: player.playerId, name: displayName });
         }
       }
     }
     return [...byId.values()];
   }
   return requestJson<PlayerSearchResult[]>(`/api/players?name=${encodeURIComponent(query)}`);
+}
+
+/** POST /api/guess — server-side wordle evaluation. */
+export async function submitGuess(matchId: number, playerId: number, guess: string): Promise<GuessResponse> {
+  if (USE_MOCK) {
+    await delay(MOCK_DELAY_MS);
+    // Find the player in mock data and evaluate locally.
+    for (const entry of MOCK_MATCHES) {
+      if (entry.match.id !== matchId) continue;
+      const player = [...entry.homeLineup, ...entry.awayLineup].find((p) => p.playerId === playerId);
+      if (!player) {
+        throw new Error(`Player ${playerId} not found in mock dataset`);
+      }
+      const displayName = (player as unknown as { displayName?: string }).displayName;
+      if (!displayName) {
+        throw new Error(`Mock player ${playerId} has no displayName`);
+      }
+      const results = evaluateGuess(guess, displayName);
+      const isCorrect = results.every((r) => r.result === 'CORRECT');
+      return { results, isCorrect, name: isCorrect ? displayName : undefined };
+    }
+    throw new Error(`Match ${matchId} not found in mock dataset`);
+  }
+  const response = await fetch(`${API_BASE_URL}/api/guess`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ matchId, playerId, guess }),
+  });
+  if (!response.ok) {
+    throw new Error(`API request failed: /api/guess responded ${response.status}`);
+  }
+  return (await response.json()) as GuessResponse;
+}
+
+/** POST /api/reveal — get all player names for game completion. */
+export async function fetchReveal(matchId: number, teamSide: TeamSide): Promise<RevealResponse> {
+  if (USE_MOCK) {
+    await delay(MOCK_DELAY_MS);
+    const entry = MOCK_MATCHES.find((e) => e.match.id === matchId);
+    if (!entry) {
+      throw new Error(`Match ${matchId} not found in mock dataset`);
+    }
+    const lineup = teamSide === 'home' ? entry.homeLineup : entry.awayLineup;
+    const players = lineup.map((p) => {
+      const displayName = (p as unknown as { displayName?: string }).displayName ?? 'Unknown';
+      return { playerId: p.playerId, name: displayName, shirtNumber: p.shirtNumber };
+    });
+    return { players };
+  }
+  const response = await fetch(`${API_BASE_URL}/api/reveal`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ matchId, teamSide }),
+  });
+  if (!response.ok) {
+    throw new Error(`API request failed: /api/reveal responded ${response.status}`);
+  }
+  return (await response.json()) as RevealResponse;
 }

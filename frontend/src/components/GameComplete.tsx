@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect } from 'react';
-import type { Match, ShirtData } from '@/types';
+import type { Match, ShirtData, RevealPlayer } from '@/types';
 
 interface GameCompleteProps {
   /** Whether the player won */
@@ -12,6 +12,8 @@ interface GameCompleteProps {
   teamSide: 'home' | 'away';
   /** All shirts with their final states */
   shirts: ShirtData[];
+  /** Revealed player names from the server (POST /api/reveal) */
+  revealedPlayers: RevealPlayer[];
   /** Callback to start a new game */
   onPlayAgain: () => void;
 }
@@ -45,11 +47,14 @@ function getPositionLabel(position: string | null): string {
   return position ? labels[position] ?? position : '?';
 }
 
-export default function GameComplete({ isWin, match, teamSide, shirts, onPlayAgain }: GameCompleteProps) {
+export default function GameComplete({ isWin, match, teamSide, shirts, revealedPlayers, onPlayAgain }: GameCompleteProps) {
   const home = match.homeClub?.name ?? 'Home';
   const away = match.awayClub?.name ?? 'Away';
   const dateLabel = formatMatchDate(match.date) ?? match.season;
   const teamName = teamSide === 'home' ? home : away;
+
+  // Map revealed players by playerId for name lookup.
+  const revealedByName = new Map(revealedPlayers.map((p) => [p.playerId, p.name]));
 
   // Calculate stats
   const totalShirts = shirts.length;
@@ -131,6 +136,7 @@ export default function GameComplete({ isWin, match, teamSide, shirts, onPlayAga
                 const isCorrect = shirt.state === 'correct';
                 const isFailed = shirt.state === 'failed';
                 const showName = isCorrect || isFailed;
+                const revealedName = revealedByName.get(shirt.playerId);
 
                 return (
                   <div
@@ -169,7 +175,7 @@ export default function GameComplete({ isWin, match, teamSide, shirts, onPlayAga
                           : 'var(--color-ink/40)',
                       }}
                     >
-                      {showName ? shirt.displayName : '—'}
+                      {showName && revealedName ? revealedName : '—'}
                     </span>
 
                     {/* Status badge */}
