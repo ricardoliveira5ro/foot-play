@@ -6,7 +6,7 @@ import type { GuessResult } from '@/lib/wordle';
 import { getCorrectLetters } from '@/lib/wordle';
 
 const SHIRT_PATH =
-  'M20 8 L8 16 L14 28 L20 24 V56 H44 V24 L50 28 L56 16 L44 8 C41 12 37 14 32 14 C27 14 23 12 20 8 Z';
+  'M28 10 L32 13 L36 10 L56 14 L62 15 L62 20 L51 22 L51 58 L13 58 L13 22 L2 20 L2 15 L8 14 L28 10 Z';
 
 interface ShirtProps {
   shirt: ShirtData;
@@ -166,7 +166,7 @@ export default function Shirt({ shirt, index, onClick, guessHistory }: ShirtProp
           style={{ '--stagger-delay': `${index * 28}ms` } as CSSProperties}
         >
           <svg viewBox="0 0 64 64" aria-hidden="true" className="block h-auto w-full drop-shadow-[0_2px_3px_rgba(16,24,32,0.25)]">
-            <path d={SHIRT_PATH} fill="#F8FAF8" />
+            <path d={SHIRT_PATH} fill="#F8FAF8" stroke="#101820" strokeWidth="1" strokeLinejoin="round" />
           </svg>
           {shirtNumber !== null && (
             <span

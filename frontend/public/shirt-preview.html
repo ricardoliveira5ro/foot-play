@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Shirt Preview — V-neck Football Jersey</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 2rem;
+      font-family: system-ui, -apple-system, sans-serif;
+      background: repeating-linear-gradient(
+        to bottom,
+        #17603c 0 12.5%,
+        #1c7147 12.5% 25%
+      );
+    }
+
+    h1 {
+      color: #f8faf8;
+      font-size: 1.25rem;
+      font-weight: 600;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+      text-shadow: 0 2px 4px rgba(16, 24, 32, 0.4);
+    }
+
+    .row {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 3rem;
+      flex-wrap: wrap;
+    }
+
+    .shirt {
+      position: relative;
+      width: 240px;
+      filter: drop-shadow(0 4px 8px rgba(16, 24, 32, 0.35));
+    }
+
+    .shirt svg {
+      display: block;
+      width: 100%;
+      height: auto;
+    }
+
+    .shirt .number {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding-top: 4%;
+      font-family: Georgia, 'Times New Roman', serif;
+      font-size: 96px; /* 40% of 240px shirt width */
+      font-weight: 700;
+      line-height: 1;
+      color: #101820;
+      pointer-events: none;
+    }
+  </style>
+</head>
+<body>
+  <h1>V-neck Football Jersey</h1>
+  <div class="row">
+    <div class="shirt">
+      <svg viewBox="0 0 64 64" aria-hidden="true">
+        <path
+          d="M28 10 L32 13 L36 10 L56 14 L62 15 L62 20 L51 22 L51 58 L13 58 L13 22 L2 20 L2 15 L8 14 L28 10 Z"
+          fill="#F8FAF8"
+          stroke="#101820"
+          stroke-width="1"
+          stroke-linejoin="round"
+        />
+      </svg>
+      <span class="number">10</span>
+    </div>
+
+    <div class="shirt">
+      <svg viewBox="0 0 64 64" aria-hidden="true">
+        <path
+          d="M28 10 L32 13 L36 10 L56 14 L62 15 L62 20 L51 22 L51 58 L13 58 L13 22 L2 20 L2 15 L8 14 L28 10 Z"
+          fill="#F8FAF8"
+          stroke="#101820"
+          stroke-width="1"
+          stroke-linejoin="round"
+        />
+      </svg>
+      <span class="number">7</span>
+    </div>
+
+    <div class="shirt">
+      <svg viewBox="0 0 64 64" aria-hidden="true">
+        <path
+          d="M28 10 L32 13 L36 10 L56 14 L62 15 L62 20 L51 22 L51 58 L13 58 L13 22 L2 20 L2 15 L8 14 L28 10 Z"
+          fill="#F8FAF8"
+          stroke="#101820"
+          stroke-width="1"
+          stroke-linejoin="round"
+        />
+      </svg>
+      <span class="number">1</span>
+    </div>
+  </div>
+</body>
+</html>
