@@ -1,6 +1,7 @@
 import { prisma } from '../prisma';
 import { fitStartingXI, type LineupPlayer } from './positionMapping';
 import type { Prisma } from '../generated/prisma/client';
+import { normalize } from './wordle';
 
 type GameWithRelations = Prisma.GameGetPayload<{
   include: {
@@ -84,7 +85,7 @@ function buildLineup(appearances: GameWithRelations['appearances'],clubId: numbe
 
   return side.map((a, i) => ({
     playerId: a.playerId,
-    displayName: a.player?.displayName ?? a.player?.name ?? '',
+    nameLength: normalize(a.player?.displayName ?? a.player?.name ?? '').length,
     shirtNumber: a.number ?? null,
     position: fitted[i].position,
     coords: fitted[i].coords,

@@ -5,7 +5,7 @@ interface GuessResult {
 
 type IndexedResult = GuessResult & { index: number };
 
-function normalize(name: string) {
+export function normalize(name: string): string {
   return name.toLowerCase()
     .normalize('NFD')
     .replace(/[\u0300-\u036f]/g, '')
