@@ -1,5 +1,5 @@
 /**
- * Pure param/query validation helpers.
+ * Pure param/query/body-field validation helpers.
  *
  * Each helper returns either the validated value or a `ValidationError`
  * matching the API error contract: `{ error, code }` with code
@@ -61,4 +61,34 @@ export const validateNonNegativeIntParam = (
   }
 
   return parseInt(value, 10);
+};
+
+/**
+ * Validates a request body field as a number (e.g. `matchId` in a guess
+ * request). Non-number or NaN values are rejected.
+ */
+export const validateNumberField = (
+  name: string,
+  value: unknown
+): ValidationResult<number> => {
+  if (typeof value !== 'number' || Number.isNaN(value)) {
+    return invalidParameter(`Body field '${name}' must be a number`);
+  }
+
+  return value;
+};
+
+/**
+ * Validates a request body field as a non-empty string (e.g. `guess` in a
+ * guess request). Non-string or whitespace-only values are rejected.
+ */
+export const validateNonEmptyStringField = (
+  name: string,
+  value: unknown
+): ValidationResult<string> => {
+  if (typeof value !== 'string' || value.trim() === '') {
+    return invalidParameter(`Body field '${name}' must be a non-empty string`);
+  }
+
+  return value;
 };

@@ -80,12 +80,12 @@ export async function searchPlayers(query: string): Promise<PlayerSearchResult[]
 }
 
 /** POST /api/guess — server-side wordle evaluation. */
-export async function submitGuess(matchId: number, playerId: number, guess: string): Promise<GuessResponse> {
+export async function submitGuess(gameId: number, playerId: number, guess: string): Promise<GuessResponse> {
   if (USE_MOCK) {
     await delay(MOCK_DELAY_MS);
     // Find the player in mock data and evaluate locally.
     for (const entry of MOCK_MATCHES) {
-      if (entry.match.id !== matchId) continue;
+      if (entry.match.id !== gameId) continue;
       const player = [...entry.homeLineup, ...entry.awayLineup].find((p) => p.playerId === playerId);
       if (!player) {
         throw new Error(`Player ${playerId} not found in mock dataset`);
@@ -98,12 +98,12 @@ export async function submitGuess(matchId: number, playerId: number, guess: stri
       const isCorrect = results.every((r) => r.result === 'CORRECT');
       return { results, isCorrect, name: isCorrect ? displayName : undefined };
     }
-    throw new Error(`Match ${matchId} not found in mock dataset`);
+    throw new Error(`Match ${gameId} not found in mock dataset`);
   }
   const response = await fetch(`${API_BASE_URL}/api/guess`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ matchId, playerId, guess }),
+    body: JSON.stringify({ gameId, playerId, guess }),
   });
   if (!response.ok) {
     throw new Error(`API request failed: /api/guess responded ${response.status}`);

@@ -55,6 +55,8 @@ export function evaluateGuess(guess: string, target: string): GuessResult[]{
     .map(({ index, ...rest }) => rest);
 }
 
-export function isCorrectGuess(guess: string, target: string): boolean {
-  return evaluateGuess(guess, target).every(r => r.result == "CORRECT");
+export function evaluateGuessWithResult(guess: string, target: string): { results: GuessResult[], isCorrect: boolean } {
+  const results = evaluateGuess(guess, target);
+
+  return { results, isCorrect: results.every(r => r.result == "CORRECT") };
 }

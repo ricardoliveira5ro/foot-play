@@ -91,3 +91,17 @@ function buildLineup(appearances: GameWithRelations['appearances'],clubId: numbe
     coords: fitted[i].coords,
   }));
 }
+
+export async function getPlayerNameForAppearance(gameId: number, playerId: number): Promise<string | null> {
+  const appearance = await prisma.appearance.findFirst({
+    where: { 
+      gameId: gameId, 
+      playerId: playerId
+    },
+    include: {
+      player: true
+    },
+  })
+
+  return appearance?.player.displayName ?? appearance?.player.name ?? null;
+}

@@ -5,7 +5,7 @@
  * Run with: npx ts-node src/services/wordle.test.ts
  */
 
-import { evaluateGuess, isCorrectGuess } from './wordle';
+import { evaluateGuess, evaluateGuessWithResult } from './wordle';
 
 function assertEqual<T>(actual: T, expected: T, message: string): void {
   const actualStr = JSON.stringify(actual);
@@ -90,11 +90,11 @@ assertEqual(longResult.length, 7, 'Ronaldinho vs Ronaldo: result truncated to ta
 // letter field is uppercase (user choice, unlike frontend which keeps original case)
 assertEqual(evaluateGuess('MESSI', 'Messi')[0].letter, 'M', 'letter field is uppercase');
 
-// isCorrectGuess("Messi", "Messi") → true
-assertTrue(isCorrectGuess('Messi', 'Messi'), 'isCorrectGuess: exact match');
+// evaluateGuessWithResult("Messi", "Messi") → true
+assertTrue(evaluateGuessWithResult('Messi', 'Messi').isCorrect, 'evaluateGuessWithResult: exact match');
 
-// isCorrectGuess("Messi", "Ronaldo") → false
-assertFalse(isCorrectGuess('Messi', 'Ronaldo'), 'isCorrectGuess: different names');
+// evaluateGuessWithResult("Messi", "Ronaldo") → false
+assertFalse(evaluateGuessWithResult('Messi', 'Ronaldo').isCorrect, 'evaluateGuessWithResult: different names');
 
 // Extra duplicate-handling case from the frontend test suite
 assertEqual(
