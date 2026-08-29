@@ -111,13 +111,13 @@ export async function submitGuess(gameId: number, playerId: number, guess: strin
   return (await response.json()) as GuessResponse;
 }
 
-/** POST /api/reveal — get all player names for game completion. */
-export async function fetchReveal(matchId: number, teamSide: TeamSide): Promise<RevealResponse> {
+/** POST /api/guess/reveal — get all player names for game completion. */
+export async function fetchReveal(gameId: number, teamSide: TeamSide): Promise<RevealResponse> {
   if (USE_MOCK) {
     await delay(MOCK_DELAY_MS);
-    const entry = MOCK_MATCHES.find((e) => e.match.id === matchId);
+    const entry = MOCK_MATCHES.find((e) => e.match.id === gameId);
     if (!entry) {
-      throw new Error(`Match ${matchId} not found in mock dataset`);
+      throw new Error(`Match ${gameId} not found in mock dataset`);
     }
     const lineup = teamSide === 'home' ? entry.homeLineup : entry.awayLineup;
     const players = lineup.map((p) => {
@@ -126,13 +126,13 @@ export async function fetchReveal(matchId: number, teamSide: TeamSide): Promise<
     });
     return { players };
   }
-  const response = await fetch(`${API_BASE_URL}/api/reveal`, {
+  const response = await fetch(`${API_BASE_URL}/api/guess/reveal`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ matchId, teamSide }),
+    body: JSON.stringify({ gameId, teamSide }),
   });
   if (!response.ok) {
-    throw new Error(`API request failed: /api/reveal responded ${response.status}`);
+    throw new Error(`API request failed: /api/guess/reveal responded ${response.status}`);
   }
   return (await response.json()) as RevealResponse;
 }

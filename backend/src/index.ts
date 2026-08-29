@@ -3,8 +3,10 @@ dotenv.config({ path: '../.env' });
 
 import express from 'express';
 import cors from 'cors';
+
 import { errorHandler } from './middleware/errorHandler';
 import { logger } from './middleware/logger';
+
 import matchesRouter from './routes/matches';
 import playersRouter from './routes/players';
 import guessRouter from './routes/guess';

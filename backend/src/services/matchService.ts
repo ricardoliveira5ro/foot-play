@@ -105,3 +105,11 @@ export async function getPlayerNameForAppearance(gameId: number, playerId: numbe
 
   return appearance?.player.displayName ?? appearance?.player.name ?? null;
 }
+
+export async function getRevealAppearances(gameId: number, clubId: number) {
+  return prisma.appearance.findMany({
+    where: { gameId, clubId },
+    include: { player: { select: { displayName: true, name: true } } },
+    orderBy: [{ number: { sort: 'asc', nulls: 'last' } }, { playerId: 'asc' }],
+  });
+}

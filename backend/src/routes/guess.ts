@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { asyncHandler } from '../middleware/asyncHandler';
-import { validateNonEmptyStringField, validateNumberField } from '../middleware/validate';
-import { getPlayerNameForAppearance } from '../services/matchService';
+import { validateEnumStringField, validateNonEmptyStringField, validateNumberField } from '../middleware/validate';
+import { getMatchById, getPlayerNameForAppearance, getRevealAppearances } from '../services/matchService';
 import { evaluateGuessWithResult } from '../services/wordle';
 
 const router = Router();
@@ -40,6 +40,29 @@ router.post('/', asyncHandler(async (req, res) => {
     res.json(response);
   }
 
+}));
+
+router.post('/reveal', asyncHandler(async (req, res) => {
+  const gameId = validateNumberField('gameId', req.body?.gameId);
+  if (typeof gameId === 'object' && gameId !== null && 'error' in gameId) {
+    return res.status(400).json(gameId);
+  }
+
+  const teamSide = validateEnumStringField('teamSide', req.body?.teamSide, ["home", "away"]);
+  if (typeof teamSide === 'object' && teamSide !== null && 'error' in teamSide) {
+    return res.status(400).json(teamSide);
+  }
+
+  const game = await getMatchById(gameId);
+
+  if (!game) {
+    return res.status(404).json({ error: `Game ${gameId} not found`, code: 'NOT_FOUND' })
+  }
+
+  const clubId = teamSide === "home" ? game.homeClubId : game.awayClubId;
+  const appearances = await getRevealAppearances(gameId, clubId);
+
+  res.json(appearances.map(ap => ({ playerId: ap.playerId, name: ap.player.displayName ?? ap.player.name ?? '', shirtNumber: ap.number })));
 }));
 
 export default router;

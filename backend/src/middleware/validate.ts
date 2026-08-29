@@ -92,3 +92,24 @@ export const validateNonEmptyStringField = (
 
   return value;
 };
+
+/**
+ * Validates a request body field as a string that must be one of a fixed set
+ * of allowed values (an enum / one-of). Non-string, whitespace-only, or values
+ * outside the allowed set are rejected.
+ */
+export const validateEnumStringField = (
+  name: string,
+  value: unknown,
+  allowed: string[]
+): ValidationResult<string> => {
+  if (typeof value !== 'string' || value.trim() === '') {
+    return invalidParameter(`Body field '${name}' must be a non-empty string`);
+  }
+
+  if (!allowed.includes(value)) {
+    return invalidParameter(`Body field '${name}' must be one of: ${allowed.join(', ')}`);
+  }
+
+  return value;
+};
