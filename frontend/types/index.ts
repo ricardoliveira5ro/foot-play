@@ -18,7 +18,12 @@ export interface PositionCoords {
 
 /** One starting-XI entry, as returned by the lineup endpoints. */
 export interface LineupPlayer {
-  playerId: number;
+  /**
+   * Opaque per-game token identifying the player behind this shirt.
+   * Replaces the stable DB `playerId` in lineup payloads so a correct guess
+   * in one game cannot be reused to cheat in another.
+   */
+  token: string;
   /** Normalized length of the player's name (no spaces/diacritics). */
   nameLength: number;
   shirtNumber: number | null;

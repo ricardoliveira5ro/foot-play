@@ -53,8 +53,9 @@ export default function GameComplete({ isWin, match, teamSide, shirts, revealedP
   const dateLabel = formatMatchDate(match.date) ?? match.season;
   const teamName = teamSide === 'home' ? home : away;
 
-  // Map revealed players by playerId for name lookup.
-  const revealedByName = new Map(revealedPlayers.map((p) => [p.playerId, p.name]));
+  // Map revealed players by shirtNumber for name lookup. Shirts carry opaque
+  // tokens now, but shirtNumber is present and unique on both sides.
+  const revealedByName = new Map(revealedPlayers.map((p) => [p.shirtNumber, p.name]));
 
   // Calculate stats
   const totalShirts = shirts.length;
@@ -136,11 +137,11 @@ export default function GameComplete({ isWin, match, teamSide, shirts, revealedP
                 const isCorrect = shirt.state === 'correct';
                 const isFailed = shirt.state === 'failed';
                 const showName = isCorrect || isFailed;
-                const revealedName = revealedByName.get(shirt.playerId);
+                const revealedName = revealedByName.get(shirt.shirtNumber);
 
                 return (
                   <div
-                    key={shirt.playerId}
+                    key={shirt.token}
                     className="flex items-center gap-3 p-3 rounded-lg transition-colors"
                     style={{
                       backgroundColor: isCorrect

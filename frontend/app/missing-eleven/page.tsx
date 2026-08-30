@@ -66,15 +66,15 @@ export default function MissingElevenPage() {
     (state.shirts[activeShirtIndex].state === 'default' || state.shirts[activeShirtIndex].state === 'in-progress');
 
   const activeShirt = shouldShowModal ? state.shirts[activeShirtIndex!] : null;
-  const activeShirtState = activeShirt ? state.shirts.find(s => s.playerId === activeShirt.playerId) : null;
+  const activeShirtState = activeShirt ? state.shirts.find(s => s.token === activeShirt.token) : null;
   const guessHistory = activeShirtState?.guessHistory ?? [];
 
-  const handleShirtClick = useCallback((playerId: number) => {
-    const shirt = state.shirts.find(s => s.playerId === playerId);
+  const handleShirtClick = useCallback((token: string) => {
+    const shirt = state.shirts.find(s => s.token === token);
     if (!shirt) return;
     if (shirt.state === 'correct' || shirt.state === 'failed') return;
     if (state.gameStatus !== 'playing') return;
-    openShirt(playerId);
+    openShirt(token);
   }, [state.shirts, state.gameStatus, openShirt]);
 
   const handleModalClose = useCallback(() => {
@@ -85,8 +85,8 @@ export default function MissingElevenPage() {
     if (!activeShirt || !state.match) return;
 
     try {
-      const response = await submitGuessApi(state.match.match.id, activeShirt.playerId, guess);
-      submitGuess(activeShirt.playerId, response.results, response.isCorrect, response.name);
+      const response = await submitGuessApi(state.match.match.id, activeShirt.token, guess);
+      submitGuess(activeShirt.token, response.results, response.isCorrect, response.name);
     } catch (cause: unknown) {
       setError(describeError(cause));
     }
@@ -161,7 +161,7 @@ export default function MissingElevenPage() {
   const teamName =
     (state.teamSide === 'home' ? state.match.match.homeClub?.name : state.match.match.awayClub?.name) ?? 'Unknown team';
   const shirts: ShirtData[] = lineup.map((entry) => {
-    const existing = state.shirts.find(s => s.playerId === entry.playerId);
+    const existing = state.shirts.find(s => s.token === entry.token);
     return existing
       ? { ...entry, state: existing.state, guessHistory: existing.guessHistory, name: existing.name }
       : { ...entry, state: 'default' as const, guessHistory: [] };

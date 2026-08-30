@@ -12,7 +12,7 @@ interface ShirtProps {
   shirt: ShirtData;
   /** Squad index, used to stagger the entrance animation. */
   index: number;
-  onClick?: (playerId: number) => void;
+  onClick?: (token: string) => void;
   /** Guess history for this shirt (used for LetterSlots preview) */
   guessHistory?: GuessResult[][];
 }
@@ -114,7 +114,7 @@ function StateBadge({ state }: { state: Extract<ShirtState, 'correct' | 'failed'
  * The whole unit is a button with an expanded (>=44px) hit area.
  */
 export default function Shirt({ shirt, index, onClick, guessHistory }: ShirtProps) {
-  const { playerId, nameLength, shirtNumber, coords, state } = shirt;
+  const { token, nameLength, shirtNumber, coords, state } = shirt;
 
   return (
     <div
@@ -128,7 +128,7 @@ export default function Shirt({ shirt, index, onClick, guessHistory }: ShirtProp
     >
       <button
         type="button"
-        onClick={onClick ? () => onClick(playerId) : undefined}
+        onClick={onClick ? () => onClick(token) : undefined}
         aria-label={shirtAriaLabel(state, shirtNumber, shirt.name)}
         className={`-m-2 block w-[calc(100%+1rem)] rounded-md p-2 transition-[transform,filter] duration-150 ease-out hover:-translate-y-0.5 hover:drop-shadow-[0_4px_6px_rgba(16,24,32,0.35)] ${state === 'failed' ? 'opacity-60 saturate-[0.6]' : ''}`}
       >

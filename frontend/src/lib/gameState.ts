@@ -28,9 +28,9 @@ export interface GameState {
 export type GameAction =
   | { type: 'SET_MATCH'; payload: MatchResponse }
   | { type: 'SELECT_TEAM'; payload: TeamSide }
-  | { type: 'OPEN_SHIRT'; payload: number }
+  | { type: 'OPEN_SHIRT'; payload: string }
   | { type: 'CLOSE_SHIRT' }
-  | { type: 'SUBMIT_GUESS'; payload: { playerId: number; results: GuessResult[]; isCorrect: boolean; name?: string } }
+  | { type: 'SUBMIT_GUESS'; payload: { token: string; results: GuessResult[]; isCorrect: boolean; name?: string } }
   | { type: 'NEW_GAME' }
   | { type: 'SET_ERROR'; payload: string | null }
   | { type: 'SET_LOADING'; payload: boolean };
@@ -68,11 +68,11 @@ function createShirts(lineup: LineupPlayer[]): ShirtGameData[] {
 
 function updateShirtState(
   shirts: ShirtGameData[],
-  playerId: number,
+  token: string,
   updates: Partial<ShirtGameData>
 ): ShirtGameData[] {
   return shirts.map(shirt => {
-    if (shirt.playerId === playerId) {
+    if (shirt.token === token) {
       return { ...shirt, ...updates };
     }
     return shirt;
@@ -113,7 +113,7 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
     }
 
     case 'OPEN_SHIRT': {
-      const shirtIndex = state.shirts.findIndex(s => s.playerId === action.payload);
+      const shirtIndex = state.shirts.findIndex(s => s.token === action.payload);
       if (shirtIndex === -1) return state;
       const shirt = state.shirts[shirtIndex];
       if (shirt.state === 'correct' || shirt.state === 'failed') return state;
@@ -133,8 +133,8 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
     case 'SUBMIT_GUESS': {
       if (!state.match || state.gameStatus !== 'playing') return state;
 
-      const { playerId, results, isCorrect, name } = action.payload;
-      const shirtIndex = state.shirts.findIndex(s => s.playerId === playerId);
+      const { token, results, isCorrect, name } = action.payload;
+      const shirtIndex = state.shirts.findIndex(s => s.token === token);
       if (shirtIndex === -1) return state;
 
       const shirt = state.shirts[shirtIndex];
@@ -151,7 +151,7 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
         newShirtState = 'correct';
         shouldCloseModal = true;
         // Check win condition
-        const updatedShirts = updateShirtState(state.shirts, playerId, {
+        const updatedShirts = updateShirtState(state.shirts, token, {
           state: newShirtState,
           attempts: newAttempts,
           guessHistory: [...shirt.guessHistory, results],
@@ -170,7 +170,7 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
         // Failed - no more attempts
         newShirtState = 'failed';
         shouldCloseModal = true;
-        const updatedShirts = updateShirtState(state.shirts, playerId, {
+        const updatedShirts = updateShirtState(state.shirts, token, {
           state: newShirtState,
           attempts: newAttempts,
           guessHistory: [...shirt.guessHistory, results],
@@ -186,7 +186,7 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
       } else {
         // In progress - more attempts remaining
         newShirtState = 'in-progress';
-        const updatedShirts = updateShirtState(state.shirts, playerId, {
+        const updatedShirts = updateShirtState(state.shirts, token, {
           state: newShirtState,
           attempts: newAttempts,
           guessHistory: [...shirt.guessHistory, results],
@@ -230,9 +230,9 @@ interface UseGameStateReturn {
   dispatch: React.Dispatch<GameAction>;
   startNewGame: (match: MatchResponse) => void;
   selectTeam: (side: TeamSide) => void;
-  openShirt: (playerId: number) => void;
+  openShirt: (token: string) => void;
   closeShirt: () => void;
-  submitGuess: (playerId: number, results: GuessResult[], isCorrect: boolean, name?: string) => void;
+  submitGuess: (token: string, results: GuessResult[], isCorrect: boolean, name?: string) => void;
   newGame: () => void;
   setError: (error: string | null) => void;
   setLoading: (loading: boolean) => void;
@@ -250,16 +250,16 @@ export function useGameState(): UseGameStateReturn {
     dispatch({ type: 'SELECT_TEAM', payload: side });
   }, []);
 
-  const openShirt = useCallback((playerId: number) => {
-    dispatch({ type: 'OPEN_SHIRT', payload: playerId });
+  const openShirt = useCallback((token: string) => {
+    dispatch({ type: 'OPEN_SHIRT', payload: token });
   }, []);
 
   const closeShirt = useCallback(() => {
     dispatch({ type: 'CLOSE_SHIRT' });
   }, []);
 
-  const submitGuess = useCallback((playerId: number, results: GuessResult[], isCorrect: boolean, name?: string) => {
-    dispatch({ type: 'SUBMIT_GUESS', payload: { playerId, results, isCorrect, name } });
+  const submitGuess = useCallback((token: string, results: GuessResult[], isCorrect: boolean, name?: string) => {
+    dispatch({ type: 'SUBMIT_GUESS', payload: { token, results, isCorrect, name } });
   }, []);
 
   const newGame = useCallback(() => {
