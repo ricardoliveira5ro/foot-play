@@ -86,7 +86,7 @@ export default function MissingElevenPage() {
 
     try {
       const response = await submitGuessApi(state.match.match.id, activeShirt.playerId, guess);
-      submitGuess(activeShirt.playerId, response.results, response.isCorrect);
+      submitGuess(activeShirt.playerId, response.results, response.isCorrect, response.name);
     } catch (cause: unknown) {
       setError(describeError(cause));
     }
@@ -163,7 +163,7 @@ export default function MissingElevenPage() {
   const shirts: ShirtData[] = lineup.map((entry) => {
     const existing = state.shirts.find(s => s.playerId === entry.playerId);
     return existing
-      ? { ...entry, state: existing.state, guessHistory: existing.guessHistory }
+      ? { ...entry, state: existing.state, guessHistory: existing.guessHistory, name: existing.name }
       : { ...entry, state: 'default' as const, guessHistory: [] };
   });
 

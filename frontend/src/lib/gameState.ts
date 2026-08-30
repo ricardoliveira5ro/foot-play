@@ -30,7 +30,7 @@ export type GameAction =
   | { type: 'SELECT_TEAM'; payload: TeamSide }
   | { type: 'OPEN_SHIRT'; payload: number }
   | { type: 'CLOSE_SHIRT' }
-  | { type: 'SUBMIT_GUESS'; payload: { playerId: number; results: GuessResult[]; isCorrect: boolean } }
+  | { type: 'SUBMIT_GUESS'; payload: { playerId: number; results: GuessResult[]; isCorrect: boolean; name?: string } }
   | { type: 'NEW_GAME' }
   | { type: 'SET_ERROR'; payload: string | null }
   | { type: 'SET_LOADING'; payload: boolean };
@@ -133,7 +133,7 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
     case 'SUBMIT_GUESS': {
       if (!state.match || state.gameStatus !== 'playing') return state;
 
-      const { playerId, results, isCorrect } = action.payload;
+      const { playerId, results, isCorrect, name } = action.payload;
       const shirtIndex = state.shirts.findIndex(s => s.playerId === playerId);
       if (shirtIndex === -1) return state;
 
@@ -155,6 +155,7 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
           state: newShirtState,
           attempts: newAttempts,
           guessHistory: [...shirt.guessHistory, results],
+          name,
         });
         if (checkWinCondition(updatedShirts)) {
           newGameStatus = 'won';
@@ -231,7 +232,7 @@ interface UseGameStateReturn {
   selectTeam: (side: TeamSide) => void;
   openShirt: (playerId: number) => void;
   closeShirt: () => void;
-  submitGuess: (playerId: number, results: GuessResult[], isCorrect: boolean) => void;
+  submitGuess: (playerId: number, results: GuessResult[], isCorrect: boolean, name?: string) => void;
   newGame: () => void;
   setError: (error: string | null) => void;
   setLoading: (loading: boolean) => void;
@@ -257,8 +258,8 @@ export function useGameState(): UseGameStateReturn {
     dispatch({ type: 'CLOSE_SHIRT' });
   }, []);
 
-  const submitGuess = useCallback((playerId: number, results: GuessResult[], isCorrect: boolean) => {
-    dispatch({ type: 'SUBMIT_GUESS', payload: { playerId, results, isCorrect } });
+  const submitGuess = useCallback((playerId: number, results: GuessResult[], isCorrect: boolean, name?: string) => {
+    dispatch({ type: 'SUBMIT_GUESS', payload: { playerId, results, isCorrect, name } });
   }, []);
 
   const newGame = useCallback(() => {

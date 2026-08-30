@@ -21,6 +21,7 @@ interface ShirtProps {
 function shirtAriaLabel(
   state: ShirtState,
   shirtNumber: number | null,
+  name?: string,
 ): string {
   const number = shirtNumber ?? '?';
   switch (state) {
@@ -29,7 +30,9 @@ function shirtAriaLabel(
     case 'in-progress':
       return `Shirt ${number}, guessing in progress`;
     case 'correct':
-      return `Shirt ${number}, guessed correctly`;
+      return name
+        ? `Shirt ${number}, guessed correctly: ${name}`
+        : `Shirt ${number}, guessed correctly`;
     case 'failed':
       return `Shirt ${number}, not guessed`;
   }
@@ -126,7 +129,7 @@ export default function Shirt({ shirt, index, onClick, guessHistory }: ShirtProp
       <button
         type="button"
         onClick={onClick ? () => onClick(playerId) : undefined}
-        aria-label={shirtAriaLabel(state, shirtNumber)}
+        aria-label={shirtAriaLabel(state, shirtNumber, shirt.name)}
         className={`-m-2 block w-[calc(100%+1rem)] rounded-md p-2 transition-[transform,filter] duration-150 ease-out hover:-translate-y-0.5 hover:drop-shadow-[0_4px_6px_rgba(16,24,32,0.35)] ${state === 'failed' ? 'opacity-60 saturate-[0.6]' : ''}`}
       >
         {/* Inner wrapper carries the entrance animation so positional and
@@ -159,7 +162,7 @@ export default function Shirt({ shirt, index, onClick, guessHistory }: ShirtProp
           )}
           {state === 'correct' && (
             <span className="block max-w-35 truncate text-[13px] font-semibold text-correct">
-              {shirtNumber !== null ? `#${shirtNumber}` : 'Correct'}
+              {shirt.name ?? (shirtNumber !== null ? `#${shirtNumber}` : 'Correct')}
             </span>
           )}
           {state === 'failed' && (

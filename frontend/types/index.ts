@@ -73,6 +73,8 @@ export interface ShirtData extends LineupPlayer {
   state: ShirtState;
   /** Guess history for shirt preview (optional — only available when game is active) */
   guessHistory?: GuessResult[][];
+  /** Player name — only set once the shirt is guessed correctly. */
+  name?: string;
 }
 
 /** Per-letter feedback for a single guess. */
