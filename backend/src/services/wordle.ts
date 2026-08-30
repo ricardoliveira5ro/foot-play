@@ -28,6 +28,7 @@ export function evaluateGuess(guess: string, target: string): GuessResult[]{
 
   let presentGuesses: IndexedResult[] = [];
   const presentIndexes: number[] = [];
+  const presentGuessIndexes: number[] = [];
 
   for (let i = 0; i < normalizedName.length; i++) {
     if (correctIndexes.includes(i)) continue;
@@ -36,6 +37,7 @@ export function evaluateGuess(guess: string, target: string): GuessResult[]{
       if (!correctIndexes.includes(j) && !presentIndexes.includes(j) && normalizedGuess.charAt(i) == normalizedName.charAt(j)) {
         presentGuesses.push({ index: i, letter: normalizedGuess.charAt(i).toUpperCase(), result: "PRESENT" })
         presentIndexes.push(j);
+        presentGuessIndexes.push(i);
         break;
       }
     }
@@ -44,7 +46,7 @@ export function evaluateGuess(guess: string, target: string): GuessResult[]{
   let absentGuesses: IndexedResult[] = [];
 
   for (let i = 0; i < normalizedName.length; i++) {
-    if (!correctIndexes.includes(i) && !presentIndexes.includes(i)) {
+    if (!correctIndexes.includes(i) && !presentGuessIndexes.includes(i)) {
       absentGuesses.push({ index: i, letter: normalizedGuess.charAt(i).toUpperCase(), result: "ABSENT" })
     }
   }

@@ -68,10 +68,32 @@ assertEqual(
 );
 
 // evaluateGuess("ALARM", "APPLE") → A:CORRECT, L:PRESENT, A:ABSENT, R:ABSENT, M:ABSENT
+// Full objects asserted: the L at guess index 1 is PRESENT, so guess index 1 must
+// NOT also produce an ABSENT entry, and guess index 3 (R) must not be dropped.
 assertEqual(
-  evaluateGuess('ALARM', 'APPLE').map(r => r.result),
-  ['CORRECT', 'PRESENT', 'ABSENT', 'ABSENT', 'ABSENT'],
+  evaluateGuess('ALARM', 'APPLE'),
+  [
+    { letter: 'A', result: 'CORRECT' },
+    { letter: 'L', result: 'PRESENT' },
+    { letter: 'A', result: 'ABSENT' },
+    { letter: 'R', result: 'ABSENT' },
+    { letter: 'M', result: 'ABSENT' },
+  ],
   'ALARM vs APPLE: duplicate A handling'
+);
+
+// evaluateGuess("NANI", "Ruiz") → N:ABSENT, A:ABSENT, N:ABSENT, I:PRESENT
+// The I at guess index 3 is PRESENT (target index 2). Guess index 2 (N) must still
+// produce its own ABSENT entry, and guess index 3 must not be duplicated.
+assertEqual(
+  evaluateGuess('NANI', 'Ruiz'),
+  [
+    { letter: 'N', result: 'ABSENT' },
+    { letter: 'A', result: 'ABSENT' },
+    { letter: 'N', result: 'ABSENT' },
+    { letter: 'I', result: 'PRESENT' },
+  ],
+  'NANI vs Ruiz: present letter at different index, one entry per guess position'
 );
 
 // evaluateGuess("Ron", "Ronaldo") → R:CORRECT, O:CORRECT, N:CORRECT, then ABSENT padding
