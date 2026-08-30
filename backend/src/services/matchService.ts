@@ -2,6 +2,7 @@ import { prisma } from '../prisma';
 import { fitStartingXI, type LineupPlayer } from './positionMapping';
 import type { Prisma } from '../generated/prisma/client';
 import { normalize } from './wordle';
+import { generatePlayerToken, resolvePlayerToken } from './tokenService';
 
 type GameWithRelations = Prisma.GameGetPayload<{
   include: {
@@ -61,12 +62,12 @@ export function buildMatchResponse(game: GameWithRelations) {
       homeFormation: game.homeClubFormation ?? null,
       awayFormation: game.awayClubFormation ?? null,
     },
-    homeLineup: buildLineup(game.appearances, game.homeClubId, game.homeClubFormation),
-    awayLineup: buildLineup(game.appearances, game.awayClubId, game.awayClubFormation),
+    homeLineup: buildLineup(game.gameId, game.appearances, game.homeClubId, game.homeClubFormation),
+    awayLineup: buildLineup(game.gameId, game.appearances, game.awayClubId, game.awayClubFormation),
   };
 }
 
-function buildLineup(appearances: GameWithRelations['appearances'],clubId: number,formation: string | null) {
+function buildLineup(gameId: number, appearances: GameWithRelations['appearances'], clubId: number, formation: string | null) {
   const side = appearances
     .filter((a) => a.clubId === clubId)
     .sort((a, b) => {
@@ -84,7 +85,7 @@ function buildLineup(appearances: GameWithRelations['appearances'],clubId: numbe
   const fitted = fitStartingXI(lineupPlayers, formation);
 
   return side.map((a, i) => ({
-    playerId: a.playerId,
+    token: generatePlayerToken(gameId, a.playerId),
     nameLength: normalize(a.player?.displayName ?? a.player?.name ?? '').length,
     shirtNumber: a.number ?? null,
     position: fitted[i].position,
@@ -92,15 +93,14 @@ function buildLineup(appearances: GameWithRelations['appearances'],clubId: numbe
   }));
 }
 
-export async function getPlayerNameForAppearance(gameId: number, playerId: number): Promise<string | null> {
+export async function getPlayerNameForAppearance(gameId: number, token: string): Promise<string | null> {
+  const playerId = await resolvePlayerToken(gameId, token);
+
+  if (!playerId) return null;
+
   const appearance = await prisma.appearance.findFirst({
-    where: { 
-      gameId: gameId, 
-      playerId: playerId
-    },
-    include: {
-      player: true
-    },
+    where: { gameId, playerId },
+    include: { player: true }
   })
 
   return appearance?.player.displayName ?? appearance?.player.name ?? null;

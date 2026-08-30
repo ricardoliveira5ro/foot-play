@@ -12,9 +12,9 @@ router.post('/', asyncHandler(async (req, res) => {
     return res.status(400).json(gameId);
   }
 
-  const playerId = validateNumberField('playerId', req.body?.playerId);
-  if (typeof playerId === 'object' && playerId !== null && 'error' in playerId) {
-    return res.status(400).json(playerId);
+  const token = validateNonEmptyStringField('token', req.body?.token);
+  if (typeof token === 'object' && token !== null && 'error' in token) {
+    return res.status(400).json(token);
   }
 
   const guess = validateNonEmptyStringField('guess', req.body?.guess);
@@ -22,10 +22,10 @@ router.post('/', asyncHandler(async (req, res) => {
     return res.status(400).json(guess);
   }
 
-  const playerName = await getPlayerNameForAppearance(gameId, playerId)
+  const playerName = await getPlayerNameForAppearance(gameId, token)
 
   if (!playerName) {
-    return res.status(404).json({ error: `Player ${playerId} not found`, code: 'NOT_FOUND' })
+    return res.status(404).json({ error: `Player not found`, code: 'NOT_FOUND' })
   }
 
   const result = evaluateGuessWithResult(guess, playerName);
