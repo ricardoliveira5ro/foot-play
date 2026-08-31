@@ -181,35 +181,35 @@ const FORMATION_LAYOUTS: Record<string, LayoutDef> = asNullProto({
   // 3-band family (DEF/MID/FWD; DM folds into MID; wingers -> FWD)
   '4-4-2': { family: '3-band', slots: ['GK', 'CB1', 'CB2', 'LB', 'RB', 'LM', 'CM1', 'CM2', 'RM', 'CF1', 'CF2'] },
   '4-4-2 double 6': { family: '3-band', slots: ['GK', 'CB1', 'CB2', 'LB', 'RB', 'DM1', 'DM2', 'LM', 'RM', 'CF1', 'CF2'] },
-  '4-4-2 diamond': { family: '3-band', slots: ['GK', 'CB1', 'CB2', 'LB', 'RB', 'DM1', 'LM', 'RM', 'AM', 'CF1', 'CF2'] },
-  '4-3-3': { family: '3-band', slots: ['GK', 'CB1', 'CB2', 'LB', 'RB', 'CM1', 'CM2', 'CM3', 'LW', 'RW', 'CF1'] },
-  '4-3-3 attacking': { family: '3-band', slots: ['GK', 'CB1', 'CB2', 'LB', 'RB', 'CM1', 'CM2', 'CM3', 'LW', 'RW', 'CF1'] },
-  '4-3-3 defending': { family: '3-band', slots: ['GK', 'CB1', 'CB2', 'LB', 'RB', 'CM1', 'CM2', 'CM3', 'LW', 'RW', 'CF1'] },
-  '4-5-1': { family: '3-band', slots: ['GK', 'CB1', 'CB2', 'LB', 'RB', 'DM1', 'LM', 'CM1', 'CM2', 'RM', 'CF1'] },
-  '4-5-1 flat': { family: '3-band', slots: ['GK', 'CB1', 'CB2', 'LB', 'RB', 'DM1', 'LM', 'CM1', 'CM2', 'RM', 'CF1'] },
-  '3-5-2': { family: '3-band', slots: ['GK', 'CB1', 'CB2', 'CB3', 'DM1', 'CM1', 'CM2', 'LM', 'RM', 'CF1', 'CF2'] },
-  '3-5-2 flat': { family: '3-band', slots: ['GK', 'CB1', 'CB2', 'CB3', 'DM1', 'CM1', 'CM2', 'LM', 'RM', 'CF1', 'CF2'] },
-  '3-5-2 attacking': { family: '3-band', slots: ['GK', 'CB1', 'CB2', 'CB3', 'DM1', 'CM1', 'CM2', 'LM', 'RM', 'CF1', 'CF2'] },
+  '4-4-2 diamond': { family: '3-band', slots: ['GK', 'CB1', 'CB2', 'LB', 'RB', 'DM3', 'LM', 'RM', 'AM', 'CF1', 'CF2'] },
+  '4-3-3': { family: '3-band', slots: ['GK', 'CB1', 'CB2', 'LB', 'RB', 'CM1', 'CM2', 'CM3', 'LW', 'RW', 'CF3'] },
+  '4-3-3 attacking': { family: '3-band', slots: ['GK', 'CB1', 'CB2', 'LB', 'RB', 'CM1', 'CM2', 'CM3', 'LW', 'RW', 'CF3'] },
+  '4-3-3 defending': { family: '3-band', slots: ['GK', 'CB1', 'CB2', 'LB', 'RB', 'CM1', 'CM2', 'CM3', 'LW', 'RW', 'CF3'] },
+  '4-5-1': { family: '3-band', slots: ['GK', 'CB1', 'CB2', 'LB', 'RB', 'DM3', 'LM', 'CM1', 'CM2', 'RM', 'CF3'] },
+  '4-5-1 flat': { family: '3-band', slots: ['GK', 'CB1', 'CB2', 'LB', 'RB', 'DM3', 'LM', 'CM1', 'CM2', 'RM', 'CF3'] },
+  '3-5-2': { family: '3-band', slots: ['GK', 'CB1', 'CB2', 'CB3', 'DM3', 'CM1', 'CM2', 'LM', 'RM', 'CF1', 'CF2'] },
+  '3-5-2 flat': { family: '3-band', slots: ['GK', 'CB1', 'CB2', 'CB3', 'DM3', 'CM1', 'CM2', 'LM', 'RM', 'CF1', 'CF2'] },
+  '3-5-2 attacking': { family: '3-band', slots: ['GK', 'CB1', 'CB2', 'CB3', 'DM3', 'CM1', 'CM2', 'LM', 'RM', 'CF1', 'CF2'] },
   '5-3-2': { family: '3-band', slots: ['GK', 'CB1', 'CB2', 'CB3', 'LB', 'RB', 'CM1', 'CM2', 'CM3', 'CF1', 'CF2'] },
-  '5-4-1': { family: '3-band', slots: ['GK', 'CB1', 'CB2', 'CB3', 'LB', 'RB', 'LM', 'CM1', 'CM2', 'RM', 'CF1'] },
-  '5-4-1 diamond': { family: '3-band', slots: ['GK', 'CB1', 'CB2', 'CB3', 'LB', 'RB', 'DM1', 'LM', 'RM', 'AM', 'CF1'] },
-  '5-2-3': { family: '3-band', slots: ['GK', 'CB1', 'CB2', 'CB3', 'LB', 'RB', 'DM1', 'DM2', 'LW', 'RW', 'CF1'] },
+  '5-4-1': { family: '3-band', slots: ['GK', 'CB1', 'CB2', 'CB3', 'LB', 'RB', 'LM', 'CM1', 'CM2', 'RM', 'CF3'] },
+  '5-4-1 diamond': { family: '3-band', slots: ['GK', 'CB1', 'CB2', 'CB3', 'LB', 'RB', 'DM3', 'LM', 'RM', 'AM', 'CF3'] },
+  '5-2-3': { family: '3-band', slots: ['GK', 'CB1', 'CB2', 'CB3', 'LB', 'RB', 'DM1', 'DM2', 'LW', 'RW', 'CF3'] },
   '4-2-4': { family: '3-band', slots: ['GK', 'CB1', 'CB2', 'LB', 'RB', 'DM1', 'DM2', 'LW', 'RW', 'CF1', 'CF2'] },
-  '3-6-1': { family: '3-band', slots: ['GK', 'CB1', 'CB2', 'CB3', 'DM1', 'CM1', 'CM2', 'LM', 'RM', 'AM', 'CF1'] },
-  '3-4-3': { family: '3-band', slots: ['GK', 'CB1', 'CB2', 'CB3', 'LM', 'CM1', 'CM2', 'RM', 'LW', 'RW', 'CF1'] },
-  '3-4-3 diamond': { family: '3-band', slots: ['GK', 'CB1', 'CB2', 'CB3', 'DM1', 'LM', 'RM', 'AM', 'LW', 'RW', 'CF1'] },
+  '3-6-1': { family: '3-band', slots: ['GK', 'CB1', 'CB2', 'CB3', 'DM3', 'CM1', 'CM2', 'LM', 'RM', 'AM', 'CF3'] },
+  '3-4-3': { family: '3-band', slots: ['GK', 'CB1', 'CB2', 'CB3', 'LM', 'CM1', 'CM2', 'RM', 'LW', 'RW', 'CF3'] },
+  '3-4-3 diamond': { family: '3-band', slots: ['GK', 'CB1', 'CB2', 'CB3', 'DM3', 'LM', 'RM', 'AM', 'LW', 'RW', 'CF3'] },
   // DM-type 4-band (DEF/DM/MID/FWD; wingers/AM -> MID)
-  '4-2-3-1': { family: 'dm-4-band', slots: ['GK', 'CB1', 'CB2', 'LB', 'RB', 'DM1', 'DM2', 'LW', 'AM', 'RW', 'CF1'] },
-  '4-1-4-1': { family: 'dm-4-band', slots: ['GK', 'CB1', 'CB2', 'LB', 'RB', 'DM1', 'LM', 'CM1', 'CM2', 'RM', 'CF1'] },
-  '4-1-3-2': { family: 'dm-4-band', slots: ['GK', 'CB1', 'CB2', 'LB', 'RB', 'DM1', 'LM', 'AM', 'RM', 'CF1', 'CF2'] },
-  '3-1-4-2': { family: 'dm-4-band', slots: ['GK', 'CB1', 'CB2', 'CB3', 'DM1', 'LM', 'CM1', 'CM2', 'RM', 'CF1', 'CF2'] },
-  '3-3-3-1': { family: 'dm-4-band', slots: ['GK', 'CB1', 'CB2', 'CB3', 'DM1', 'DM2', 'DM3', 'CM1', 'CM2', 'CM3', 'CF1'] },
+  '4-2-3-1': { family: 'dm-4-band', slots: ['GK', 'CB1', 'CB2', 'LB', 'RB', 'DM1', 'DM2', 'LW', 'AM', 'RW', 'CF3'] },
+  '4-1-4-1': { family: 'dm-4-band', slots: ['GK', 'CB1', 'CB2', 'LB', 'RB', 'DM3', 'LM', 'CM1', 'CM2', 'RM', 'CF3'] },
+  '4-1-3-2': { family: 'dm-4-band', slots: ['GK', 'CB1', 'CB2', 'LB', 'RB', 'DM3', 'LM', 'AM', 'RM', 'CF1', 'CF2'] },
+  '3-1-4-2': { family: 'dm-4-band', slots: ['GK', 'CB1', 'CB2', 'CB3', 'DM3', 'LM', 'CM1', 'CM2', 'RM', 'CF1', 'CF2'] },
+  '3-3-3-1': { family: 'dm-4-band', slots: ['GK', 'CB1', 'CB2', 'CB3', 'DM1', 'DM2', 'DM3', 'CM1', 'CM2', 'CM3', 'CF3'] },
   // MID-type 4-band (DEF/MID+AM/FWD)
-  '3-4-2-1': { family: 'mid-4-band', slots: ['GK', 'CB1', 'CB2', 'CB3', 'LM', 'CM1', 'CM2', 'RM', 'AM1', 'AM2', 'CF1'] },
+  '3-4-2-1': { family: 'mid-4-band', slots: ['GK', 'CB1', 'CB2', 'CB3', 'LM', 'CM1', 'CM2', 'RM', 'AM1', 'AM2', 'CF3'] },
   '4-3-1-2': { family: 'mid-4-band', slots: ['GK', 'CB1', 'CB2', 'LB', 'RB', 'CM1', 'CM2', 'CM3', 'AM', 'CF1', 'CF2'] },
-  '4-4-1-1': { family: 'mid-4-band', slots: ['GK', 'CB1', 'CB2', 'LB', 'RB', 'LM', 'CM1', 'CM2', 'RM', 'SS', 'CF1'] },
+  '4-4-1-1': { family: 'mid-4-band', slots: ['GK', 'CB1', 'CB2', 'LB', 'RB', 'LM', 'CM1', 'CM2', 'RM', 'SS', 'CF3'] },
   '3-4-1-2': { family: 'mid-4-band', slots: ['GK', 'CB1', 'CB2', 'CB3', 'LM', 'CM1', 'CM2', 'RM', 'AM', 'CF1', 'CF2'] },
-  '4-3-2-1': { family: 'mid-4-band', slots: ['GK', 'CB1', 'CB2', 'LB', 'RB', 'CM1', 'CM2', 'CM3', 'AM1', 'AM2', 'CF1'] },
+  '4-3-2-1': { family: 'mid-4-band', slots: ['GK', 'CB1', 'CB2', 'LB', 'RB', 'CM1', 'CM2', 'CM3', 'AM1', 'AM2', 'CF3'] },
 });
 
 /** Band of a slot id for the given formation family. */
@@ -291,9 +291,9 @@ function defSlots(count: number): string[] | null {
 function midSlots3(count: number): string[] | null {
   switch (count) {
     case 6:
-      return ['DM1', 'CM1', 'CM2', 'LM', 'RM', 'AM'];
+      return ['DM3', 'CM1', 'CM2', 'LM', 'RM', 'AM'];
     case 5:
-      return ['DM1', 'CM1', 'CM2', 'LM', 'RM'];
+      return ['DM3', 'CM1', 'CM2', 'LM', 'RM'];
     case 4:
       return ['LM', 'CM1', 'CM2', 'RM'];
     case 3:
@@ -333,7 +333,7 @@ function fwdSlots(count: number): string[] | null {
     case 2:
       return ['CF1', 'CF2'];
     case 1:
-      return ['CF1'];
+      return ['CF3'];
     case 0:
       return [];
     default:
@@ -373,7 +373,7 @@ function parseGenericFormation(norm: string): LayoutDef | null {
   if (fwd === null) return null;
   if (b <= 2) {
     // dm-4-band (DEF x a, DM x b, MID x c, FWD x d)
-    const dm = b === 2 ? ['DM1', 'DM2'] : b === 1 ? ['DM1'] : b === 0 ? [] : null;
+    const dm = b === 2 ? ['DM1', 'DM2'] : b === 1 ? ['DM3'] : b === 0 ? [] : null;
     if (dm === null) return null;
     const mid = midSlots4(c);
     if (mid === null) return null;
