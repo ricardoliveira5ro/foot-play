@@ -69,9 +69,9 @@ const POSITION_COORDS: Record<string, Coords> = asNullProto({
   'centre-back': { x: 50, y: 72 },
   'left-back': { x: 10, y: 60 },
   'right-back': { x: 90, y: 60 },
-  'defensive midfield': { x: 50, y: 50 },
+  'defensive midfield': { x: 50, y: 55 },
   'central midfield': { x: 50, y: 45 },
-  'attacking midfield': { x: 50, y: 35 },
+  'attacking midfield': { x: 50, y: 32 },
   'left midfield': { x: 15, y: 42 },
   'right midfield': { x: 85, y: 42 },
   'left winger': { x: 15, y: 25 },
@@ -146,22 +146,22 @@ const SLOT_DICTIONARY: Record<string, SlotDef> = asNullProto({
   CB3: { coords: { x: 50, y: 72 }, preferred: CB_PREF },
   LB: { coords: { x: 10, y: 60 }, preferred: ['Left-Back', 'Centre-Back', 'Defender', 'Left Midfield', 'Left Winger'] },
   RB: { coords: { x: 90, y: 60 }, preferred: ['Right-Back', 'Centre-Back', 'Defender', 'Right Midfield', 'Right Winger'] },
-  DM1: { coords: { x: 40, y: 50 }, preferred: DM_PREF },
-  DM2: { coords: { x: 60, y: 50 }, preferred: DM_PREF },
-  DM3: { coords: { x: 50, y: 50 }, preferred: DM_PREF },
-  CM1: { coords: { x: 40, y: 45 }, preferred: CM_PREF },
-  CM2: { coords: { x: 60, y: 45 }, preferred: CM_PREF },
+  DM1: { coords: { x: 30, y: 55 }, preferred: DM_PREF },
+  DM2: { coords: { x: 70, y: 55 }, preferred: DM_PREF },
+  DM3: { coords: { x: 50, y: 55 }, preferred: DM_PREF },
+  CM1: { coords: { x: 30, y: 45 }, preferred: CM_PREF },
+  CM2: { coords: { x: 70, y: 45 }, preferred: CM_PREF },
   CM3: { coords: { x: 50, y: 45 }, preferred: CM_PREF },
   LM: { coords: { x: 15, y: 42 }, preferred: ['Left Midfield', 'Left Winger', 'Central Midfield', 'Attacking Midfield', 'Midfield'] },
   RM: { coords: { x: 85, y: 42 }, preferred: ['Right Midfield', 'Right Winger', 'Central Midfield', 'Attacking Midfield', 'Midfield'] },
-  AM: { coords: { x: 50, y: 35 }, preferred: AM_PREF },
-  AM1: { coords: { x: 40, y: 35 }, preferred: AM_PREF },
-  AM2: { coords: { x: 60, y: 35 }, preferred: AM_PREF },
+  AM: { coords: { x: 50, y: 32 }, preferred: AM_PREF },
+  AM1: { coords: { x: 30, y: 35 }, preferred: AM_PREF },
+  AM2: { coords: { x: 70, y: 35 }, preferred: AM_PREF },
   LW: { coords: { x: 15, y: 25 }, preferred: ['Left Winger', 'Left Midfield', 'Attacking Midfield', 'Second Striker', 'Centre-Forward', 'Attack'] },
   RW: { coords: { x: 85, y: 25 }, preferred: ['Right Winger', 'Right Midfield', 'Attacking Midfield', 'Second Striker', 'Centre-Forward', 'Attack'] },
-  SS: { coords: { x: 50, y: 25 }, preferred: ['Second Striker', 'Centre-Forward', 'Attacking Midfield', 'Left Winger', 'Right Winger'] },
-  CF1: { coords: { x: 40, y: 15 }, preferred: CF_PREF },
-  CF2: { coords: { x: 60, y: 15 }, preferred: CF_PREF },
+  SS: { coords: { x: 50, y: 28 }, preferred: ['Second Striker', 'Centre-Forward', 'Attacking Midfield', 'Left Winger', 'Right Winger'] },
+  CF1: { coords: { x: 30, y: 15 }, preferred: CF_PREF },
+  CF2: { coords: { x: 70, y: 15 }, preferred: CF_PREF },
   CF3: { coords: { x: 50, y: 15 }, preferred: CF_PREF },
 });
 
@@ -715,6 +715,28 @@ export function fitStartingXI(lineup: LineupPlayer[], formation?: string | null)
       fitQuality: quality,
       coords: quality === 'static' ? getPositionCoords(player.position ?? '') : slot.coords,
     });
+  }
+
+  // Post-processing: narrow paired-slot spacing when only 2 players occupy a
+  // band. Paired slots use x=30/x=70 which looks right with 3 players (center
+  // slot fills the gap) but is too wide for just 2. Pull them to x=40/x=60.
+  const bandGroups = new Map<number, FittedPlayer[]>();
+  for (const f of fitted) {
+    if (f.fitQuality === 'static') continue;
+    const y = f.coords.y;
+    if (!bandGroups.has(y)) bandGroups.set(y, []);
+    bandGroups.get(y)!.push(f);
+  }
+  for (const group of bandGroups.values()) {
+    if (group.length !== 2) continue;
+    const [a, b] = group;
+    if (a.coords.x === 30 && b.coords.x === 70) {
+      a.coords = { x: 40, y: a.coords.y };
+      b.coords = { x: 60, y: b.coords.y };
+    } else if (a.coords.x === 70 && b.coords.x === 30) {
+      a.coords = { x: 60, y: a.coords.y };
+      b.coords = { x: 40, y: b.coords.y };
+    }
   }
 
   for (const f of fitted) {
