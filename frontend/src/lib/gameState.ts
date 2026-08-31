@@ -1,7 +1,8 @@
 'use client';
 
 import { useReducer, useCallback } from 'react';
-import type { MatchResponse, ShirtData, ShirtState, TeamSide, LineupPlayer, GuessResult } from '@/types';
+import type { GameResponse, ShirtData, ShirtState, TeamSide, LineupPlayer, GuessResult } from '@/types';
+import { CURATED_TEAM_IDS } from '@/lib/curatedTeams';
 
 const MAX_ATTEMPTS = 6;
 
@@ -17,7 +18,7 @@ export interface ShirtGameData extends ShirtData {
 }
 
 export interface GameState {
-  match: MatchResponse | null;
+  match: GameResponse | null;
   teamSide: TeamSide;
   shirts: ShirtGameData[];
   activeShirtIndex: number | null;
@@ -26,7 +27,7 @@ export interface GameState {
 }
 
 export type GameAction =
-  | { type: 'SET_MATCH'; payload: MatchResponse }
+  | { type: 'SET_MATCH'; payload: GameResponse }
   | { type: 'SELECT_TEAM'; payload: TeamSide }
   | { type: 'OPEN_SHIRT'; payload: string }
   | { type: 'CLOSE_SHIRT' }
@@ -48,11 +49,25 @@ const initialState: GameState = {
 
 // --- Helpers ---
 
-function pickSide(response: MatchResponse): TeamSide {
+function pickSide(response: GameResponse): TeamSide {
   if (response.homeLineup.length === 0 && response.awayLineup.length === 0) {
     throw new Error('This match has no lineup data.');
   }
-  const preferred: TeamSide = Math.random() < 0.5 ? 'home' : 'away';
+
+  const homeCurated = response.game.homeClub ? CURATED_TEAM_IDS.has(response.game.homeClub.clubId) : false;
+  const awayCurated = response.game.awayClub ? CURATED_TEAM_IDS.has(response.game.awayClub.clubId) : false;
+
+  // Prefer the curated side so the displayed team is always a curated team/nation.
+  // If both (or neither) are curated, fall back to random for variety.
+  let preferred: TeamSide;
+  if (homeCurated && !awayCurated) {
+    preferred = 'home';
+  } else if (awayCurated && !homeCurated) {
+    preferred = 'away';
+  } else {
+    preferred = Math.random() < 0.5 ? 'home' : 'away';
+  }
+
   const preferredLineup = preferred === 'home' ? response.homeLineup : response.awayLineup;
   return preferredLineup.length > 0 ? preferred : preferred === 'home' ? 'away' : 'home';
 }
@@ -228,7 +243,7 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
 interface UseGameStateReturn {
   state: GameState;
   dispatch: React.Dispatch<GameAction>;
-  startNewGame: (match: MatchResponse) => void;
+  startNewGame: (match: GameResponse) => void;
   selectTeam: (side: TeamSide) => void;
   openShirt: (token: string) => void;
   closeShirt: () => void;
@@ -242,7 +257,7 @@ export function useGameState(): UseGameStateReturn {
   const [state, dispatch] = useReducer(gameReducer, initialState);
 
   // Action creators
-  const startNewGame = useCallback((match: MatchResponse) => {
+  const startNewGame = useCallback((match: GameResponse) => {
     dispatch({ type: 'SET_MATCH', payload: match });
   }, []);
 

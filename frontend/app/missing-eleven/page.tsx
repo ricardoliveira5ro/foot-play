@@ -48,7 +48,7 @@ export default function MissingElevenPage() {
   // Fetch revealed names when the game completes (won or lost)
   useEffect(() => {
     if ((state.gameStatus === 'won' || state.gameStatus === 'lost') && state.match) {
-      fetchReveal(state.match.match.id, state.teamSide)
+      fetchReveal(state.match.game.gameId, state.teamSide)
         .then((response) => {
           setRevealedPlayers(response.players);
         })
@@ -85,7 +85,7 @@ export default function MissingElevenPage() {
     if (!activeShirt || !state.match) return;
 
     try {
-      const response = await submitGuessApi(state.match.match.id, activeShirt.token, guess);
+      const response = await submitGuessApi(state.match.game.gameId, activeShirt.token, guess);
       submitGuess(activeShirt.token, response.results, response.isCorrect, response.name);
     } catch (cause: unknown) {
       setError(describeError(cause));
@@ -157,9 +157,9 @@ export default function MissingElevenPage() {
   }
 
   const lineup = state.teamSide === 'home' ? state.match.homeLineup : state.match.awayLineup;
-  const formation = state.teamSide === 'home' ? state.match.match.homeFormation : state.match.match.awayFormation;
+  const formation = state.teamSide === 'home' ? state.match.game.homeFormation : state.match.game.awayFormation;
   const teamName =
-    (state.teamSide === 'home' ? state.match.match.homeClub?.name : state.match.match.awayClub?.name) ?? 'Unknown team';
+    (state.teamSide === 'home' ? state.match.game.homeClub?.name : state.match.game.awayClub?.name) ?? 'Unknown team';
   const shirts: ShirtData[] = lineup.map((entry) => {
     const existing = state.shirts.find(s => s.token === entry.token);
     return existing
@@ -177,7 +177,7 @@ export default function MissingElevenPage() {
         </header>
 
         <div className="lg:col-start-1 lg:row-start-2">
-          <MatchInfo match={state.match.match} />
+          <MatchInfo match={state.match.game} />
         </div>
 
         <section className="lg:col-start-2 lg:row-start-1 lg:row-span-3" aria-label="Tactic board">
@@ -220,7 +220,7 @@ export default function MissingElevenPage() {
       {isGameComplete && (
         <GameComplete
           isWin={state.gameStatus === 'won'}
-          match={state.match.match}
+          match={state.match.game}
           teamSide={state.teamSide}
           shirts={state.shirts}
           revealedPlayers={revealedPlayers}

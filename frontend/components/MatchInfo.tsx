@@ -1,4 +1,4 @@
-import type { Match } from '@/types';
+import type { Game } from '@/types';
 
 function formatMatchDate(date: string | null): string | null {
   if (!date) {
@@ -16,7 +16,7 @@ function formatMatchDate(date: string | null): string | null {
  * Mobile: centered column with the score alone and prominent.
  * Desktop: one baseline row (name · score · name) with labels beneath.
  */
-export default function MatchInfo({ match }: { match: Match }) {
+export default function MatchInfo({ match }: { match: Game }) {
   const home = match.homeClub?.name ?? 'Home';
   const away = match.awayClub?.name ?? 'Away';
   const dateLabel = formatMatchDate(match.date) ?? match.season;

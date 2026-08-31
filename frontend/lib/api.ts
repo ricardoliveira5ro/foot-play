@@ -1,4 +1,4 @@
-import type { MatchResponse, PlayerSearchResult, GuessResponse, RevealResponse, TeamSide } from '@/types';
+import type { GameResponse, PlayerSearchResult, GuessResponse, RevealResponse, TeamSide } from '@/types';
 import MOCK_MATCHES from './mockData';
 import { evaluateGuess } from '@/lib/wordle';
 
@@ -36,25 +36,25 @@ async function requestJson<T>(path: string): Promise<T> {
 }
 
 /** GET /api/matches/random — a random match with both full lineups. */
-export async function fetchRandomMatch(): Promise<MatchResponse> {
+export async function fetchRandomMatch(): Promise<GameResponse> {
   if (USE_MOCK) {
     await delay(MOCK_DELAY_MS);
     return MOCK_MATCHES[Math.floor(Math.random() * MOCK_MATCHES.length)];
   }
-  return requestJson<MatchResponse>('/api/matches/random');
+  return requestJson<GameResponse>('/api/matches/random');
 }
 
 /** GET /api/matches/:id — a specific match with both full lineups. */
-export async function fetchMatchById(id: number): Promise<MatchResponse> {
+export async function fetchMatchById(id: number): Promise<GameResponse> {
   if (USE_MOCK) {
     await delay(MOCK_DELAY_MS);
-    const found = MOCK_MATCHES.find((entry) => entry.match.id === id);
+    const found = MOCK_MATCHES.find((entry) => entry.game.gameId === id);
     if (!found) {
       throw new Error(`Match ${id} not found in mock dataset`);
     }
     return found;
   }
-  return requestJson<MatchResponse>(`/api/matches/${id}`);
+  return requestJson<GameResponse>(`/api/matches/${id}`);
 }
 
 /** GET /api/players?name=<query> — player search for guess autocompletion. */
@@ -84,7 +84,7 @@ export async function submitGuess(gameId: number, token: string, guess: string):
     await delay(MOCK_DELAY_MS);
     // Find the player by its opaque token in mock data and evaluate locally.
     for (const entry of MOCK_MATCHES) {
-      if (entry.match.id !== gameId) continue;
+      if (entry.game.gameId !== gameId) continue;
       const player = [...entry.homeLineup, ...entry.awayLineup].find((p) => p.token === token);
       if (!player) {
         throw new Error(`Token not found in mock dataset for game ${gameId}`);
@@ -110,7 +110,7 @@ export async function submitGuess(gameId: number, token: string, guess: string):
 export async function fetchReveal(gameId: number, teamSide: TeamSide): Promise<RevealResponse> {
   if (USE_MOCK) {
     await delay(MOCK_DELAY_MS);
-    const entry = MOCK_MATCHES.find((e) => e.match.id === gameId);
+    const entry = MOCK_MATCHES.find((e) => e.game.gameId === gameId);
     if (!entry) {
       throw new Error(`Match ${gameId} not found in mock dataset`);
     }

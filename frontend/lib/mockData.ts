@@ -1,4 +1,4 @@
-import type { LineupPlayer, Match, PositionCoords } from '@/types';
+import type { LineupPlayer, Game, PositionCoords } from '@/types';
 import { normalize } from '@/lib/wordle';
 
 /**
@@ -35,9 +35,9 @@ export interface MockLineupPlayer extends LineupPlayer {
   displayName: string;
 }
 
-/** Mock dataset entry: same shape as MatchResponse, with internal fields on lineups. */
+/** Mock dataset entry: same shape as GameResponse, with internal fields on lineups. */
 export interface MockMatchResponse {
-  match: Match;
+  game: Game;
   homeLineup: MockLineupPlayer[];
   awayLineup: MockLineupPlayer[];
 }
@@ -68,13 +68,13 @@ function buildLineup(gameId: number, players: MockRawPlayer[]): MockLineupPlayer
 
 const MOCK_MATCHES: MockMatchResponse[] = [
   {
-    match: {
-      id: 1,
+    game: {
+      gameId: 1,
       date: '2022-10-02',
       season: '2022/23',
       competition: 'Premier League',
-      homeClub: { id: 1, name: 'Manchester City' },
-      awayClub: { id: 2, name: 'Manchester United' },
+      homeClub: { clubId: 281, name: 'Manchester City' },
+      awayClub: { clubId: 985, name: 'Manchester United' },
       homeScore: 6,
       awayScore: 3,
       homeFormation: '4-3-3',
@@ -108,13 +108,13 @@ const MOCK_MATCHES: MockMatchResponse[] = [
     ]),
   },
   {
-    match: {
-      id: 2,
+    game: {
+      gameId: 2,
       date: '2010-11-29',
       season: '2010/11',
       competition: 'La Liga',
-      homeClub: { id: 3, name: 'FC Barcelona' },
-      awayClub: { id: 4, name: 'Real Madrid' },
+      homeClub: { clubId: 131, name: 'FC Barcelona' },
+      awayClub: { clubId: 418, name: 'Real Madrid' },
       homeScore: 5,
       awayScore: 0,
       homeFormation: '4-3-3',

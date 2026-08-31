@@ -1,13 +1,13 @@
 'use client';
 
 import { useEffect } from 'react';
-import type { Match, ShirtData, RevealPlayer } from '@/types';
+import type { Game, ShirtData, RevealPlayer } from '@/types';
 
 interface GameCompleteProps {
   /** Whether the player won */
   isWin: boolean;
   /** The match data */
-  match: Match;
+  match: Game;
   /** The team side that was played */
   teamSide: 'home' | 'away';
   /** All shirts with their final states */

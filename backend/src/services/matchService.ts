@@ -50,13 +50,13 @@ export async function getMatchById(id: number) {
 
 export function buildMatchResponse(game: GameWithRelations) {
   return {
-    match: {
-      id: game.gameId,
+    game: {
+      gameId: game.gameId,
       date: game.date?.toISOString().slice(0, 10) ?? null,
       season: game.season ? `${game.season}/${game.season + 1}` : null,
       competition: game.competition?.name ?? null,
-      homeClub: game.homeClub ? { id: game.homeClub.id, name: game.homeClub.name } : null,
-      awayClub: game.awayClub ? { id: game.awayClub.id, name: game.awayClub.name } : null,
+      homeClub: game.homeClub ? { clubId: game.homeClub.clubId, name: game.homeClub.name } : null,
+      awayClub: game.awayClub ? { clubId: game.awayClub.clubId, name: game.awayClub.name } : null,
       homeScore: game.homeClubGoals ?? 0,
       awayScore: game.awayClubGoals ?? 0,
       homeFormation: game.homeClubFormation ?? null,

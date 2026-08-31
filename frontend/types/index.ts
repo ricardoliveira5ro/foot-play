@@ -4,7 +4,7 @@
  */
 
 export interface Club {
-  id: number;
+  clubId: number;
   name: string;
 }
 
@@ -32,8 +32,8 @@ export interface LineupPlayer {
   coords: PositionCoords;
 }
 
-export interface Match {
-  id: number;
+export interface Game {
+  gameId: number;
   /** ISO date, 'YYYY-MM-DD'. */
   date: string | null;
   /** e.g. '2022/23'. */
@@ -49,8 +49,8 @@ export interface Match {
 }
 
 /** Response shape for GET /api/matches/random and GET /api/matches/:id. */
-export interface MatchResponse {
-  match: Match;
+export interface GameResponse {
+  game: Game;
   homeLineup: LineupPlayer[];
   awayLineup: LineupPlayer[];
 }

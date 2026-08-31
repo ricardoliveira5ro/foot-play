@@ -73,11 +73,11 @@ Build the five Express API endpoints that power the Missing Eleven game. By the 
 - **API response shape**:
   ```json
   {
-    "match": {
-      "id": 123, "date": "2023-05-28", "season": "2022/2023",
+    "game": {
+      "gameId": 123, "date": "2023-05-28", "season": "2022/2023",
       "competition": "Premier League",
-      "homeClub": { "id": 15, "name": "Manchester City" },
-      "awayClub": { "id": 42, "name": "Chelsea" },
+      "homeClub": { "clubId": 15, "name": "Manchester City" },
+      "awayClub": { "clubId": 42, "name": "Chelsea" },
       "homeScore": 4, "awayScore": 1,
       "homeFormation": "4-3-3", "awayFormation": "4-2-3-1"
     },
