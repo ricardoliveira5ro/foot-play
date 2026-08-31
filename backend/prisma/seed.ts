@@ -426,12 +426,36 @@ async function main(): Promise<void> {
     if (droppedAppearances > 0)
         console.warn(`Skipping ${droppedAppearances} appearances whose players are missing from players.csv`);
 
+    // Drop entire sides (gameId+clubId) that don't have all 11 starting
+    // players present in players.csv. A partial lineup in the DB is worse
+    // than no lineup at all.
+    const sideCounts = new Map<string, number>();
+    for (const a of keptAppearances) {
+        const key = `${a.gameId}:${a.clubId}`;
+        sideCounts.set(key, (sideCounts.get(key) ?? 0) + 1);
+    }
+    const completeSideKeys = new Set<string>();
+    for (const [key, count] of sideCounts) {
+        if (count >= 11) {
+            completeSideKeys.add(key);
+        } else {
+            const [gameId, clubId] = key.split(':');
+            console.warn(
+                `Dropping side (gameId=${gameId}, clubId=${clubId}): ` +
+                `only ${count} of 11 starting players found in players.csv`
+            );
+        }
+    }
+    const sideFilteredAppearances = keptAppearances.filter(a =>
+        completeSideKeys.has(`${a.gameId}:${a.clubId}`)
+    );
+
     try {
         await insertInBatches(prisma.competition, toCompetitionData(competitions));
         await insertInBatches(prisma.club, toClubData(uniqueClubs));
         await insertInBatches(prisma.player, toPlayerData(players));
         await insertInBatches(prisma.game, toGameData(games));
-        await insertInBatches(prisma.appearance, toAppearanceData(dedupeAppearances(keptAppearances)));
+        await insertInBatches(prisma.appearance, toAppearanceData(dedupeAppearances(sideFilteredAppearances)));
     } finally {
         await prisma.$disconnect();
     }
