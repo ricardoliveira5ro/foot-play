@@ -730,12 +730,17 @@ export function fitStartingXI(lineup: LineupPlayer[], formation?: string | null)
   for (const group of bandGroups.values()) {
     if (group.length !== 2) continue;
     const [a, b] = group;
+    // Per-band spacing: CBs x=35/65, strikers x=37/63, others x=40/60
+    let targetA = 40;
+    let targetB = 60;
+    if (a.coords.y === 72) { targetA = 35; targetB = 65; }        // CBs
+    else if (a.coords.y === 15) { targetA = 37; targetB = 63; }   // strikers
     if (a.coords.x === 30 && b.coords.x === 70) {
-      a.coords = { x: 40, y: a.coords.y };
-      b.coords = { x: 60, y: b.coords.y };
+      a.coords = { x: targetA, y: a.coords.y };
+      b.coords = { x: targetB, y: b.coords.y };
     } else if (a.coords.x === 70 && b.coords.x === 30) {
-      a.coords = { x: 60, y: a.coords.y };
-      b.coords = { x: 40, y: b.coords.y };
+      a.coords = { x: targetB, y: a.coords.y };
+      b.coords = { x: targetA, y: b.coords.y };
     }
   }
 
