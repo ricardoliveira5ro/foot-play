@@ -25,6 +25,29 @@ function formatMatchDate(date: string | null): string | null {
   return parsed.toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' });
 }
 
+const POSITION_ORDER: Record<string, number> = {
+  // Goalkeeper
+  'Goalkeeper': 0, 'GK': 0,
+  // Defenders
+  'Centre-Back': 10, 'CB': 10,
+  'Left-Back': 11, 'LB': 11,
+  'Right-Back': 12, 'RB': 12,
+  'Defender': 15, 'Sweeper': 15,
+  // Midfielders
+  'Defensive Midfield': 20, 'DM': 20,
+  'Central Midfield': 21, 'CM': 21,
+  'Attacking Midfield': 22, 'AM': 22, 'CAM': 22,
+  'Midfield': 23,
+  'Left Midfield': 24, 'LM': 24,
+  'Right Midfield': 25, 'RM': 25,
+  // Forwards
+  'Left Winger': 30, 'LW': 30, 'LWB': 30,
+  'Right Winger': 31, 'RW': 31, 'RWB': 31,
+  'Centre-Forward': 32, 'ST': 32, 'CF': 33,
+  'Second Striker': 34,
+  'Attack': 35,
+};
+
 function getPositionLabel(position: string | null): string {
   const labels: Record<string, string> = {
     GK: 'GK',
@@ -132,7 +155,7 @@ export default function GameComplete({ isWin, match, teamSide, shirts, revealedP
           <div className="space-y-2">
             {shirts
               .slice()
-              .sort((a, b) => (a.shirtNumber ?? 99) - (b.shirtNumber ?? 99))
+              .sort((a, b) => (POSITION_ORDER[a.position ?? ''] ?? 99) - (POSITION_ORDER[b.position ?? ''] ?? 99))
               .map((shirt) => {
                 const isCorrect = shirt.state === 'correct';
                 const isFailed = shirt.state === 'failed';
@@ -154,14 +177,14 @@ export default function GameComplete({ isWin, match, teamSide, shirts, revealedP
                   >
                     {/* Shirt number */}
                     <span
-                      className="flex-shrink-0 w-10 text-center font-display text-lg text-ink/60"
+                      className="shrink-0 w-10 text-center font-display text-lg text-ink/60"
                       aria-label={`Shirt ${shirt.shirtNumber ?? '?'}`}
                     >
                       {shirt.shirtNumber ?? '?'}
                     </span>
 
                     {/* Position */}
-                    <span className="flex-shrink-0 w-14 text-xs font-mono text-ink/50 text-right uppercase">
+                    <span className="shrink-0 w-28 text-xs font-mono text-ink/50 text-left uppercase">
                       {getPositionLabel(shirt.position)}
                     </span>
 
