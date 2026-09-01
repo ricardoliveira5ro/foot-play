@@ -62,7 +62,7 @@ router.post('/reveal', asyncHandler(async (req, res) => {
   const clubId = teamSide === "home" ? game.homeClubId : game.awayClubId;
   const appearances = await getRevealAppearances(gameId, clubId);
 
-  res.json(appearances.map(ap => ({ playerId: ap.playerId, name: ap.player.displayName ?? ap.player.name ?? '', shirtNumber: ap.number })));
+  res.json({ players: appearances.map(ap => ({ playerId: ap.playerId, name: ap.player.displayName ?? ap.player.name ?? '', shirtNumber: ap.number })) });
 }));
 
 export default router;

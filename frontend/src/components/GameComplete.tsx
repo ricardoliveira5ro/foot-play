@@ -55,7 +55,7 @@ export default function GameComplete({ isWin, match, teamSide, shirts, revealedP
 
   // Map revealed players by shirtNumber for name lookup. Shirts carry opaque
   // tokens now, but shirtNumber is present and unique on both sides.
-  const revealedByName = new Map(revealedPlayers.map((p) => [p.shirtNumber, p.name]));
+  const revealedByName = new Map((revealedPlayers ?? []).map((p) => [p.shirtNumber, p.name]));
 
   // Calculate stats
   const totalShirts = shirts.length;
