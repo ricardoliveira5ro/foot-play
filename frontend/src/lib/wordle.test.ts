@@ -2,7 +2,7 @@
  * Test cases for the Wordle algorithm
  */
 
-import { evaluateGuess, isCorrectGuess, getTargetLength, normalize, getCorrectLetters } from './wordle';
+import { evaluateGuess, isCorrectGuess, getTargetLength, normalize, getCorrectLetters, getWordBoundaries } from './wordle';
 
 function assertEqual<T>(actual: T, expected: T, message: string): void {
   const actualStr = JSON.stringify(actual);
@@ -202,5 +202,15 @@ assertEqual(
   ['R', 'A', 'F', 'A', 'E', 'L'],
   'getCorrectLetters: accumulates across guesses'
 );
+
+// --- getWordBoundaries tests ---
+console.log('\n--- getWordBoundaries tests ---');
+
+assertEqual(getWordBoundaries('Messi'), [], 'getWordBoundaries: single word');
+assertEqual(getWordBoundaries('Nico Gaitan'), [4], 'getWordBoundaries: space separator');
+assertEqual(getWordBoundaries('Nico Gaitán'), [4], 'getWordBoundaries: diacritic does not shift index');
+assertEqual(getWordBoundaries("O'Brien"), [1], 'getWordBoundaries: apostrophe separator');
+assertEqual(getWordBoundaries('San-Jose'), [3], 'getWordBoundaries: hyphen separator');
+assertEqual(getWordBoundaries('De Bruyne'), [2], 'getWordBoundaries: De Bruyne');
 
 console.log('\n✅ All tests passed!');

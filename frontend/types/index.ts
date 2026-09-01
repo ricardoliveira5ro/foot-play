@@ -26,6 +26,8 @@ export interface LineupPlayer {
   token: string;
   /** Normalized length of the player's name (no spaces/diacritics). */
   nameLength: number;
+  /** Normalized indices where a word separator (space/hyphen/apostrophe) occurs. */
+  wordBoundaries: number[];
   shirtNumber: number | null;
   /** Position code, e.g. 'GK' | 'CB' | 'LB' | 'CM' | 'ST'. */
   position: string | null;

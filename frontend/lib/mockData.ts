@@ -1,5 +1,5 @@
 import type { LineupPlayer, Game, PositionCoords } from '@/types';
-import { normalize } from '@/lib/wordle';
+import { normalize, getWordBoundaries } from '@/lib/wordle';
 
 /**
  * Static mock dataset mimicking the Dev 3 API responses exactly.
@@ -62,6 +62,7 @@ function buildLineup(gameId: number, players: MockRawPlayer[]): MockLineupPlayer
   return players.map((p) => ({
     ...p,
     nameLength: normalize(p.displayName).length,
+    wordBoundaries: getWordBoundaries(p.displayName),
     token: mockToken(gameId, p.playerId),
   }));
 }

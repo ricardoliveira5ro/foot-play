@@ -41,9 +41,11 @@ function shirtAriaLabel(
 function LetterSlots({
   nameLength,
   guessHistory,
+  wordBoundaries = [],
 }: {
   nameLength: number;
   guessHistory?: GuessResult[][];
+  wordBoundaries?: number[];
 }) {
   const correctLetters = guessHistory
     ? getCorrectLettersByLength(guessHistory, nameLength)
@@ -53,6 +55,9 @@ function LetterSlots({
   if (correctLetters.every(l => l === null)) {
     const slots: React.ReactNode[] = [];
     for (let i = 0; i < nameLength; i++) {
+      if (wordBoundaries.includes(i)) {
+        slots.push(<span key={`spacer-${i}`} className="text-ink/30" aria-hidden="true"> </span>);
+      }
       slots.push(<span key={i} className="text-ink/30">·</span>);
     }
     return (
@@ -64,6 +69,9 @@ function LetterSlots({
 
   const slots: React.ReactNode[] = [];
   for (let i = 0; i < correctLetters.length; i++) {
+    if (wordBoundaries.includes(i)) {
+      slots.push(<span key={`spacer-${i}`} className="text-ink/30" aria-hidden="true"> </span>);
+    }
     const letter = correctLetters[i];
     slots.push(
       letter ? (
@@ -158,7 +166,7 @@ export default function Shirt({ shirt, index, onClick, guessHistory }: ShirtProp
       <div className="pointer-events-none absolute left-1/2 top-full z-10 mt-1 w-max -translate-x-1/2">
         <div className="inline-block rounded-md bg-paper px-2 py-1 shadow-sm">
           {(state === 'default' || state === 'in-progress') && (
-            <LetterSlots nameLength={nameLength} guessHistory={guessHistory} />
+            <LetterSlots nameLength={nameLength} guessHistory={guessHistory} wordBoundaries={shirt.wordBoundaries} />
           )}
           {state === 'correct' && (
             <span className="block max-w-35 truncate text-[13px] font-semibold text-correct">

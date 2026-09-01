@@ -12,6 +12,27 @@ export function normalize(name: string): string {
     .replace(/[\s\-']/g, '');
 }
 
+export function getWordBoundaries(name: string): number[] {
+  const boundaries: number[] = [];
+  let normalizedIndex = 0;
+
+  for (const char of name) {
+    if (char === ' ' || char === '-' || char === "'") {
+      if (boundaries[boundaries.length - 1] !== normalizedIndex) {
+        boundaries.push(normalizedIndex);
+      }
+
+    } else if (/[\u0300-\u036f]/.test(char)) {
+      continue;
+
+    } else {
+      normalizedIndex++;
+    }
+  }
+  
+  return boundaries;
+}
+
 export function evaluateGuess(guess: string, target: string): GuessResult[]{
   const normalizedName = normalize(target);
   const normalizedGuess = normalize(guess);

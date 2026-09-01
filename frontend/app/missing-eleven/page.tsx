@@ -205,6 +205,7 @@ export default function MissingElevenPage() {
       {shouldShowModal && activeShirt && (
         <WordleModal
           nameLength={activeShirt.nameLength}
+          wordBoundaries={activeShirt.wordBoundaries}
           shirtNumber={activeShirt.shirtNumber}
           position={activeShirt.position}
           guesses={guessHistory}

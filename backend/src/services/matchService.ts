@@ -1,7 +1,7 @@
 import { prisma } from '../prisma';
 import { fitStartingXI, type LineupPlayer } from './positionMapping';
 import type { Prisma } from '../generated/prisma/client';
-import { normalize } from './wordle';
+import { normalize, getWordBoundaries } from './wordle';
 import { generatePlayerToken, resolvePlayerToken } from './tokenService';
 
 type GameWithRelations = Prisma.GameGetPayload<{
@@ -84,13 +84,17 @@ function buildLineup(gameId: number, appearances: GameWithRelations['appearances
 
   const fitted = fitStartingXI(lineupPlayers, formation);
 
-  return side.map((a, i) => ({
-    token: generatePlayerToken(gameId, a.playerId),
-    nameLength: normalize(a.player?.displayName ?? a.player?.name ?? '').length,
-    shirtNumber: a.number ?? null,
-    position: fitted[i].position,
-    coords: fitted[i].coords,
-  }));
+  return side.map((a, i) => {
+    const displayName = a.player?.displayName ?? a.player?.name ?? '';
+    return {
+      token: generatePlayerToken(gameId, a.playerId),
+      nameLength: normalize(displayName).length,
+      wordBoundaries: getWordBoundaries(displayName),
+      shirtNumber: a.number ?? null,
+      position: fitted[i].position,
+      coords: fitted[i].coords,
+    };
+  });
 }
 
 export async function getPlayerNameForAppearance(gameId: number, token: string): Promise<string | null> {

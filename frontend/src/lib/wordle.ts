@@ -25,6 +25,29 @@ export function normalize(str: string): string {
 }
 
 /**
+ * Return the normalized indices where a word separator (space, hyphen,
+ * apostrophe) occurs in the original name. These are positions in the
+ * normalized (lowercased, diacritics-stripped, separators-removed) string
+ * where a visual gap should be rendered. E.g. "Nico Gaitan" -> [4].
+ */
+export function getWordBoundaries(name: string): number[] {
+  const boundaries: number[] = [];
+  let normalizedIndex = 0;
+  for (const char of name) {
+    if (char === ' ' || char === '-' || char === "'") {
+      if (boundaries[boundaries.length - 1] !== normalizedIndex) {
+        boundaries.push(normalizedIndex);
+      }
+    } else if (/[\u0300-\u036f]/.test(char)) {
+      continue; // combining diacritic mark — does not advance normalized index
+    } else {
+      normalizedIndex++;
+    }
+  }
+  return boundaries;
+}
+
+/**
  * Evaluate a guess against a target name using Wordle rules.
  * 
  * Algorithm:
