@@ -109,3 +109,8 @@ export interface RevealPlayer {
 export interface RevealResponse {
   players: RevealPlayer[];
 }
+
+/** POST /api/guess/reveal-one response — a single player's name. */
+export interface RevealOneResponse {
+  name: string;
+}

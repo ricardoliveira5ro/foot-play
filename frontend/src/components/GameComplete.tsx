@@ -43,8 +43,8 @@ const POSITION_ORDER: Record<string, number> = {
   // Forwards
   'Left Winger': 30, 'LW': 30, 'LWB': 30,
   'Right Winger': 31, 'RW': 31, 'RWB': 31,
-  'Centre-Forward': 32, 'ST': 32, 'CF': 33,
-  'Second Striker': 34,
+  'Second Striker': 32,
+  'Centre-Forward': 33, 'ST': 33, 'CF': 34,
   'Attack': 35,
 };
 
@@ -230,17 +230,18 @@ export default function GameComplete({ isWin, match, teamSide, shirts, revealedP
 
         {/* Match summary */}
         <div className="border-t border-ink/10 px-6 py-4">
-          <div className="flex flex-col items-center gap-1 text-center md:flex-row md:flex-wrap md:items-baseline md:gap-x-3 md:gap-y-1 md:text-left">
+          <div className="flex items-center justify-center gap-4">
             <p className="font-display text-[36px] leading-none text-ink">
               {match.homeScore} – {match.awayScore}
             </p>
-            <p className="font-semibold text-xl text-ink">{home}</p>
-            <p className="text-xl font-medium text-ink/55 md:hidden">v</p>
-            <p className="font-semibold text-xl text-ink">{away}</p>
+            <div className="flex flex-col items-start gap-0.5">
+              <p className="font-semibold text-xl text-ink">{home}</p>
+              <p className="font-semibold text-xl text-ink">{away}</p>
+            </div>
           </div>
 
           {(dateLabel || match.competition) && (
-            <div className="mt-3 flex flex-col items-center gap-0.5 md:items-start text-xs uppercase tracking-[0.08em] text-ink/55">
+            <div className="mt-3 flex flex-col items-center gap-0.5 text-xs uppercase tracking-[0.08em] text-ink/55">
               {dateLabel && <p>{dateLabel}</p>}
               {match.competition && <p>{match.competition}</p>}
             </div>

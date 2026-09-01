@@ -32,6 +32,7 @@ export type GameAction =
   | { type: 'OPEN_SHIRT'; payload: string }
   | { type: 'CLOSE_SHIRT' }
   | { type: 'SUBMIT_GUESS'; payload: { token: string; results: GuessResult[]; isCorrect: boolean; name?: string } }
+  | { type: 'REVEAL_NAME'; payload: { token: string; name: string } }
   | { type: 'NEW_GAME' }
   | { type: 'SET_ERROR'; payload: string | null }
   | { type: 'SET_LOADING'; payload: boolean };
@@ -96,6 +97,10 @@ function updateShirtState(
 
 function checkWinCondition(shirts: ShirtGameData[]): boolean {
   return shirts.every(shirt => shirt.state === 'correct');
+}
+
+function checkGameComplete(shirts: ShirtGameData[]): boolean {
+  return shirts.every(s => s.state === 'correct' || s.state === 'failed');
 }
 
 // --- Reducer ---
@@ -182,7 +187,7 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
           activeShirtIndex: shouldCloseModal ? null : state.activeShirtIndex,
         };
       } else if (isLastAttempt) {
-        // Failed - no more attempts
+        // Failed - no more attempts for this shirt
         newShirtState = 'failed';
         shouldCloseModal = true;
         const updatedShirts = updateShirtState(state.shirts, token, {
@@ -190,8 +195,10 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
           attempts: newAttempts,
           guessHistory: [...shirt.guessHistory, results],
         });
-        // Immediate loss on first failed shirt
-        newGameStatus = 'lost';
+        // Only end the game when ALL shirts are resolved
+        if (checkGameComplete(updatedShirts)) {
+          newGameStatus = 'lost';
+        }
         return {
           ...state,
           shirts: updatedShirts,
@@ -212,6 +219,15 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
           activeShirtIndex: state.activeShirtIndex,
         };
       }
+    }
+
+    case 'REVEAL_NAME': {
+      return {
+        ...state,
+        shirts: state.shirts.map(s =>
+          s.token === action.payload.token ? { ...s, name: action.payload.name } : s
+        ),
+      };
     }
 
     case 'NEW_GAME': {
@@ -248,6 +264,7 @@ interface UseGameStateReturn {
   openShirt: (token: string) => void;
   closeShirt: () => void;
   submitGuess: (token: string, results: GuessResult[], isCorrect: boolean, name?: string) => void;
+  revealName: (token: string, name: string) => void;
   newGame: () => void;
   setError: (error: string | null) => void;
   setLoading: (loading: boolean) => void;
@@ -277,6 +294,10 @@ export function useGameState(): UseGameStateReturn {
     dispatch({ type: 'SUBMIT_GUESS', payload: { token, results, isCorrect, name } });
   }, []);
 
+  const revealName = useCallback((token: string, name: string) => {
+    dispatch({ type: 'REVEAL_NAME', payload: { token, name } });
+  }, []);
+
   const newGame = useCallback(() => {
     dispatch({ type: 'NEW_GAME' });
   }, []);
@@ -297,6 +318,7 @@ export function useGameState(): UseGameStateReturn {
     openShirt,
     closeShirt,
     submitGuess,
+    revealName,
     newGame,
     setError,
     setLoading,

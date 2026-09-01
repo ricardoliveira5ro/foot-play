@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { useGameState, MAX_ATTEMPTS } from '@/lib/gameState';
-import { fetchRandomMatch, submitGuess as submitGuessApi, fetchReveal } from '@/lib/api';
+import { fetchRandomMatch, submitGuess as submitGuessApi, fetchReveal, revealOnePlayer } from '@/lib/api';
 import MatchInfo from '@/components/MatchInfo';
 import TacticBoard from '@/components/TacticBoard';
 import WordleModal from '@/components/WordleModal';
@@ -20,6 +20,7 @@ export default function MissingElevenPage() {
     openShirt,
     closeShirt,
     submitGuess,
+    revealName,
     newGame,
     setError,
     setLoading,
@@ -87,11 +88,18 @@ export default function MissingElevenPage() {
     try {
       const response = await submitGuessApi(state.match.game.gameId, activeShirt.token, guess);
       submitGuess(activeShirt.token, response.results, response.isCorrect, response.name);
+
+      // If this was the last attempt and it failed, reveal the player's name
+      const isLastAttempt = activeShirt.guessHistory.length + 1 >= MAX_ATTEMPTS;
+      if (!response.isCorrect && isLastAttempt) {
+        const reveal = await revealOnePlayer(state.match.game.gameId, activeShirt.token);
+        revealName(activeShirt.token, reveal.name);
+      }
     } catch (cause: unknown) {
       setError(describeError(cause));
     }
     // Modal will close via state change if correct or failed
-  }, [activeShirt, state.match, submitGuess, setError]);
+  }, [activeShirt, state.match, submitGuess, revealName, setError]);
 
   const handlePlayAgain = useCallback(() => {
     setRevealedPlayers([]);

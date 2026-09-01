@@ -65,4 +65,24 @@ router.post('/reveal', asyncHandler(async (req, res) => {
   res.json({ players: appearances.map(ap => ({ playerId: ap.playerId, name: ap.player.displayName ?? ap.player.name ?? '', shirtNumber: ap.number })) });
 }));
 
+router.post('/reveal-one', asyncHandler(async (req, res) => {
+  const gameId = validateNumberField('gameId', req.body?.gameId);
+  if (typeof gameId === 'object' && gameId !== null && 'error' in gameId) {
+    return res.status(400).json(gameId);
+  }
+
+  const token = validateNonEmptyStringField('token', req.body?.token);
+  if (typeof token === 'object' && token !== null && 'error' in token) {
+    return res.status(400).json(token);
+  }
+
+  const name = await getPlayerNameForAppearance(gameId, token);
+
+  if (!name) {
+    return res.status(404).json({ error: 'Player not found', code: 'NOT_FOUND' });
+  }
+
+  res.json({ name });
+}));
+
 export default router;

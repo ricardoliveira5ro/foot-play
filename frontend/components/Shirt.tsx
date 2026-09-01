@@ -175,7 +175,7 @@ export default function Shirt({ shirt, index, onClick, guessHistory }: ShirtProp
           )}
           {state === 'failed' && (
             <span className="block max-w-35 truncate text-[13px] font-semibold text-failed">
-              {shirtNumber !== null ? `#${shirtNumber}` : 'Failed'}
+              {shirt.name ?? (shirtNumber !== null ? `#${shirtNumber}` : 'Failed')}
             </span>
           )}
         </div>
