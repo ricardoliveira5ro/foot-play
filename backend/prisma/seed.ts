@@ -4,6 +4,7 @@ import { createReadStream } from 'fs';
 import { parse } from 'csv-parse';
 import { cleanDisplayName } from '../../scripts/src/name-cleaning';
 import { normalizeCompetitionName, MISSING_COMPETITIONS } from '../../scripts/src/competition-names';
+import { normalizeTeamName } from '../../scripts/src/team-names';
 import path from 'path';
 import { PrismaPg } from '@prisma/adapter-pg';
 import { PrismaClient, Prisma } from '../src/generated/prisma/client';
@@ -293,7 +294,7 @@ function toCompetitionData(rows: Competition[]): Prisma.CompetitionCreateManyInp
 function toClubData(rows: Team[]): Prisma.ClubCreateManyInput[] {
     return rows.map(t => ({
         clubId: t.clubId,
-        name: t.name,
+        name: normalizeTeamName(t.clubId, t.name),
         isNationalTeam: t.isNationalTeam,
     }));
 }
@@ -451,6 +452,17 @@ async function main(): Promise<void> {
     );
 
     try {
+        // Reset all tables in FK-safe order so `npm run seed` is idempotent.
+        // The explicit timeout covers large tables (e.g. ~200k appearances)
+        // where the default 5s transaction timeout can be exceeded.
+        await prisma.$transaction([
+            prisma.appearance.deleteMany(),
+            prisma.game.deleteMany(),
+            prisma.player.deleteMany(),
+            prisma.club.deleteMany(),
+            prisma.competition.deleteMany(),
+        ], { timeout: 120000 });
+
         await insertInBatches(prisma.competition, toCompetitionData(competitions));
         await insertInBatches(prisma.club, toClubData(uniqueClubs));
         await insertInBatches(prisma.player, toPlayerData(players));
