@@ -283,3 +283,57 @@ Without these, the backend would think all requests come from Nginx's IP (127.0.
 |------|----------|-----------|
 | `nginx.conf` | How Nginx runs | Engine settings |
 | `default.conf` | Where traffic goes | Traffic cop |
+
+---
+
+# Certbot Explained
+
+## What is Certbot?
+
+**Certbot** is a tool that automatically gets and manages **SSL/TLS certificates** from **Let's Encrypt** — a free certificate authority.
+
+## What Certbot does in our stack
+
+```
+┌─────────────────────────────────────────────────────────┐
+│  certbot container (runs forever in background)          │
+│                                                          │
+│  1. On first setup:                                      │
+│     - Requests a certificate from Let's Encrypt          │
+│     - Proves you own the domain (via nginx webroot)      │
+│     - Saves cert to ./nginx/certbot/conf/                │
+│                                                          │
+│  2. Every 12 hours:                                      │
+│     - Checks if cert is expiring (90-day lifetime)       │
+│     - Renews automatically if needed                     │
+│     - Nginx picks up the new cert                        │
+└─────────────────────────────────────────────────────────┘
+```
+
+## The entrypoint command explained
+
+```yaml
+entrypoint: "/bin/sh -c 'trap exit TERM; while :; do certbot renew; sleep 12h & wait $${!}; done;'"
+```
+
+This is a **loop** that:
+1. Runs `certbot renew` — checks if cert needs renewal
+2. Sleeps 12 hours
+3. Repeats forever
+
+## How it connects to nginx
+
+- **`./nginx/certbot/conf`** → mounted into nginx as `/etc/letsencrypt` (where nginx reads certs)
+- **`./nginx/certbot/www`** → mounted into nginx as `/var/www/certbot` (where Let's Encrypt verifies domain ownership)
+
+## The flow
+
+```
+User visits https://footplay.com
+        ↓
+Nginx (port 443) → uses SSL cert from ./nginx/certbot/conf
+        ↓
+Cert expires in 90 days
+        ↓
+Certbot auto-renews → saves new cert → nginx reloads
+```
