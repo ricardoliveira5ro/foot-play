@@ -2,7 +2,7 @@
  * Test cases for the Wordle algorithm
  */
 
-import { evaluateGuess, isCorrectGuess, getTargetLength, normalize, getCorrectLetters } from './wordle';
+import { evaluateGuess, isCorrectGuess, getTargetLength, normalize, getCorrectLetters, getWordBoundaries } from './wordle';
 
 function assertEqual<T>(actual: T, expected: T, message: string): void {
   const actualStr = JSON.stringify(actual);
@@ -51,7 +51,7 @@ console.log('\n--- evaluateGuess tests (spec cases) ---');
 // evaluateGuess("MESSI", "Messi") → all correct
 assertEqual(
   evaluateGuess('MESSI', 'Messi').map(r => r.result),
-  ['correct', 'correct', 'correct', 'correct', 'correct'],
+  ['CORRECT', 'CORRECT', 'CORRECT', 'CORRECT', 'CORRECT'],
   'MESSI vs Messi: all correct'
 );
 
@@ -59,28 +59,28 @@ assertEqual(
 // Note: The 4th letter (index 3) of both "meesi" and "messi" is 's', so it's correct, not present
 assertEqual(
   evaluateGuess('MEESI', 'Messi').map(r => r.result),
-  ['correct', 'correct', 'absent', 'correct', 'correct'],
+  ['CORRECT', 'CORRECT', 'ABSENT', 'CORRECT', 'CORRECT'],
   'MEESI vs Messi: duplicate E handling (S at pos 3 matches)'
 );
 
 // evaluateGuess("MMMMM", "Messi") → M:correct, M:absent, M:absent, M:absent, M:absent
 assertEqual(
   evaluateGuess('MMMMM', 'Messi').map(r => r.result),
-  ['correct', 'absent', 'absent', 'absent', 'absent'],
+  ['CORRECT', 'ABSENT', 'ABSENT', 'ABSENT', 'ABSENT'],
   'MMMMM vs Messi: duplicate M handling'
 );
 
 // evaluateGuess("ronaldo", "Ronaldo") → all correct (case-insensitive)
 assertEqual(
   evaluateGuess('ronaldo', 'Ronaldo').map(r => r.result),
-  ['correct', 'correct', 'correct', 'correct', 'correct', 'correct', 'correct'],
+  ['CORRECT', 'CORRECT', 'CORRECT', 'CORRECT', 'CORRECT', 'CORRECT', 'CORRECT'],
   'ronaldo vs Ronaldo: case insensitive'
 );
 
 // evaluateGuess("messi", "Ronaldo") → all absent
 assertEqual(
   evaluateGuess('messi', 'Ronaldo').map(r => r.result),
-  ['absent', 'absent', 'absent', 'absent', 'absent', 'absent', 'absent'],
+  ['ABSENT', 'ABSENT', 'ABSENT', 'ABSENT', 'ABSENT', 'ABSENT', 'ABSENT'],
   'messi vs Ronaldo: all absent'
 );
 
@@ -88,7 +88,7 @@ assertEqual(
 console.log('\n--- Diacritics tests ---');
 assertEqual(
   evaluateGuess('Pele', 'Pelé').map(r => r.result),
-  ['correct', 'correct', 'correct', 'correct'],
+  ['CORRECT', 'CORRECT', 'CORRECT', 'CORRECT'],
   'Pele vs Pelé: diacritics handled'
 );
 
@@ -96,7 +96,7 @@ assertEqual(
 console.log('\n--- Spaces/hyphens tests ---');
 assertEqual(
   evaluateGuess('van dijk', 'Van Dijk').map(r => r.result),
-  ['correct', 'correct', 'correct', 'correct', 'correct', 'correct', 'correct'],
+  ['CORRECT', 'CORRECT', 'CORRECT', 'CORRECT', 'CORRECT', 'CORRECT', 'CORRECT'],
   'van dijk vs Van Dijk: spaces handled'
 );
 
@@ -106,9 +106,9 @@ console.log('\n--- Additional edge cases ---');
 // Test with shorter guess
 const shortResult = evaluateGuess('Ron', 'Ronaldo');
 assertEqual(shortResult.length, 7, 'Short guess: result length matches target');
-assertEqual(shortResult[0].result, 'correct', 'Short guess: first letter correct');
-assertEqual(shortResult[1].result, 'correct', 'Short guess: second letter correct');
-assertEqual(shortResult[2].result, 'correct', 'Short guess: third letter correct');
+assertEqual(shortResult[0].result, 'CORRECT', 'Short guess: first letter correct');
+assertEqual(shortResult[1].result, 'CORRECT', 'Short guess: second letter correct');
+assertEqual(shortResult[2].result, 'CORRECT', 'Short guess: third letter correct');
 
 // Test with longer guess
 const longResult = evaluateGuess('Ronaldinho', 'Ronaldo');
@@ -118,25 +118,25 @@ assertEqual(longResult.length, 7, 'Long guess: result length matches target');
 // Target: "APPLE", Guess: "ALARM"
 // A: correct, L: present, A: absent (already matched), R: absent, M: absent
 const appleAlarm = evaluateGuess('ALARM', 'APPLE');
-assertEqual(appleAlarm[0].result, 'correct', 'ALARM vs APPLE: A correct');
-assertEqual(appleAlarm[1].result, 'present', 'ALARM vs APPLE: L present');
-assertEqual(appleAlarm[2].result, 'absent', 'ALARM vs APPLE: second A absent');
-assertEqual(appleAlarm[3].result, 'absent', 'ALARM vs APPLE: R absent');
-assertEqual(appleAlarm[4].result, 'absent', 'ALARM vs APPLE: M absent');
+assertEqual(appleAlarm[0].result, 'CORRECT', 'ALARM vs APPLE: A correct');
+assertEqual(appleAlarm[1].result, 'PRESENT', 'ALARM vs APPLE: L present');
+assertEqual(appleAlarm[2].result, 'ABSENT', 'ALARM vs APPLE: second A absent');
+assertEqual(appleAlarm[3].result, 'ABSENT', 'ALARM vs APPLE: R absent');
+assertEqual(appleAlarm[4].result, 'ABSENT', 'ALARM vs APPLE: M absent');
 
 // Target: "SPEAR", Guess: "SPARE"
 // S: correct, P: correct, A: present, R: present, E: present
 const spearSpare = evaluateGuess('SPARE', 'SPEAR');
-assertEqual(spearSpare[0].result, 'correct', 'SPARE vs SPEAR: S correct');
-assertEqual(spearSpare[1].result, 'correct', 'SPARE vs SPEAR: P correct');
-assertEqual(spearSpare[2].result, 'present', 'SPARE vs SPEAR: A present');
-assertEqual(spearSpare[3].result, 'present', 'SPARE vs SPEAR: R present');
-assertEqual(spearSpare[4].result, 'present', 'SPARE vs SPEAR: E present');
+assertEqual(spearSpare[0].result, 'CORRECT', 'SPARE vs SPEAR: S correct');
+assertEqual(spearSpare[1].result, 'CORRECT', 'SPARE vs SPEAR: P correct');
+assertEqual(spearSpare[2].result, 'PRESENT', 'SPARE vs SPEAR: A present');
+assertEqual(spearSpare[3].result, 'PRESENT', 'SPARE vs SPEAR: R present');
+assertEqual(spearSpare[4].result, 'PRESENT', 'SPARE vs SPEAR: E present');
 
 // Target: "BANANA", Guess: "BANANA" - all correct
 assertEqual(
   evaluateGuess('BANANA', 'BANANA').map(r => r.result),
-  ['correct', 'correct', 'correct', 'correct', 'correct', 'correct'],
+  ['CORRECT', 'CORRECT', 'CORRECT', 'CORRECT', 'CORRECT', 'CORRECT'],
   'BANANA vs BANANA: all correct'
 );
 
@@ -202,5 +202,15 @@ assertEqual(
   ['R', 'A', 'F', 'A', 'E', 'L'],
   'getCorrectLetters: accumulates across guesses'
 );
+
+// --- getWordBoundaries tests ---
+console.log('\n--- getWordBoundaries tests ---');
+
+assertEqual(getWordBoundaries('Messi'), [], 'getWordBoundaries: single word');
+assertEqual(getWordBoundaries('Nico Gaitan'), [4], 'getWordBoundaries: space separator');
+assertEqual(getWordBoundaries('Nico Gaitán'), [4], 'getWordBoundaries: diacritic does not shift index');
+assertEqual(getWordBoundaries("O'Brien"), [1], 'getWordBoundaries: apostrophe separator');
+assertEqual(getWordBoundaries('San-Jose'), [3], 'getWordBoundaries: hyphen separator');
+assertEqual(getWordBoundaries('De Bruyne'), [2], 'getWordBoundaries: De Bruyne');
 
 console.log('\n✅ All tests passed!');

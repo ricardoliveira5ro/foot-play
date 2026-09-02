@@ -3,10 +3,13 @@ dotenv.config({ path: '../.env' });
 
 import express from 'express';
 import cors from 'cors';
+
 import { errorHandler } from './middleware/errorHandler';
 import { logger } from './middleware/logger';
+
 import matchesRouter from './routes/matches';
 import playersRouter from './routes/players';
+import guessRouter from './routes/guess';
 
 const app = express();
 const port = process.env.BACKEND_PORT ? parseInt(process.env.BACKEND_PORT, 10) : 4000;
@@ -24,6 +27,7 @@ app.get('/api/health', (_req, res) => {
 // API routes
 app.use('/api/matches', matchesRouter);
 app.use('/api/players', playersRouter);
+app.use('/api/guess', guessRouter);
 
 // 404 catch-all Unknown routes
 app.use((_req, res) => res.status(404).json({ error: 'Not found', code: 'NOT_FOUND' }));

@@ -4,6 +4,7 @@ import { createReadStream } from 'fs';
 import { parse } from 'csv-parse';
 import { cleanDisplayName } from '../../scripts/src/name-cleaning';
 import { normalizeCompetitionName, MISSING_COMPETITIONS } from '../../scripts/src/competition-names';
+import { normalizeTeamName } from '../../scripts/src/team-names';
 import path from 'path';
 import { PrismaPg } from '@prisma/adapter-pg';
 import { PrismaClient, Prisma } from '../src/generated/prisma/client';
@@ -293,7 +294,7 @@ function toCompetitionData(rows: Competition[]): Prisma.CompetitionCreateManyInp
 function toClubData(rows: Team[]): Prisma.ClubCreateManyInput[] {
     return rows.map(t => ({
         clubId: t.clubId,
-        name: t.name,
+        name: normalizeTeamName(t.clubId, t.name),
         isNationalTeam: t.isNationalTeam,
     }));
 }
@@ -426,12 +427,47 @@ async function main(): Promise<void> {
     if (droppedAppearances > 0)
         console.warn(`Skipping ${droppedAppearances} appearances whose players are missing from players.csv`);
 
+    // Drop entire sides (gameId+clubId) that don't have all 11 starting
+    // players present in players.csv. A partial lineup in the DB is worse
+    // than no lineup at all.
+    const sideCounts = new Map<string, number>();
+    for (const a of keptAppearances) {
+        const key = `${a.gameId}:${a.clubId}`;
+        sideCounts.set(key, (sideCounts.get(key) ?? 0) + 1);
+    }
+    const completeSideKeys = new Set<string>();
+    for (const [key, count] of sideCounts) {
+        if (count >= 11) {
+            completeSideKeys.add(key);
+        } else {
+            const [gameId, clubId] = key.split(':');
+            console.warn(
+                `Dropping side (gameId=${gameId}, clubId=${clubId}): ` +
+                `only ${count} of 11 starting players found in players.csv`
+            );
+        }
+    }
+    const sideFilteredAppearances = keptAppearances.filter(a =>
+        completeSideKeys.has(`${a.gameId}:${a.clubId}`)
+    );
+
     try {
+        // Reset all tables in FK-safe order so `npm run seed` is idempotent.
+        // The explicit timeout covers large tables (e.g. ~200k appearances)
+        // where the default 5s transaction timeout can be exceeded.
+        await prisma.$transaction([
+            prisma.appearance.deleteMany(),
+            prisma.game.deleteMany(),
+            prisma.player.deleteMany(),
+            prisma.club.deleteMany(),
+            prisma.competition.deleteMany(),
+        ], { timeout: 120000 });
+
         await insertInBatches(prisma.competition, toCompetitionData(competitions));
         await insertInBatches(prisma.club, toClubData(uniqueClubs));
         await insertInBatches(prisma.player, toPlayerData(players));
         await insertInBatches(prisma.game, toGameData(games));
-        await insertInBatches(prisma.appearance, toAppearanceData(dedupeAppearances(keptAppearances)));
+        await insertInBatches(prisma.appearance, toAppearanceData(dedupeAppearances(sideFilteredAppearances)));
     } finally {
         await prisma.$disconnect();
     }

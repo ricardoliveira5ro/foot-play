@@ -8,7 +8,7 @@
 
 ## Objective
 
-Build the three Express API endpoints that power the Missing Eleven game. By the end of this development, the backend serves match data with full lineups, individual match details, and player search — all with consistent error handling and logging.
+Build the five Express API endpoints that power the Missing Eleven game. By the end of this development, the backend serves match data with full lineups, individual match details, player search, and server-side guess validation — all with consistent error handling and logging.
 
 ---
 
@@ -31,6 +31,14 @@ Build the three Express API endpoints that power the Missing Eleven game. By the
    - Server-side search by `display_name` (case-insensitive, partial match)
    - Returns top 20 matches
    - Minimum query length: 2 characters
+
+4. `POST /api/guess`
+   - Server-side wordle-style guess evaluation against the player's name
+   - Returns per-letter results and `isCorrect`; reveals `name` only on a correct guess
+
+5. `POST /api/guess/reveal`
+   - Reveals the full lineup names for a team side at game completion
+   - The only legitimate time names are exposed
 
 **Error handling**: Middleware that catches all errors and returns consistent JSON shape.
 **Logging**: Morgan middleware for request logging.
@@ -65,25 +73,26 @@ Build the three Express API endpoints that power the Missing Eleven game. By the
 - **API response shape**:
   ```json
   {
-    "match": {
-      "id": 123, "date": "2023-05-28", "season": "2022/2023",
+    "game": {
+      "gameId": 123, "date": "2023-05-28", "season": "2022/2023",
       "competition": "Premier League",
-      "homeClub": { "id": 15, "name": "Manchester City" },
-      "awayClub": { "id": 42, "name": "Chelsea" },
+      "homeClub": { "clubId": 15, "name": "Manchester City" },
+      "awayClub": { "clubId": 42, "name": "Chelsea" },
       "homeScore": 4, "awayScore": 1,
       "homeFormation": "4-3-3", "awayFormation": "4-2-3-1"
     },
     "homeLineup": [
-      { "playerId": 1, "displayName": "Ederson", "shirtNumber": 31, "position": "Goalkeeper", "coords": { "x": 50, "y": 92 } }
+      { "playerId": 1, "nameLength": 7, "shirtNumber": 31, "position": "Goalkeeper", "coords": { "x": 50, "y": 92 } }
     ],
     "awayLineup": [...]
   }
   ```
+- **Note**: Lineup entries expose `nameLength` — the normalized length of the player's name (lowercase, diacritics stripped, spaces/hyphens/apostrophes removed) — instead of `displayName`. The frontend uses it to validate input length without the answer (the player's name) ever leaving the server. See Task 3.6 for the server-side guess validation contract.
 - **Acceptance criteria**:
   - [ ] Returns 200 with valid JSON response
   - [ ] Includes match metadata + Both lineups with exactly 11 players each
   - [ ] Competition name is resolved (not raw ID)
-  - [ ] Each lineup entry has: playerId, displayName, shirtNumber, position, coords
+  - [ ] Each lineup entry has: playerId, nameLength, shirtNumber, position, coords
   - [ ] Response time < 500ms
 - **Validation**: `curl http://localhost:4000/api/matches/random | jq '.homeLineup | length'` returns 11.
 
@@ -134,6 +143,47 @@ Build the three Express API endpoints that power the Missing Eleven game. By the
   - [ ] Stack traces are NOT exposed in production responses
 - **Validation**: Test all error cases manually with curl.
 
+### Task 3.6: Server-side guess validation
+
+- **Description**: Move wordle-style guess evaluation from the client to the server so player names (the answers) are never exposed to the client. The server evaluates each guess against the player's name and only reveals the name on a correct guess or at game completion.
+- **Files to create/modify**:
+  - `backend/src/routes/guess.ts` — route definitions
+  - `backend/src/services/guessService.ts` — guess evaluation logic
+  - `backend/src/index.ts` — register guess routes
+- **API: `POST /api/guess`**:
+  - Request body: `{ "gameId": 123, "playerId": 456, "guess": "Messi" }`
+  - Response (wrong guess):
+    ```json
+    { "results": [{ "letter": "M", "result": "CORRECT" }, ...], "isCorrect": false }
+    ```
+  - Response (correct guess):
+    ```json
+    { "results": [...], "isCorrect": true, "name": "Messi" }
+    ```
+  - `result` values are UPPERCASE: `"CORRECT" | "PRESENT" | "ABSENT"`
+  - **Critical rule**: `name` is ONLY present when `isCorrect` is `true`. Never leak the answer on a wrong guess.
+  - Errors:
+    - 400 `{ "error": "...", "code": "INVALID_PARAMETER" }` — invalid body (gameId/playerId must be numbers, guess must be a non-empty string)
+    - 404 `{ "error": "...", "code": "NOT_FOUND" }` — player is not in the match
+- **API: `POST /api/guess/reveal`**:
+  - Request body: `{ "gameId": 123, "teamSide": "home" }` (`teamSide` is `"home"` or `"away"`)
+  - Response:
+    ```json
+    { "players": [{ "playerId": 456, "name": "Messi", "shirtNumber": 10 }, ...] }
+    ```
+  - This is the ONLY legitimate time names are revealed (game completion).
+  - Errors:
+    - 400 `{ "error": "...", "code": "INVALID_PARAMETER" }` — invalid body
+    - 404 `{ "error": "...", "code": "NOT_FOUND" }` — game does not exist
+- **Security rationale**: The answers (player names) never leave the server until a correct guess or game completion. This is the core anti-cheat fix.
+- **Acceptance criteria**:
+  - [ ] `POST /api/guess` returns per-letter results with `isCorrect`
+  - [ ] `name` is only present in the response when `isCorrect` is `true`
+  - [ ] `POST /api/guess/reveal` returns the full lineup names for the requested team side
+  - [ ] Invalid bodies return 400 with `code: "INVALID_PARAMETER"`
+  - [ ] Unknown player or game returns 404 with `code: "NOT_FOUND"`
+- **Validation**: `curl -X POST http://localhost:4000/api/guess -H 'Content-Type: application/json' -d '{"gameId":123,"playerId":456,"guess":"Messi"}' | jq '.isCorrect'`.
+
 ---
 
 ## Dependencies
@@ -153,6 +203,7 @@ Build the three Express API endpoints that power the Missing Eleven game. By the
 | Task 3.3 (matches/:id)                    | 0.5 day  |
 | Task 3.4 (players search)                 | 0.5 day  |
 | Task 3.5 (validation + error consistency) | 0.5 day  |
+| Task 3.6 (server-side guess validation)   | 0.5 day  |
 | Buffer                                    | 0.5 day  |
 
 ---
@@ -174,6 +225,8 @@ Build the three Express API endpoints that power the Missing Eleven game. By the
 - [ ] `GET /api/matches/:id` returns 404 for non-existent or invalid IDs
 - [ ] `GET /api/players?q=ron` returns ≤ 20 results within 300ms
 - [ ] `GET /api/players?q=r` returns 400 (minimum 2 chars)
+- [ ] `POST /api/guess` returns per-letter results and only reveals `name` when `isCorrect` is true
+- [ ] `POST /api/guess/reveal` returns lineup names only at game completion
 - [ ] All errors return consistent JSON shape `{ error, code }`
 - [ ] Request logging shows method, path, status, duration
 - [ ] CORS configured for frontend origin

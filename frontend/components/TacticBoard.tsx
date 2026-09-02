@@ -6,7 +6,7 @@ interface TacticBoardProps {
   teamName: string;
   formation: string | null;
   shirts: ShirtData[];
-  onShirtClick?: (playerId: number) => void;
+  onShirtClick?: (token: string) => void;
 }
 
 /** Team caption + formation label above the pitch, shirts positioned inside. */
@@ -21,7 +21,7 @@ export default function TacticBoard({ teamName, formation, shirts, onShirtClick 
       </div>
       <Pitch>
         {shirts.map((shirt, index) => (
-          <Shirt key={shirt.playerId} shirt={shirt} index={index} onClick={onShirtClick} guessHistory={shirt.guessHistory} />
+          <Shirt key={shirt.token} shirt={shirt} index={index} onClick={onShirtClick} guessHistory={shirt.guessHistory} />
         ))}
       </Pitch>
     </section>

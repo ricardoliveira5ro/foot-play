@@ -1,6 +1,8 @@
 import { prisma } from '../prisma';
 import { fitStartingXI, type LineupPlayer } from './positionMapping';
 import type { Prisma } from '../generated/prisma/client';
+import { normalize, getWordBoundaries } from './wordle';
+import { generatePlayerToken, resolvePlayerToken } from './tokenService';
 
 type GameWithRelations = Prisma.GameGetPayload<{
   include: {
@@ -48,24 +50,24 @@ export async function getMatchById(id: number) {
 
 export function buildMatchResponse(game: GameWithRelations) {
   return {
-    match: {
-      id: game.gameId,
+    game: {
+      gameId: game.gameId,
       date: game.date?.toISOString().slice(0, 10) ?? null,
       season: game.season ? `${game.season}/${game.season + 1}` : null,
       competition: game.competition?.name ?? null,
-      homeClub: game.homeClub ? { id: game.homeClub.id, name: game.homeClub.name } : null,
-      awayClub: game.awayClub ? { id: game.awayClub.id, name: game.awayClub.name } : null,
+      homeClub: game.homeClub ? { clubId: game.homeClub.clubId, name: game.homeClub.name } : null,
+      awayClub: game.awayClub ? { clubId: game.awayClub.clubId, name: game.awayClub.name } : null,
       homeScore: game.homeClubGoals ?? 0,
       awayScore: game.awayClubGoals ?? 0,
       homeFormation: game.homeClubFormation ?? null,
       awayFormation: game.awayClubFormation ?? null,
     },
-    homeLineup: buildLineup(game.appearances, game.homeClubId, game.homeClubFormation),
-    awayLineup: buildLineup(game.appearances, game.awayClubId, game.awayClubFormation),
+    homeLineup: buildLineup(game.gameId, game.appearances, game.homeClubId, game.homeClubFormation),
+    awayLineup: buildLineup(game.gameId, game.appearances, game.awayClubId, game.awayClubFormation),
   };
 }
 
-function buildLineup(appearances: GameWithRelations['appearances'],clubId: number,formation: string | null) {
+function buildLineup(gameId: number, appearances: GameWithRelations['appearances'], clubId: number, formation: string | null) {
   const side = appearances
     .filter((a) => a.clubId === clubId)
     .sort((a, b) => {
@@ -82,11 +84,36 @@ function buildLineup(appearances: GameWithRelations['appearances'],clubId: numbe
 
   const fitted = fitStartingXI(lineupPlayers, formation);
 
-  return side.map((a, i) => ({
-    playerId: a.playerId,
-    displayName: a.player?.displayName ?? a.player?.name ?? '',
-    shirtNumber: a.number ?? null,
-    position: fitted[i].position,
-    coords: fitted[i].coords,
-  }));
+  return side.map((a, i) => {
+    const displayName = a.player?.displayName ?? a.player?.name ?? '';
+    return {
+      token: generatePlayerToken(gameId, a.playerId),
+      nameLength: normalize(displayName).length,
+      wordBoundaries: getWordBoundaries(displayName),
+      shirtNumber: a.number ?? null,
+      position: fitted[i].position,
+      coords: fitted[i].coords,
+    };
+  });
+}
+
+export async function getPlayerNameForAppearance(gameId: number, token: string): Promise<string | null> {
+  const playerId = await resolvePlayerToken(gameId, token);
+
+  if (!playerId) return null;
+
+  const appearance = await prisma.appearance.findFirst({
+    where: { gameId, playerId },
+    include: { player: true }
+  })
+
+  return appearance?.player.displayName ?? appearance?.player.name ?? null;
+}
+
+export async function getRevealAppearances(gameId: number, clubId: number) {
+  return prisma.appearance.findMany({
+    where: { gameId, clubId },
+    include: { player: { select: { displayName: true, name: true } } },
+    orderBy: [{ number: { sort: 'asc', nulls: 'last' } }, { playerId: 'asc' }],
+  });
 }

@@ -1,17 +1,19 @@
 'use client';
 
 import { useEffect } from 'react';
-import type { Match, ShirtData } from '@/types';
+import type { Game, ShirtData, RevealPlayer } from '@/types';
 
 interface GameCompleteProps {
   /** Whether the player won */
   isWin: boolean;
   /** The match data */
-  match: Match;
+  match: Game;
   /** The team side that was played */
   teamSide: 'home' | 'away';
   /** All shirts with their final states */
   shirts: ShirtData[];
+  /** Revealed player names from the server (POST /api/reveal) */
+  revealedPlayers: RevealPlayer[];
   /** Callback to start a new game */
   onPlayAgain: () => void;
 }
@@ -22,6 +24,29 @@ function formatMatchDate(date: string | null): string | null {
   if (Number.isNaN(parsed.getTime())) return date;
   return parsed.toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' });
 }
+
+const POSITION_ORDER: Record<string, number> = {
+  // Goalkeeper
+  'Goalkeeper': 0, 'GK': 0,
+  // Defenders
+  'Centre-Back': 10, 'CB': 10,
+  'Left-Back': 11, 'LB': 11,
+  'Right-Back': 12, 'RB': 12,
+  'Defender': 15, 'Sweeper': 15,
+  // Midfielders
+  'Defensive Midfield': 20, 'DM': 20,
+  'Central Midfield': 21, 'CM': 21,
+  'Attacking Midfield': 22, 'AM': 22, 'CAM': 22,
+  'Midfield': 23,
+  'Left Midfield': 24, 'LM': 24,
+  'Right Midfield': 25, 'RM': 25,
+  // Forwards
+  'Left Winger': 30, 'LW': 30, 'LWB': 30,
+  'Right Winger': 31, 'RW': 31, 'RWB': 31,
+  'Second Striker': 32,
+  'Centre-Forward': 33, 'ST': 33, 'CF': 34,
+  'Attack': 35,
+};
 
 function getPositionLabel(position: string | null): string {
   const labels: Record<string, string> = {
@@ -45,11 +70,15 @@ function getPositionLabel(position: string | null): string {
   return position ? labels[position] ?? position : '?';
 }
 
-export default function GameComplete({ isWin, match, teamSide, shirts, onPlayAgain }: GameCompleteProps) {
+export default function GameComplete({ isWin, match, teamSide, shirts, revealedPlayers, onPlayAgain }: GameCompleteProps) {
   const home = match.homeClub?.name ?? 'Home';
   const away = match.awayClub?.name ?? 'Away';
   const dateLabel = formatMatchDate(match.date) ?? match.season;
   const teamName = teamSide === 'home' ? home : away;
+
+  // Map revealed players by shirtNumber for name lookup. Shirts carry opaque
+  // tokens now, but shirtNumber is present and unique on both sides.
+  const revealedByName = new Map((revealedPlayers ?? []).map((p) => [p.shirtNumber, p.name]));
 
   // Calculate stats
   const totalShirts = shirts.length;
@@ -126,15 +155,16 @@ export default function GameComplete({ isWin, match, teamSide, shirts, onPlayAga
           <div className="space-y-2">
             {shirts
               .slice()
-              .sort((a, b) => (a.shirtNumber ?? 99) - (b.shirtNumber ?? 99))
+              .sort((a, b) => (POSITION_ORDER[a.position ?? ''] ?? 99) - (POSITION_ORDER[b.position ?? ''] ?? 99))
               .map((shirt) => {
                 const isCorrect = shirt.state === 'correct';
                 const isFailed = shirt.state === 'failed';
                 const showName = isCorrect || isFailed;
+                const revealedName = revealedByName.get(shirt.shirtNumber);
 
                 return (
                   <div
-                    key={shirt.playerId}
+                    key={shirt.token}
                     className="flex items-center gap-3 p-3 rounded-lg transition-colors"
                     style={{
                       backgroundColor: isCorrect
@@ -147,14 +177,14 @@ export default function GameComplete({ isWin, match, teamSide, shirts, onPlayAga
                   >
                     {/* Shirt number */}
                     <span
-                      className="flex-shrink-0 w-10 text-center font-display text-lg text-ink/60"
+                      className="shrink-0 w-10 text-center font-display text-lg text-ink/60"
                       aria-label={`Shirt ${shirt.shirtNumber ?? '?'}`}
                     >
                       {shirt.shirtNumber ?? '?'}
                     </span>
 
                     {/* Position */}
-                    <span className="flex-shrink-0 w-14 text-xs font-mono text-ink/50 text-right uppercase">
+                    <span className="shrink-0 w-28 text-xs font-mono text-ink/50 text-left uppercase">
                       {getPositionLabel(shirt.position)}
                     </span>
 
@@ -169,7 +199,7 @@ export default function GameComplete({ isWin, match, teamSide, shirts, onPlayAga
                           : 'var(--color-ink/40)',
                       }}
                     >
-                      {showName ? shirt.displayName : '—'}
+                      {showName && revealedName ? revealedName : '—'}
                     </span>
 
                     {/* Status badge */}
@@ -200,17 +230,18 @@ export default function GameComplete({ isWin, match, teamSide, shirts, onPlayAga
 
         {/* Match summary */}
         <div className="border-t border-ink/10 px-6 py-4">
-          <div className="flex flex-col items-center gap-1 text-center md:flex-row md:flex-wrap md:items-baseline md:gap-x-3 md:gap-y-1 md:text-left">
+          <div className="flex items-center justify-center gap-4">
             <p className="font-display text-[36px] leading-none text-ink">
               {match.homeScore} – {match.awayScore}
             </p>
-            <p className="font-semibold text-xl text-ink">{home}</p>
-            <p className="text-xl font-medium text-ink/55 md:hidden">v</p>
-            <p className="font-semibold text-xl text-ink">{away}</p>
+            <div className="flex flex-col items-start gap-0.5">
+              <p className="font-semibold text-xl text-ink">{home}</p>
+              <p className="font-semibold text-xl text-ink">{away}</p>
+            </div>
           </div>
 
           {(dateLabel || match.competition) && (
-            <div className="mt-3 flex flex-col items-center gap-0.5 md:items-start text-xs uppercase tracking-[0.08em] text-ink/55">
+            <div className="mt-3 flex flex-col items-center gap-0.5 text-xs uppercase tracking-[0.08em] text-ink/55">
               {dateLabel && <p>{dateLabel}</p>}
               {match.competition && <p>{match.competition}</p>}
             </div>

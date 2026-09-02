@@ -3,10 +3,8 @@
  * Shapes mirror the REST API contract (see docs/v0.1/dev-4-frontend-shell.md).
  */
 
-import type { GuessResult } from '@/lib/wordle';
-
 export interface Club {
-  id: number;
+  clubId: number;
   name: string;
 }
 
@@ -20,16 +18,24 @@ export interface PositionCoords {
 
 /** One starting-XI entry, as returned by the lineup endpoints. */
 export interface LineupPlayer {
-  playerId: number;
-  displayName: string;
+  /**
+   * Opaque per-game token identifying the player behind this shirt.
+   * Replaces the stable DB `playerId` in lineup payloads so a correct guess
+   * in one game cannot be reused to cheat in another.
+   */
+  token: string;
+  /** Normalized length of the player's name (no spaces/diacritics). */
+  nameLength: number;
+  /** Normalized indices where a word separator (space/hyphen/apostrophe) occurs. */
+  wordBoundaries: number[];
   shirtNumber: number | null;
   /** Position code, e.g. 'GK' | 'CB' | 'LB' | 'CM' | 'ST'. */
   position: string | null;
   coords: PositionCoords;
 }
 
-export interface Match {
-  id: number;
+export interface Game {
+  gameId: number;
   /** ISO date, 'YYYY-MM-DD'. */
   date: string | null;
   /** e.g. '2022/23'. */
@@ -45,8 +51,8 @@ export interface Match {
 }
 
 /** Response shape for GET /api/matches/random and GET /api/matches/:id. */
-export interface MatchResponse {
-  match: Match;
+export interface GameResponse {
+  game: Game;
   homeLineup: LineupPlayer[];
   awayLineup: LineupPlayer[];
 }
@@ -74,4 +80,37 @@ export interface ShirtData extends LineupPlayer {
   state: ShirtState;
   /** Guess history for shirt preview (optional — only available when game is active) */
   guessHistory?: GuessResult[][];
+  /** Player name — only set once the shirt is guessed correctly. */
+  name?: string;
+}
+
+/** Per-letter feedback for a single guess. */
+export interface GuessResult {
+  letter: string;
+  result: 'CORRECT' | 'PRESENT' | 'ABSENT';
+}
+
+/** POST /api/guess response — server-side wordle evaluation. */
+export interface GuessResponse {
+  results: GuessResult[];
+  isCorrect: boolean;
+  /** Only present when isCorrect is true. */
+  name?: string;
+}
+
+/** One entry of POST /api/reveal. */
+export interface RevealPlayer {
+  playerId: number;
+  name: string;
+  shirtNumber: number | null;
+}
+
+/** POST /api/reveal response — all player names for game completion. */
+export interface RevealResponse {
+  players: RevealPlayer[];
+}
+
+/** POST /api/guess/reveal-one response — a single player's name. */
+export interface RevealOneResponse {
+  name: string;
 }
