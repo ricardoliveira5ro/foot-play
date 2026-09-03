@@ -31,6 +31,12 @@ jobs:
         working-directory: backend
         run: npm install
 
+      - name: Generate Prisma client
+        working-directory: backend
+        run: npx prisma generate
+        env:
+          DATABASE_URL: "postgresql://dummy:dummy@localhost:5432/dummy"
+
       - name: Build backend (type check)
         working-directory: backend
         run: npm run build
@@ -99,4 +105,5 @@ jobs:
             git pull origin main
             docker compose -f docker-compose.prod.yml --env-file .env.production up -d --build
             sleep 10
+            docker compose -f docker-compose.prod.yml --env-file .env.production exec -T backend npx prisma migrate deploy
             curl -f http://localhost/api/health || exit 1
