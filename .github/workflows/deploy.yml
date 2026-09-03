@@ -36,6 +36,7 @@ jobs:
         run: npx prisma generate
         env:
           DATABASE_URL: "postgresql://dummy:dummy@localhost:5432/dummy"
+          SHADOW_DATABASE_URL: "postgresql://dummy:dummy@localhost:5432/dummy_shadow"
 
       - name: Build backend (type check)
         working-directory: backend
