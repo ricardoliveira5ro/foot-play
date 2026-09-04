@@ -180,6 +180,8 @@ async function processGameLineupsDataset(candidateGames: Game[], candidateGameId
 
 function processOpponentTeams(games: Game[], opponents: Team[], candidateClubOpponentsNameById: Map<number, string>, candidateNationOpponentsNameById: Map<number, string>, gameOpponentNamesById: Map<number, string>) {
     const finalOpponentsIds = new Set<number>();
+    const fallbackOpponents: number[] = [];
+    const missingOpponentNames: number[] = [];
     
     games.forEach(g => {
         const oppTeamId = g.opponentTeamId;
@@ -193,13 +195,18 @@ function processOpponentTeams(games: Game[], opponents: Team[], candidateClubOpp
             const oppTeamName = clubName || nationName || gameName || "";
 
             if (!clubName && !nationName && gameName)
-                console.warn(`Opponent team ${oppTeamId}: name not in clubs.csv/national_teams.csv, falling back to games.csv name "${gameName}"`);
+                fallbackOpponents.push(oppTeamId);
             else if (!oppTeamName)
-                console.warn(`Opponent team ${oppTeamId}: no name found in clubs.csv, national_teams.csv or games.csv; inserting empty name`);
+                missingOpponentNames.push(oppTeamId);
 
             opponents.push({ clubId: oppTeamId, name: oppTeamName, isNationalTeam: false });
         }
     });
+
+    if (fallbackOpponents.length > 0)
+        console.warn(`${fallbackOpponents.length} opponent teams fell back to games.csv name (not in clubs.csv/national_teams.csv)`);
+    if (missingOpponentNames.length > 0)
+        console.warn(`${missingOpponentNames.length} opponent teams had no name found in any dataset; inserting empty name`);
 }
 
 async function processCompetitionsDataset(games: Game[], competitions: Competition[]) {
@@ -436,17 +443,16 @@ async function main(): Promise<void> {
         sideCounts.set(key, (sideCounts.get(key) ?? 0) + 1);
     }
     const completeSideKeys = new Set<string>();
+    let droppedSides = 0;
     for (const [key, count] of sideCounts) {
         if (count >= 11) {
             completeSideKeys.add(key);
         } else {
-            const [gameId, clubId] = key.split(':');
-            console.warn(
-                `Dropping side (gameId=${gameId}, clubId=${clubId}): ` +
-                `only ${count} of 11 starting players found in players.csv`
-            );
+            droppedSides++;
         }
     }
+    if (droppedSides > 0)
+        console.warn(`Dropped ${droppedSides} sides with incomplete lineups (fewer than 11 starting players found in players.csv)`);
     const sideFilteredAppearances = keptAppearances.filter(a =>
         completeSideKeys.has(`${a.gameId}:${a.clubId}`)
     );

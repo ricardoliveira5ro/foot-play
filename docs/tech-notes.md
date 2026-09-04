@@ -520,3 +520,40 @@ docker compose -f docker-compose.prod.yml --env-file .env.production restart ngi
 | `EAI_AGAIN` in frontend | Set `HOSTNAME=0.0.0.0` in frontend Dockerfile |
 | SSL cert not renewing | Check certbot logs: `sudo docker compose logs certbot` |
 | Health check failing | Backend can't reach DB — check `DATABASE_URL` in `.env.production` |
+
+---
+
+## Access Production Database via SSH Tunnel
+
+The production PostgreSQL runs in a Docker container with **no public port** — it's bound to loopback only (`127.0.0.1:5432`). To access it from your local machine with a GUI tool (DBeaver, pgAdmin, etc.) without exposing it to the internet, use an SSH tunnel.
+
+### Prerequisite: loopback-only port binding
+
+The postgres service in `docker-compose.prod.yml` must bind to loopback only:
+
+```yaml
+services:
+  postgres:
+    ...
+    ports:
+      - '127.0.0.1:5432:5432'
+```
+
+This binding is **safe** — it listens only on the server's own loopback interface (not the public interface), so the DB is NOT reachable from the internet. It only becomes reachable once an SSH tunnel forwards to it (which requires valid SSH credentials).
+
+### Method: DBeaver (GUI)
+
+1. **New connection → PostgreSQL**
+2. **Main tab:**
+   - Host: `localhost`
+   - Port: `5432`
+   - Database / Username / Password: from the server's `.env.production` (`DB_NAME`, `DB_USER`, `DB_PASSWORD`)
+3. **SSH/SSL or SSH Tunnel tab:**
+   - Enable SSH tunnel
+   - Host: server public IP
+   - Port: `22`
+   - Username: your SSH user (e.g. `ubuntu`)
+   - Auth: Public key → select your private key file
+4. **Test Connection** — should succeed.
+
+DBeaver creates the tunnel `laptop:5432 → server:5432` over SSH, then connects to the DB through it.

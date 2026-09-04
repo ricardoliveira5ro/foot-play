@@ -47,7 +47,8 @@ export const TEAM_NAME_OVERRIDES: Record<number, string> = {
     3854: 'D.R. Congo',
     317: 'FC Twente',
     150: 'Real Betis',
-    65: 'Greuther Fürth'
+    65: 'Greuther Fürth',
+    714: 'Espanyol'
 };
 
 export function normalizeTeamName(clubId: number, name: string): string {
