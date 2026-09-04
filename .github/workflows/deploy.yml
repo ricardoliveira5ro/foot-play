@@ -62,5 +62,10 @@ jobs:
             git pull origin main
             sudo docker compose -f docker-compose.prod.yml --env-file .env.production up -d --build
             sudo docker compose -f docker-compose.prod.yml --env-file .env.production exec -T backend npx prisma migrate deploy
+            # Seed database
+            cd ~/foot-play
+            npm install --ignore-scripts 2>/dev/null
+            npm run data-pipeline
+            sudo docker compose -f docker-compose.prod.yml --env-file .env.production exec -T backend npx ts-node --project prisma/tsconfig.json prisma/seed.ts
             sleep 10
             curl -f http://localhost/api/health || exit 1

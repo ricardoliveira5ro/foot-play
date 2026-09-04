@@ -24,6 +24,8 @@ services:
       - PLAYER_TOKEN_SECRET=${PLAYER_TOKEN_SECRET}
       - CORS_ORIGIN=http://localhost
       - BACKEND_PORT=4000
+    volumes:
+      - ./scripts:/app/scripts:ro
     ports:
       - '4000:4000'
     depends_on:
