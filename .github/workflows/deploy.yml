@@ -63,7 +63,7 @@ jobs:
             sudo docker compose -f docker-compose.prod.yml --env-file .env.production up -d --build
             sudo docker compose -f docker-compose.prod.yml --env-file .env.production exec -T backend npx prisma migrate deploy
             # Seed database
-            sudo docker run --rm -v ~/foot-play/scripts:/app -w /app node:20-alpine sh -c "npm install && npx ts-node --transpile-only src/download-data.ts"
+            sudo docker run --rm -v ~/foot-play/scripts:/app -v ~/foot-play/tsconfig.base.json:/tsconfig.base.json:ro -w /app node:20-alpine sh -c "npm install && npx ts-node --transpile-only src/download-data.ts"
             sudo docker compose -f docker-compose.prod.yml --env-file .env.production exec -T backend npx ts-node --transpile-only --project prisma/tsconfig.json prisma/seed.ts
             sleep 10
             curl -f http://localhost/api/health || exit 1
