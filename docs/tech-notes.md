@@ -337,3 +337,186 @@ Cert expires in 90 days
         ↓
 Certbot auto-renews → saves new cert → nginx reloads
 ```
+
+---
+
+
+# Deployment Guide
+
+This guide covers deploying the Foot-Play game to Oracle Cloud Free Tier.
+
+## Prerequisites
+
+1. **Oracle Cloud Free Tier account** — [sign up here](https://www.oracle.com/cloud/free/)
+2. **A domain name** — for HTTPS (e.g., `footplay.example.com`)
+3. **SSH key pair** — Ed25519 or RSA (`ssh-keygen -t ed25519 -C "your-email@example.com"` you should have both `id_ed25519` and `id_ed25519.pub`)
+4. **GitHub repository** — with the code pushed
+
+---
+
+## Step 1: Create Oracle Cloud Instance
+
+1. Log into Oracle Cloud Console
+2. Go to **Compute → Instances → Create Instance**
+3. **Basic Information**:
+   - **Name**: `foot-play-server`
+4. **Security**:
+   - Skip shielded instances and confidential computing
+5. **Networking**:
+   - Select **"Create new virtual cloud network"**
+   - Use defaults (VCN name, CIDR, subnet)
+6. **Storage**:
+   - Use defaults (Boot volume: 50 GB)
+7. **Review → Create**
+
+### Attach Public IP
+
+After instance is created:
+1. Click on the instance → **Primary VNIC** link
+2. Go to **IP Administration** tab
+3. Click on the **Primary IP** row → **Edit**
+4. Under **"Public IP type"** → select **"Ephemeral public IP"**
+5. **Save**
+
+### Configure Security Rules
+
+1. In the top search bar, type **"VCN"** → **"Virtual Cloud Networks"**
+2. Click your VCN name: **`foot-play-server-vcn`**
+3. Under **Related Resources** → click **"Security Lists"**
+4. Click **"Default Security List for foot-play-server-vcn"**
+5. Click **"Add Ingress Rules"** and add:
+
+| Source CIDR | Destination Port | Description |
+|-------------|------------------|-------------|
+| 0.0.0.0/0 | 22 | SSH |
+| 0.0.0.0/0 | 80 | HTTP |
+| 0.0.0.0/0 | 443 | HTTPS |
+
+**Note:** Port 22 is usually open by default. You only need to add 80 and 443.
+
+---
+
+## Step 2: Connect via SSH
+
+```bash
+ssh -i ~/.ssh/id_ed25519 ubuntu@YOUR_PUBLIC_IP
+```
+
+**Note:** If you used a different key name during Oracle Cloud setup, replace `id_ed25519` with your key name.
+
+---
+
+## Step 3: Run Provisioning Script
+
+On the server:
+
+```bash
+# Clone the repo
+git clone https://github.com/ricardoliveira5ro/foot-play.git ~/foot-play
+
+# Enter the directory
+cd ~/foot-play
+
+# Make provisioning script executable
+chmod +x scripts/provision-oracle.sh
+
+# Run it
+sudo bash scripts/provision-oracle.sh
+```
+
+---
+
+## Step 4: Configure Environment
+
+```bash
+cd ~/foot-play
+nano .env.production
+```
+
+Set real values:
+
+```env
+DB_NAME=
+DB_USER=
+DB_PASSWORD=
+PLAYER_TOKEN_SECRET=
+```
+
+Generate a random secret:
+```bash
+openssl rand -hex 32
+```
+
+---
+
+## Step 5: Start the Stack
+
+```bash
+cd ~/foot-play
+docker compose -f docker-compose.prod.yml --env-file .env.production up -d
+```
+
+Verify:
+```bash
+curl http://localhost/api/health
+```
+
+---
+
+## Step 6: Set Up DNS
+
+1. Go to your domain registrar (or Cloudflare)
+2. Create an **A record**:
+   - **Name**: `footplay` (or `@` for root)
+   - **Value**: YOUR_SERVER_PUBLIC_IP
+   - **TTL**: 300 (5 min)
+
+---
+
+## Step 7: Set Up SSL (HTTPS)
+
+After DNS is pointing to your server:
+
+```bash
+# Request certificate
+docker compose -f docker-compose.prod.yml --env-file .env.production run --rm certbot certonly --webroot -w /var/www/certbot -d YOUR_DOMAIN.com
+```
+
+Then update `nginx/conf.d/default.conf`:
+- Uncomment the HTTPS server block
+- Replace `your-domain.com` with your actual domain
+- Uncomment the HTTP → HTTPS redirect
+
+Restart nginx:
+```bash
+docker compose -f docker-compose.prod.yml --env-file .env.production restart nginx
+```
+
+---
+
+## Step 8: Set Up CI/CD
+
+1. In GitHub repo: **Settings → Secrets and variables → Actions**
+2. Add secrets:
+
+| Secret | Value |
+|--------|-------|
+| `DEPLOY_HOST` | YOUR_SERVER_PUBLIC_IP |
+| `DEPLOY_USER` | `ubuntu` |
+| `DEPLOY_KEY` | Your SSH private key content |
+| `DATABASE_URL` | `postgresql://[USER]:[PASSWORD]@localhost:5432/[NAME]` |
+
+3. Push to `main` — the pipeline runs automatically
+
+---
+
+## Troubleshooting
+
+| Problem | Solution |
+|---------|----------|
+| `Permission denied (publickey)` | Make sure you're using the correct private key |
+| `port 5432 already in use` | Local PostgreSQL running — stop it or remove port mapping |
+| `host not found in upstream` | Frontend/backend containers not running — check `sudo docker compose ps` |
+| `EAI_AGAIN` in frontend | Set `HOSTNAME=0.0.0.0` in frontend Dockerfile |
+| SSL cert not renewing | Check certbot logs: `sudo docker compose logs certbot` |
+| Health check failing | Backend can't reach DB — check `DATABASE_URL` in `.env.production` |
