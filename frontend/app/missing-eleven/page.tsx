@@ -194,6 +194,7 @@ export default function MissingElevenPage() {
             formation={formation}
             shirts={shirts}
             onShirtClick={handleShirtClick}
+            clubId={state.teamSide === 'home' ? state.match.game.homeClub?.clubId : state.match.game.awayClub?.clubId}
           />
         </section>
 
