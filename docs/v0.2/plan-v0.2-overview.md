@@ -1,6 +1,6 @@
 # FootPlay v0.2 — Missing Eleven Enhanced
 
-**Status**: `planned`
+**Status**: `in progress`
 **Date**: 2026-09-04
 **Source**: Brainstorming session with project owner
 
@@ -17,12 +17,12 @@ No new games, no auth, no infrastructure changes — just gameplay depth.
 
 ## 2. Feature Summary
 
-| Feature | What it does | Effort |
-|---|---|---|
-| Team Colors | Shirts reflect real kit colors per team | S (2-3 days) |
-| Opponent Toggle | Guess both teams via board toggle | M (3-4 days) |
-| Scoring System | Attempt-based scoring + bonuses | M (3-4 days) |
-| Integration & Polish | E2E testing, edge cases, smooth transitions | S (2-3 days) |
+| Feature | What it does | Effort | Status |
+|---|---|---|---|
+| Team Colors | Shirts reflect real kit colors per team | S (2-3 days) | ✅ Implemented |
+| Opponent Toggle | Guess both teams via board toggle | M (3-4 days) | Planned |
+| Scoring System | Attempt-based scoring + bonuses | M (3-4 days) | Planned |
+| Integration & Polish | E2E testing, edge cases, smooth transitions | S (2-3 days) | Planned |
 
 **Total estimated effort**: 10-14 days (2-3 weeks)
 
@@ -44,9 +44,9 @@ v0.2 builds on v1.0. All v1.0 features must be working. No new infrastructure re
 
 | # | Decision | Choice | Rationale |
 |---|---|---|---|
-| D1 | Shirt color source | Static curated lookup (~60-80 teams) | No external dependency, covers most popular teams |
-| D2 | Color model per team | primary, secondary, pattern (solid/stripes/halves) | Simple, covers most iconic home kits |
-| D3 | Fallback for unknown teams | Neutral gray/white, no pattern | Clean default, no errors |
+| D1 | Shirt color source | Static curated lookup (25 teams, matching the curated set) | No external dependency, covers most popular teams |
+| D2 | Color model per team | primary, secondary, pattern (solid/stripes/halves), optional number outline flag | Simple, covers most iconic home kits |
+| D3 | Fallback for unknown teams | Neutral white/gray, solid pattern | Clean default, no errors |
 | D4 | Loss condition | No early game-over — play until all 22 resolved | Rewards completion, no frustration from early exit |
 | D5 | Toggle UX | Simple toggle switch, no progress indicators | Minimal, clean, doesn't clutter the board |
 | D6 | Scoring: correct guess | Linear decay: 1000 → 100 based on attempts used | Transparent, rewards precision |
@@ -65,8 +65,8 @@ v0.2 builds on v1.0. All v1.0 features must be working. No new infrastructure re
 
 ## 7. Release Criteria
 
-- [ ] Team colors render correctly for all curated teams
-- [ ] Unknown teams fall back to neutral default
+- [x] Team colors render correctly for all curated teams
+- [x] Unknown teams fall back to neutral default
 - [ ] Toggle switches between target and opponent boards
 - [ ] Both teams' shirts have independent guess state
 - [ ] Game ends when all 22 shirts are resolved

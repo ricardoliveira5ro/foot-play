@@ -225,7 +225,10 @@ export default function Shirt({ shirt, index, onClick, guessHistory, colors }: S
           {shirtNumber !== null && (
             <span
               className={`absolute inset-0 flex items-center justify-center pt-[4%] font-display leading-none ${numberClass}`}
-              style={{ fontSize: '38cqw' }}
+              style={{
+                fontSize: '38cqw',
+                ...(colors?.numberOutline ? { WebkitTextStroke: '1px #000' } : {}),
+              }}
             >
               {shirtNumber}
             </span>
