@@ -93,7 +93,7 @@ Populate the map with one entry per team in the table above. Group the entries b
 
 - First, a helper that parses a hex color string into red, green, and blue channel values in the 0-255 range. It must handle both 3-digit (#RGB) and 6-digit (#RRGGBB) formats — for a 3-digit value, expand each digit by doubling it (e.g., #ABC becomes #AABBCC) before converting.
 - Second, a function that computes relative luminance per WCAG 2.1: convert each channel from the 0-255 range to a 0-1 sRGB value, then apply the standard linearization — values at or below 0.03928 are divided by 12.92, larger values are raised to the 2.4 power after adding 0.055 and dividing by 1.055. Finally, combine the three linearized channels with the standard luminance weights (roughly 0.2126 for red, 0.7152 for green, 0.0722 for blue).
-- Third, the exported contrast function: compute the relative luminance of the given background color and return "dark" when the background is light (luminance above the chosen threshold of 0.4) and "light" when the background is dark. The Shirt component calls this with the primary shirt color to pick the number color.
+- Third, the exported contrast function: compute the relative luminance of the given background color and return "dark" when the background is light (luminance above the chosen threshold of 0.35) and "light" when the background is dark. The Shirt component calls this with the primary shirt color to pick the number color.
 
 **What to verify after this step**:
 - A white background (#FFFFFF) returns dark text.
