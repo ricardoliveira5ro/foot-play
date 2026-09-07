@@ -1,4 +1,5 @@
 import type { ShirtData } from '@/types';
+import { getTeamColors, type TeamColorEntry } from '@/lib/teamColors';
 import Pitch from './Pitch';
 import Shirt from './Shirt';
 
@@ -7,10 +8,13 @@ interface TacticBoardProps {
   formation: string | null;
   shirts: ShirtData[];
   onShirtClick?: (token: string) => void;
+  clubId?: number;
 }
 
 /** Team caption + formation label above the pitch, shirts positioned inside. */
-export default function TacticBoard({ teamName, formation, shirts, onShirtClick }: TacticBoardProps) {
+export default function TacticBoard({ teamName, formation, shirts, onShirtClick, clubId }: TacticBoardProps) {
+  const colors: TeamColorEntry | undefined = clubId != null ? getTeamColors(clubId) : undefined;
+
   return (
     <section aria-label={`${teamName} tactic board`}>
       <div className="mb-3 flex items-baseline justify-between gap-4">
@@ -21,7 +25,7 @@ export default function TacticBoard({ teamName, formation, shirts, onShirtClick 
       </div>
       <Pitch>
         {shirts.map((shirt, index) => (
-          <Shirt key={shirt.token} shirt={shirt} index={index} onClick={onShirtClick} guessHistory={shirt.guessHistory} />
+          <Shirt key={shirt.token} shirt={shirt} index={index} onClick={onShirtClick} guessHistory={shirt.guessHistory} colors={colors} />
         ))}
       </Pitch>
     </section>

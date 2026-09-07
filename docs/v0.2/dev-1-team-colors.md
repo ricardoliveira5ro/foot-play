@@ -1,6 +1,6 @@
 # Development 1: Team-Specific Shirt Colors
 
-**Status**: `planned`
+**Status**: `implemented`
 **Source**: `docs/v0.2/plan-v0.2-overview.md` (Feature 1)
 **Estimated Effort**: S (2-3 days)
 
@@ -8,16 +8,17 @@
 
 ## Objective
 
-Replace the default white/gray shirt colors with team-authentic colors. Each team's shirts reflect their real home kit — Barcelona gets red/blue stripes, Juventus gets black/white halves, Brazil gets yellow/green, etc. Teams not in the curated lookup get a clean neutral default.
+Replace the default white/gray shirt colors with team-authentic colors. Each team's shirts reflect their real home kit — Barcelona gets red/blue stripes, Juventus gets black/white stripes, Brazil gets yellow/green, etc. Teams not in the curated lookup get a clean neutral default.
 
 ---
 
 ## Approach
 
-**Color lookup**: A static lookup map in a new file (`frontend/src/lib/teamColors.ts`) keyed by club ID (a number). Each entry defines three things:
+**Color lookup**: A static lookup map in a new file (`frontend/src/lib/teamColors.ts`) keyed by club ID (a number). Each entry defines three things, plus an optional fourth:
 - A primary color: the hex color used for the main shirt fill (e.g., #A50044 for Barcelona)
 - A secondary color: the hex color used for accents and stripes (e.g., #004D98 for Barcelona)
 - A pattern: one of four values — solid, vertical stripes, horizontal stripes, or halves
+- An optional number outline flag: when set, the shirt number gets a thin black outline so it stays readable on striped shirts (used by Atlético, Juventus, Porto, Sporting)
 
 **Coverage**: 25+ curated teams — all entries from `frontend/lib/curatedTeams.ts` plus popular extras.
 
@@ -38,39 +39,39 @@ Replace the default white/gray shirt colors with team-authentic colors. Each tea
 
 **Step 1**: Create the file `frontend/src/lib/teamColors.ts`.
 
-**Step 2**: Define the shape of a team color entry at the top of the file. It should have three fields: a primary color string, a secondary color string, and a pattern field restricted to one of the four pattern values (solid, vertical stripes, horizontal stripes, halves). Export this shape so other files can import it.
+**Step 2**: Define the shape of a team color entry at the top of the file. It should have three fields: a primary color string, a secondary color string, and a pattern field restricted to one of the four pattern values (solid, vertical stripes, horizontal stripes, halves). It also has an optional fourth field: a boolean number outline flag that gives the shirt number a thin black outline (used by striped teams where a single text color would be unreadable on both stripe colors). Export this shape so other files can import it.
 
 **Step 3**: Define the default colors constant: primary #F8FAF8, secondary #E2E8F0, and the solid pattern. Export it so the fallback path can reuse it.
 
 **Step 4**: Create the team colors map. The keys must match the club ID values from `frontend/lib/curatedTeams.ts`. Below is the full table of curated teams with real kit colors:
 
-| clubId | Name | Primary | Secondary | Pattern |
-|-------:|------|---------|-----------|---------|
-| 131 | FC Barcelona | `#A50044` | `#004D98` | `stripes-v` |
-| 418 | Real Madrid | `#FFFFFF` | `#FEBE10` | `solid` |
-| 27 | Bayern Munich | `#DC052D` | `#FFFFFF` | `solid` |
-| 506 | Juventus | `#000000` | `#FFFFFF` | `halves` |
-| 31 | Liverpool FC | `#C8102E` | `#FFFFFF` | `solid` |
-| 281 | Manchester City | `#6CABDD` | `#FFFFFF` | `solid` |
-| 583 | Paris Saint-Germain | `#004170` | `#DA291C` | `solid` |
-| 11 | Arsenal FC | `#EF0107` | `#FFFFFF` | `solid` |
-| 148 | Tottenham Hotspur | `#132257` | `#FFFFFF` | `solid` |
-| 631 | Chelsea FC | `#034694` | `#DBA111` | `solid` |
-| 985 | Manchester United | `#DA291C` | `#FBE122` | `solid` |
-| 5 | AC Milan | `#FB090B` | `#000000` | `stripes-v` |
-| 46 | Inter Milan | `#0068A8` | `#000000` | `stripes-v` |
-| 13 | Atlético de Madrid | `#CB3524` | `#FFFFFF` | `stripes-h` |
-| 294 | SL Benfica | `#FF0000` | `#FFFFFF` | `solid` |
-| 336 | Sporting CP | `#00843D` | `#FFFFFF` | `stripes-v` |
-| 720 | FC Porto | `#003893` | `#FFFFFF` | `stripes-h` |
-| 3300 | Portugal | `#006600` | `#FF0000` | `solid` |
-| 3375 | Spain | `#AA151B` | `#FABD00` | `solid` |
-| 3377 | France | `#002395` | `#FFFFFF` | `solid` |
-| 3262 | Germany | `#000000` | `#FFFFFF` | `solid` |
-| 3299 | England | `#FFFFFF` | `#CF081F` | `solid` |
-| 3376 | Italy | `#004B87` | `#FFFFFF` | `solid` |
-| 3437 | Argentina | `#75AADB` | `#FFFFFF` | `stripes-v` |
-| 3439 | Brazil | `#FFDC00` | `#009B3A` | `solid` |
+| clubId | Name | Primary | Secondary | Pattern | Number Outline |
+|-------:|------|---------|-----------|---------|----------------|
+| 131 | FC Barcelona | `#A50044` | `#004D98` | `stripes-v` | |
+| 418 | Real Madrid | `#FFFFFF` | `#FEBE10` | `solid` | |
+| 27 | Bayern Munich | `#DC052D` | `#FFFFFF` | `solid` | |
+| 506 | Juventus | `#000000` | `#FFFFFF` | `stripes-v` | ✓ |
+| 31 | Liverpool FC | `#C8102E` | `#FFFFFF` | `solid` | |
+| 281 | Manchester City | `#6CABDD` | `#FFFFFF` | `solid` | |
+| 583 | Paris Saint-Germain | `#004170` | `#002654` | `solid` | |
+| 11 | Arsenal FC | `#DB0007` | `#FFFFFF` | `solid` | |
+| 148 | Tottenham Hotspur | `#FFFFFF` | `#132257` | `solid` | |
+| 631 | Chelsea FC | `#034694` | `#002F6C` | `solid` | |
+| 985 | Manchester United | `#C70101` | `#FFFFFF` | `solid` | |
+| 5 | AC Milan | `#FB090B` | `#000000` | `stripes-v` | |
+| 46 | Inter Milan | `#0068A8` | `#000000` | `stripes-v` | |
+| 13 | Atlético de Madrid | `#CB3524` | `#FFFFFF` | `stripes-v` | ✓ |
+| 294 | SL Benfica | `#E83030` | `#FFFFFF` | `solid` | |
+| 336 | Sporting CP | `#00843D` | `#FFFFFF` | `stripes-h` | ✓ |
+| 720 | FC Porto | `#003893` | `#FFFFFF` | `stripes-v` | ✓ |
+| 3300 | Portugal | `#E42518` | `#0D6938` | `solid` | |
+| 3375 | Spain | `#AA151B` | `#FABD00` | `solid` | |
+| 3377 | France | `#00539B` | `#FFFFFF` | `solid` | |
+| 3262 | Germany | `#FFFFFF` | `#000000` | `solid` | |
+| 3299 | England | `#FFFFFF` | `#E31837` | `solid` | |
+| 3376 | Italy | `#004B87` | `#FFFFFF` | `solid` | |
+| 3437 | Argentina | `#75AADB` | `#FFFFFF` | `stripes-v` | |
+| 3439 | Brazil | `#FFDC00` | `#009B3A` | `solid` | |
 
 Populate the map with one entry per team in the table above. Group the entries by league with short comments for readability: La Liga, Premier League, Bundesliga, Serie A, Ligue 1, Primeira Liga, and national teams. Each entry pairs the club ID with its color definition (primary color, secondary color, and pattern).
 
@@ -93,7 +94,7 @@ Populate the map with one entry per team in the table above. Group the entries b
 
 - First, a helper that parses a hex color string into red, green, and blue channel values in the 0-255 range. It must handle both 3-digit (#RGB) and 6-digit (#RRGGBB) formats — for a 3-digit value, expand each digit by doubling it (e.g., #ABC becomes #AABBCC) before converting.
 - Second, a function that computes relative luminance per WCAG 2.1: convert each channel from the 0-255 range to a 0-1 sRGB value, then apply the standard linearization — values at or below 0.03928 are divided by 12.92, larger values are raised to the 2.4 power after adding 0.055 and dividing by 1.055. Finally, combine the three linearized channels with the standard luminance weights (roughly 0.2126 for red, 0.7152 for green, 0.0722 for blue).
-- Third, the exported contrast function: compute the relative luminance of the given background color and return "dark" when the background is light (luminance above the chosen threshold of 0.4) and "light" when the background is dark. The Shirt component calls this with the primary shirt color to pick the number color.
+- Third, the exported contrast function: compute the relative luminance of the given background color and return "dark" when the background is light (luminance above the chosen threshold of 0.35) and "light" when the background is dark. The Shirt component calls this with the primary shirt color to pick the number color.
 
 **What to verify after this step**:
 - A white background (#FFFFFF) returns dark text.
@@ -124,7 +125,7 @@ Describe the pattern approach:
 - For solid (or when no colors are provided): fill the shirt path with the primary color directly, falling back to the default white when colors are absent.
 - In all cases, stroke the shirt path with the secondary color (falling back to the current ink stroke when absent), using a thin stroke width and rounded line joins so the shirt outline stays crisp.
 
-**Step 5**: Update the shirt number span. Replace the hardcoded dark text class with a dynamic choice: call the contrast function with the primary color (falling back to the default white when no colors are provided). When the result is "light", use the light text color; when it is "dark", use the dark ink text color. Keep the existing font, sizing, and centering styles.
+**Step 5**: Update the shirt number span. Replace the hardcoded dark text class with a dynamic choice: call the contrast function with the primary color (falling back to the default white when no colors are provided). When the result is "light", use the light text color; when it is "dark", use the dark ink text color. Keep the existing font, sizing, and centering styles. When the team color entry has the number outline flag set, the number also gets a thin black text stroke (1px) so it stays readable across both stripe colors.
 
 **What to verify after this step**:
 - Run npx tsc --noEmit from the frontend directory — no type errors.
@@ -149,7 +150,7 @@ Describe the pattern approach:
 **What to verify after this step**:
 - Run npx tsc --noEmit from the frontend directory — no type errors.
 - Run npm run lint from the frontend directory — no lint warnings.
-- Visual: Barcelona match → red/blue striped shirts. Real Madrid match → white shirts with gold text. Unknown team → default white shirts.
+- Visual: Barcelona match → red/blue striped shirts. Real Madrid match → white shirts with gold border and dark number text. Unknown team → default white shirts.
 
 ---
 
@@ -180,12 +181,12 @@ Describe the pattern approach:
 
 ## "Done" Checklist
 
-- [ ] The team colors map has 25+ entries matching the curated teams IDs
-- [ ] The contrast function returns correct values for light/dark backgrounds
-- [ ] Shirts render with team-specific colors and patterns (vertical stripes, horizontal stripes, halves, solid)
-- [ ] Fallback works for unknown teams (no colors prop or unmapped club ID)
-- [ ] Shirt numbers are readable on all color combinations (dark text on light, light text on dark)
-- [ ] No TypeScript errors (npx tsc --noEmit passes)
-- [ ] Lint passes (npm run lint)
-- [ ] Visual check: 5+ teams with different patterns look correct
+- [x] The team colors map has 25+ entries matching the curated teams IDs
+- [x] The contrast function returns correct values for light/dark backgrounds
+- [x] Shirts render with team-specific colors and patterns (vertical stripes, horizontal stripes, solid — halves supported but currently unused)
+- [x] Fallback works for unknown teams (no colors prop or unmapped club ID)
+- [x] Shirt numbers are readable on all color combinations (dark text on light, light text on dark; outlined numbers on striped shirts)
+- [x] No TypeScript errors (npx tsc --noEmit passes)
+- [x] Lint passes (npm run lint)
+- [x] Visual check: 5+ teams with different patterns look correct
 - [ ] All changes committed

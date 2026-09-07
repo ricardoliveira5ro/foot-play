@@ -4,9 +4,16 @@ import type { CSSProperties } from 'react';
 import type { ShirtData, ShirtState } from '@/types';
 import type { GuessResult } from '@/lib/wordle';
 import { getCorrectLettersByLength } from '@/lib/wordle';
+import type { TeamColorEntry } from '@/lib/teamColors';
+import { getTextColor } from '@/lib/colorUtils';
 
 const SHIRT_PATH =
   'M28 10 L32 13 L36 10 L56 14 L62 15 L62 20 L51 22 L51 58 L13 58 L13 22 L2 20 L2 15 L8 14 L28 10 Z';
+
+/** Default shirt fill when no team colors are provided (matches legacy white). */
+const DEFAULT_FILL = '#F8FAF8';
+/** Default shirt stroke when no team colors are provided (matches legacy ink). */
+const DEFAULT_STROKE = '#101820';
 
 interface ShirtProps {
   shirt: ShirtData;
@@ -15,6 +22,11 @@ interface ShirtProps {
   onClick?: (token: string) => void;
   /** Guess history for this shirt (used for LetterSlots preview) */
   guessHistory?: GuessResult[][];
+  /**
+   * Team colors/pattern for this shirt. When omitted, the shirt renders with
+   * the default white/ink styling.
+   */
+  colors?: TeamColorEntry;
 }
 
 /** State-aware accessible name for the shirt button. */
@@ -121,8 +133,63 @@ function StateBadge({ state }: { state: Extract<ShirtState, 'correct' | 'failed'
  * Four states: default → in-progress → correct → failed.
  * The whole unit is a button with an expanded (>=44px) hit area.
  */
-export default function Shirt({ shirt, index, onClick, guessHistory }: ShirtProps) {
+export default function Shirt({ shirt, index, onClick, guessHistory, colors }: ShirtProps) {
   const { token, nameLength, shirtNumber, coords, state } = shirt;
+
+  // Resolve colors with defaults so the legacy white/ink rendering is preserved
+  // when no team colors are provided.
+  const primary = colors?.primary ?? DEFAULT_FILL;
+  const secondary = colors?.secondary ?? DEFAULT_STROKE;
+  const pattern = colors?.pattern ?? 'solid';
+
+  // Unique pattern IDs keyed by the shirt token so two shirts sharing a team
+  // on the same board never collide.
+  const patternId = `pattern-${token}`;
+  const clipId = `clip-${token}`;
+
+  let fill: string | undefined;
+  let extraDefs: React.ReactNode = null;
+
+  if (pattern === 'stripes-v') {
+    fill = `url(#${patternId}-v)`;
+    extraDefs = (
+      <pattern
+        id={`${patternId}-v`}
+        width="8"
+        height="64"
+        patternUnits="userSpaceOnUse"
+      >
+        <rect width="4" height="64" fill={primary} />
+        <rect x="4" width="4" height="64" fill={secondary} />
+      </pattern>
+    );
+  } else if (pattern === 'stripes-h') {
+    fill = `url(#${patternId}-h)`;
+    extraDefs = (
+      <pattern
+        id={`${patternId}-h`}
+        width="64"
+        height="8"
+        patternUnits="userSpaceOnUse"
+      >
+        <rect width="64" height="4" fill={primary} />
+        <rect y="4" width="64" height="4" fill={secondary} />
+      </pattern>
+    );
+  } else if (pattern === 'halves') {
+    fill = primary;
+    extraDefs = (
+      <clipPath id={clipId}>
+        <path d={SHIRT_PATH} />
+      </clipPath>
+    );
+  } else {
+    // solid (or no colors provided)
+    fill = primary;
+  }
+
+  const textColor = getTextColor(primary);
+  const numberClass = textColor === 'light' ? 'text-white' : 'text-ink';
 
   return (
     <div
@@ -147,12 +214,21 @@ export default function Shirt({ shirt, index, onClick, guessHistory }: ShirtProp
           style={{ '--stagger-delay': `${index * 28}ms` } as CSSProperties}
         >
           <svg viewBox="0 0 64 64" aria-hidden="true" className="block h-auto w-full drop-shadow-[0_2px_3px_rgba(16,24,32,0.25)]">
-            <path d={SHIRT_PATH} fill="#F8FAF8" stroke="#101820" strokeWidth="1" strokeLinejoin="round" />
+            <defs>{extraDefs}</defs>
+            <path d={SHIRT_PATH} fill={fill} stroke={secondary} strokeWidth="1" strokeLinejoin="round" />
+            {pattern === 'halves' && (
+              <g clipPath={`url(#${clipId})`}>
+                <rect x="32" y="0" width="32" height="64" fill={secondary} />
+              </g>
+            )}
           </svg>
           {shirtNumber !== null && (
             <span
-              className="absolute inset-0 flex items-center justify-center pt-[4%] font-display leading-none text-ink"
-              style={{ fontSize: '38cqw' }}
+              className={`absolute inset-0 flex items-center justify-center pt-[4%] font-display leading-none ${numberClass}`}
+              style={{
+                fontSize: '38cqw',
+                ...(colors?.numberOutline ? { WebkitTextStroke: '1px #000' } : {}),
+              }}
             >
               {shirtNumber}
             </span>
