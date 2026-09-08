@@ -459,6 +459,17 @@ async function main(): Promise<void> {
         completeSideKeys.has(`${a.gameId}:${a.clubId}`)
     );
 
+    // Drop games that no longer have any complete side after the players.csv
+    // filter. A game with zero complete lineups is worse than no game at all.
+    const gamesWithCompleteSide = new Set<number>();
+    for (const key of completeSideKeys) {
+        gamesWithCompleteSide.add(Number(key.split(':')[0]));
+    }
+    const filteredGames = games.filter(g => gamesWithCompleteSide.has(g.gameId));
+    const droppedGames = games.length - filteredGames.length;
+    if (droppedGames > 0)
+        console.warn(`Dropped ${droppedGames} games with no complete lineup after players.csv filtering`);
+
     try {
       console.log('Starting prisma batch');
 
@@ -476,7 +487,7 @@ async function main(): Promise<void> {
       await insertInBatches(prisma.competition, toCompetitionData(competitions));
       await insertInBatches(prisma.club, toClubData(uniqueClubs));
       await insertInBatches(prisma.player, toPlayerData(players));
-      await insertInBatches(prisma.game, toGameData(games));
+      await insertInBatches(prisma.game, toGameData(filteredGames));
       await insertInBatches(prisma.appearance, toAppearanceData(dedupeAppearances(sideFilteredAppearances)));
 
     } finally {
