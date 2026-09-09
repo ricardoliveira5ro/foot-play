@@ -173,7 +173,7 @@ export default function GameComplete({ match, targetShirts, opponentShirts, targ
             style={{
               background: allCorrect
                 ? 'radial-gradient(circle at center, var(--color-correct) 0%, transparent 70%)'
-                : 'radial-gradient(circle at center, var(--color-correct) 0%, transparent 70%)',
+                : 'radial-gradient(circle at center, var(--color-failed) 0%, transparent 70%)',
             }}
           />
           
@@ -182,8 +182,8 @@ export default function GameComplete({ match, targetShirts, opponentShirts, targ
             <div
               className="flex h-20 w-20 items-center justify-center rounded-full mx-auto mb-2"
               style={{
-                backgroundColor: allCorrect ? 'var(--color-correct)/15' : 'var(--color-correct)/15',
-                border: `2px solid ${allCorrect ? 'var(--color-correct)' : 'var(--color-correct)'}`,
+                backgroundColor: allCorrect ? 'var(--color-correct)/15' : 'var(--color-failed)/15',
+                border: `2px solid ${allCorrect ? 'var(--color-correct)' : 'var(--color-failed)'}`,
               }}
               aria-hidden="true"
             >
@@ -192,14 +192,15 @@ export default function GameComplete({ match, targetShirts, opponentShirts, targ
                   <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" />
                 </svg>
               ) : (
-                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ color: 'var(--color-correct)' }}>
-                  <polyline points="20 6 9 17 4 12" />
+                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ color: 'var(--color-failed)' }}>
+                  <line x1="18" y1="6" x2="6" y2="18" />
+                  <line x1="6" y1="6" x2="18" y2="18" />
                 </svg>
               )}
             </div>
 
-            <h1 id="game-complete-title" className="font-display uppercase text-[clamp(28px,5vw,40px)] leading-tight" style={{ color: 'var(--color-correct)' }}>
-              {allCorrect ? 'Perfect Score!' : 'Game Complete'}
+            <h1 id="game-complete-title" className="font-display uppercase text-[clamp(28px,5vw,40px)] leading-tight" style={{ color: allCorrect ? 'var(--color-correct)' : 'var(--color-failed)' }}>
+              {allCorrect ? 'Perfect Score!' : 'Game Over'}
             </h1>
 
             <p className="text-lg text-ink/70 max-w-xs">

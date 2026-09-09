@@ -41,6 +41,7 @@ export type GameAction =
   | { type: 'CLOSE_SHIRT' }
   | { type: 'SUBMIT_GUESS'; payload: { token: string; results: GuessResult[]; isCorrect: boolean; name?: string } }
   | { type: 'REVEAL_NAME'; payload: { token: string; name: string } }
+  | { type: 'SURRENDER' }
   | { type: 'NEW_GAME' }
   | { type: 'SET_ERROR'; payload: string | null }
   | { type: 'SET_LOADING'; payload: boolean };
@@ -244,6 +245,22 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
       };
     }
 
+    case 'SURRENDER': {
+      if (state.gameStatus !== 'playing') return state;
+
+      const markFailed = (shirts: typeof state.targetShirts) =>
+        shirts.map(s =>
+          s.state === 'correct' ? s : { ...s, state: 'failed' as ShirtState }
+        );
+
+      return {
+        ...state,
+        gameStatus: 'complete',
+        targetShirts: markFailed(state.targetShirts),
+        opponentShirts: markFailed(state.opponentShirts),
+      };
+    }
+
     case 'NEW_GAME': {
       return initialState;
     }
@@ -280,6 +297,7 @@ interface UseGameStateReturn {
   closeShirt: () => void;
   submitGuess: (token: string, results: GuessResult[], isCorrect: boolean, name?: string) => void;
   revealName: (token: string, name: string) => void;
+  surrender: () => void;
   newGame: () => void;
   setError: (error: string | null) => void;
   setLoading: (loading: boolean) => void;
@@ -317,6 +335,10 @@ export function useGameState(): UseGameStateReturn {
     dispatch({ type: 'REVEAL_NAME', payload: { token, name } });
   }, []);
 
+  const surrender = useCallback(() => {
+    dispatch({ type: 'SURRENDER' });
+  }, []);
+
   const newGame = useCallback(() => {
     dispatch({ type: 'NEW_GAME' });
   }, []);
@@ -339,6 +361,7 @@ export function useGameState(): UseGameStateReturn {
     closeShirt,
     submitGuess,
     revealName,
+    surrender,
     newGame,
     setError,
     setLoading,

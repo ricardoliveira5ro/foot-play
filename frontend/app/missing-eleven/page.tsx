@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useGameState, MAX_ATTEMPTS } from '@/lib/gameState';
 import { fetchRandomMatch, submitGuess as submitGuessApi, fetchReveal, revealOnePlayer } from '@/lib/api';
 import MatchInfo from '@/components/MatchInfo';
@@ -21,6 +21,7 @@ export default function MissingElevenPage() {
     closeShirt,
     submitGuess,
     revealName,
+    surrender,
     newGame,
     setError,
     setLoading,
@@ -28,6 +29,51 @@ export default function MissingElevenPage() {
   } = useGameState();
 
   const [revealedPlayers, setRevealedPlayers] = useState<RevealPlayer[]>([]);
+  const [confirmingSurrender, setConfirmingSurrender] = useState(false);
+  const confirmTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const handleSurrender = useCallback(async () => {
+    if (confirmingSurrender) {
+      // Second click — actually surrender
+      if (confirmTimerRef.current) clearTimeout(confirmTimerRef.current);
+      setConfirmingSurrender(false);
+
+      if (!state.match) return;
+
+      try {
+        const pickedSide = state.teamSide;
+        const oppositeSide = pickedSide === 'home' ? 'away' : 'home';
+
+        // Reveal both teams
+        const [picked, opposite] = await Promise.all([
+          fetchReveal(state.match.game.gameId, pickedSide),
+          fetchReveal(state.match.game.gameId, oppositeSide),
+        ]);
+        setRevealedPlayers([...picked.players, ...opposite.players]);
+
+        // Reveal names on all unresolved shirts
+        const allRevealed = [...picked.players, ...opposite.players];
+        const allShirts = [...state.targetShirts, ...state.opponentShirts];
+        for (const player of allRevealed) {
+          const shirt = allShirts.find(s => s.shirtNumber === player.shirtNumber && s.state !== 'correct');
+          if (shirt) {
+            revealName(shirt.token, player.name);
+          }
+        }
+
+        // Mark game as complete
+        surrender();
+      } catch (cause: unknown) {
+        setError(describeError(cause));
+      }
+    } else {
+      // First click — show confirmation
+      setConfirmingSurrender(true);
+      confirmTimerRef.current = setTimeout(() => {
+        setConfirmingSurrender(false);
+      }, 4000);
+    }
+  }, [confirmingSurrender, state.match, state.teamSide, state.targetShirts, state.opponentShirts, revealName, surrender, setError]);
 
   // Initialize game on mount (no localStorage restore — fixes hydration mismatch)
   useEffect(() => {
@@ -65,6 +111,13 @@ export default function MissingElevenPage() {
         });
     }
   }, [state.gameStatus, state.match, state.teamSide, setError]);
+
+  // Cleanup confirm timer on unmount
+  useEffect(() => {
+    return () => {
+      if (confirmTimerRef.current) clearTimeout(confirmTimerRef.current);
+    };
+  }, []);
 
   // Derive active shirts array from the state
   const activeShirtsArray = state.activeBoard === 'target' ? state.targetShirts : state.opponentShirts;
@@ -236,6 +289,19 @@ export default function MissingElevenPage() {
           >
             New Puzzle
           </button>
+          {state.gameStatus === 'playing' && (
+            <button
+              type="button"
+              onClick={handleSurrender}
+              className={`rounded-lg border px-6 py-3 font-semibold text-sm transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-flare ${
+                confirmingSurrender
+                  ? 'border-failed/40 text-failed hover:bg-failed/10'
+                  : 'border-ink/20 text-ink/50 hover:border-ink/40 hover:text-ink/70'
+              }`}
+            >
+              {confirmingSurrender ? 'Are you sure?' : 'Give up?'}
+            </button>
+          )}
         </aside>
       </div>
 
