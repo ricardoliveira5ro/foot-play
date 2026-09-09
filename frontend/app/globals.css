@@ -31,6 +31,10 @@ body {
     animation: shirt-in 260ms ease-out both;
     animation-delay: var(--stagger-delay, 0ms);
   }
+
+  .animate-pill-solve {
+    animation: pill-solve 300ms ease-out;
+  }
 }
 
 @keyframes pitch-in {
@@ -52,5 +56,17 @@ body {
   to {
     opacity: 1;
     transform: translateY(0);
+  }
+}
+
+@keyframes pill-solve {
+  0% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.4);
+  }
+  100% {
+    transform: scale(1);
   }
 }
