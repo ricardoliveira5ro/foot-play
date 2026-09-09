@@ -8,19 +8,26 @@ const MAX_ATTEMPTS = 6;
 
 // --- Types ---
 
-export type GameStatus = 'idle' | 'loading' | 'playing' | 'won' | 'lost';
+export type GameStatus = 'idle' | 'loading' | 'playing' | 'complete';
 
 export interface ShirtGameData extends ShirtData {
   /** Number of guess attempts made for this shirt */
   attempts: number;
   /** History of guess results for this shirt */
   guessHistory: GuessResult[][];
+  /** Unique letters that received a CORRECT result across all guesses */
+  correctLetters: string[];
 }
 
 export interface GameState {
   match: GameResponse | null;
   teamSide: TeamSide;
-  shirts: ShirtGameData[];
+  /** 11 shirts for the picked team */
+  targetShirts: ShirtGameData[];
+  /** 11 shirts for the other team */
+  opponentShirts: ShirtGameData[];
+  /** Which board is displayed */
+  activeBoard: 'target' | 'opponent';
   activeShirtIndex: number | null;
   gameStatus: GameStatus;
   error: string | null;
@@ -29,6 +36,7 @@ export interface GameState {
 export type GameAction =
   | { type: 'SET_MATCH'; payload: GameResponse }
   | { type: 'SELECT_TEAM'; payload: TeamSide }
+  | { type: 'TOGGLE_BOARD' }
   | { type: 'OPEN_SHIRT'; payload: string }
   | { type: 'CLOSE_SHIRT' }
   | { type: 'SUBMIT_GUESS'; payload: { token: string; results: GuessResult[]; isCorrect: boolean; name?: string } }
@@ -42,7 +50,9 @@ export type GameAction =
 const initialState: GameState = {
   match: null,
   teamSide: 'home',
-  shirts: [],
+  targetShirts: [],
+  opponentShirts: [],
+  activeBoard: 'target',
   activeShirtIndex: null,
   gameStatus: 'idle',
   error: null,
@@ -79,6 +89,7 @@ function createShirts(lineup: LineupPlayer[]): ShirtGameData[] {
     state: 'default' as ShirtState,
     attempts: 0,
     guessHistory: [],
+    correctLetters: [],
   }));
 }
 
@@ -95,12 +106,9 @@ function updateShirtState(
   });
 }
 
-function checkWinCondition(shirts: ShirtGameData[]): boolean {
-  return shirts.every(shirt => shirt.state === 'correct');
-}
-
-function checkGameComplete(shirts: ShirtGameData[]): boolean {
-  return shirts.every(s => s.state === 'correct' || s.state === 'failed');
+function checkGameComplete(target: ShirtGameData[], opponent: ShirtGameData[]): boolean {
+  const all = [...target, ...opponent];
+  return all.length > 0 && all.every(s => s.state === 'correct' || s.state === 'failed');
 }
 
 // --- Reducer ---
@@ -109,12 +117,15 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
   switch (action.type) {
     case 'SET_MATCH': {
       const side = pickSide(action.payload);
-      const lineup = side === 'home' ? action.payload.homeLineup : action.payload.awayLineup;
+      const targetLineup = side === 'home' ? action.payload.homeLineup : action.payload.awayLineup;
+      const opponentLineup = side === 'home' ? action.payload.awayLineup : action.payload.homeLineup;
       return {
         ...state,
         match: action.payload,
         teamSide: side,
-        shirts: createShirts(lineup),
+        targetShirts: createShirts(targetLineup),
+        opponentShirts: createShirts(opponentLineup),
+        activeBoard: 'target',
         gameStatus: 'playing',
         error: null,
         activeShirtIndex: null,
@@ -123,19 +134,32 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
 
     case 'SELECT_TEAM': {
       if (!state.match) return state;
-      const lineup = action.payload === 'home' ? state.match.homeLineup : state.match.awayLineup;
+      const side = action.payload;
+      const targetLineup = side === 'home' ? state.match.homeLineup : state.match.awayLineup;
+      const opponentLineup = side === 'home' ? state.match.awayLineup : state.match.homeLineup;
       return {
         ...state,
-        teamSide: action.payload,
-        shirts: createShirts(lineup),
+        teamSide: side,
+        targetShirts: createShirts(targetLineup),
+        opponentShirts: createShirts(opponentLineup),
+        activeBoard: 'target',
+        activeShirtIndex: null,
+      };
+    }
+
+    case 'TOGGLE_BOARD': {
+      return {
+        ...state,
+        activeBoard: state.activeBoard === 'target' ? 'opponent' : 'target',
         activeShirtIndex: null,
       };
     }
 
     case 'OPEN_SHIRT': {
-      const shirtIndex = state.shirts.findIndex(s => s.token === action.payload);
+      const activeShirts = state.activeBoard === 'target' ? state.targetShirts : state.opponentShirts;
+      const shirtIndex = activeShirts.findIndex(s => s.token === action.payload);
       if (shirtIndex === -1) return state;
-      const shirt = state.shirts[shirtIndex];
+      const shirt = activeShirts[shirtIndex];
       if (shirt.state === 'correct' || shirt.state === 'failed') return state;
       return {
         ...state,
@@ -154,77 +178,67 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
       if (!state.match || state.gameStatus !== 'playing') return state;
 
       const { token, results, isCorrect, name } = action.payload;
-      const shirtIndex = state.shirts.findIndex(s => s.token === token);
+      const activeShirts = state.activeBoard === 'target' ? state.targetShirts : state.opponentShirts;
+      const shirtIndex = activeShirts.findIndex(s => s.token === token);
       if (shirtIndex === -1) return state;
 
-      const shirt = state.shirts[shirtIndex];
+      const shirt = activeShirts[shirtIndex];
       if (shirt.state === 'correct' || shirt.state === 'failed') return state;
 
       const newAttempts = shirt.attempts + 1;
       const isLastAttempt = newAttempts >= MAX_ATTEMPTS;
 
+      // Collect letters with CORRECT result from this guess, deduplicated against existing ones.
+      const correctLettersFromGuess = results
+        .filter(r => r.result === 'CORRECT')
+        .map(r => r.letter);
+      const newCorrectLetters = [...new Set([...shirt.correctLetters, ...correctLettersFromGuess])];
+
       let newShirtState: ShirtState;
-      let newGameStatus: GameStatus = state.gameStatus;
       let shouldCloseModal = false;
 
       if (isCorrect) {
         newShirtState = 'correct';
         shouldCloseModal = true;
-        // Check win condition
-        const updatedShirts = updateShirtState(state.shirts, token, {
-          state: newShirtState,
-          attempts: newAttempts,
-          guessHistory: [...shirt.guessHistory, results],
-          name,
-        });
-        if (checkWinCondition(updatedShirts)) {
-          newGameStatus = 'won';
-        }
-        return {
-          ...state,
-          shirts: updatedShirts,
-          gameStatus: newGameStatus,
-          activeShirtIndex: shouldCloseModal ? null : state.activeShirtIndex,
-        };
       } else if (isLastAttempt) {
         // Failed - no more attempts for this shirt
         newShirtState = 'failed';
         shouldCloseModal = true;
-        const updatedShirts = updateShirtState(state.shirts, token, {
-          state: newShirtState,
-          attempts: newAttempts,
-          guessHistory: [...shirt.guessHistory, results],
-        });
-        // Only end the game when ALL shirts are resolved
-        if (checkGameComplete(updatedShirts)) {
-          newGameStatus = 'lost';
-        }
-        return {
-          ...state,
-          shirts: updatedShirts,
-          gameStatus: newGameStatus,
-          activeShirtIndex: null,
-        };
       } else {
         // In progress - more attempts remaining
         newShirtState = 'in-progress';
-        const updatedShirts = updateShirtState(state.shirts, token, {
-          state: newShirtState,
-          attempts: newAttempts,
-          guessHistory: [...shirt.guessHistory, results],
-        });
-        return {
-          ...state,
-          shirts: updatedShirts,
-          activeShirtIndex: state.activeShirtIndex,
-        };
       }
+
+      const updatedActiveShirts = updateShirtState(activeShirts, token, {
+        state: newShirtState,
+        attempts: newAttempts,
+        guessHistory: [...shirt.guessHistory, results],
+        correctLetters: newCorrectLetters,
+        ...(isCorrect ? { name } : {}),
+      });
+
+      const updatedTarget = state.activeBoard === 'target' ? updatedActiveShirts : state.targetShirts;
+      const updatedOpponent = state.activeBoard === 'opponent' ? updatedActiveShirts : state.opponentShirts;
+
+      // Only end the game when ALL shirts on both boards are resolved.
+      const isComplete = checkGameComplete(updatedTarget, updatedOpponent);
+
+      return {
+        ...state,
+        targetShirts: updatedTarget,
+        opponentShirts: updatedOpponent,
+        gameStatus: isComplete ? 'complete' : state.gameStatus,
+        activeShirtIndex: shouldCloseModal ? null : state.activeShirtIndex,
+      };
     }
 
     case 'REVEAL_NAME': {
       return {
         ...state,
-        shirts: state.shirts.map(s =>
+        targetShirts: state.targetShirts.map(s =>
+          s.token === action.payload.token ? { ...s, name: action.payload.name } : s
+        ),
+        opponentShirts: state.opponentShirts.map(s =>
           s.token === action.payload.token ? { ...s, name: action.payload.name } : s
         ),
       };
@@ -261,6 +275,7 @@ interface UseGameStateReturn {
   dispatch: React.Dispatch<GameAction>;
   startNewGame: (match: GameResponse) => void;
   selectTeam: (side: TeamSide) => void;
+  toggleBoard: () => void;
   openShirt: (token: string) => void;
   closeShirt: () => void;
   submitGuess: (token: string, results: GuessResult[], isCorrect: boolean, name?: string) => void;
@@ -280,6 +295,10 @@ export function useGameState(): UseGameStateReturn {
 
   const selectTeam = useCallback((side: TeamSide) => {
     dispatch({ type: 'SELECT_TEAM', payload: side });
+  }, []);
+
+  const toggleBoard = useCallback(() => {
+    dispatch({ type: 'TOGGLE_BOARD' });
   }, []);
 
   const openShirt = useCallback((token: string) => {
@@ -315,6 +334,7 @@ export function useGameState(): UseGameStateReturn {
     dispatch,
     startNewGame,
     selectTeam,
+    toggleBoard,
     openShirt,
     closeShirt,
     submitGuess,
