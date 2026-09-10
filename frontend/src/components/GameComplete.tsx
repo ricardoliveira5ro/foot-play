@@ -1,5 +1,7 @@
 'use client';
 
+import { useState } from 'react';
+import TeamTabBar from '@/components/TeamTabBar';
 import type { Game, ShirtData, RevealPlayer } from '@/types';
 
 interface GameCompleteProps {
@@ -81,9 +83,13 @@ export default function GameComplete({ match, targetShirts, opponentShirts, targ
   const totalShirts = allShirts.length;
   const correctCount = allShirts.filter(s => s.state === 'correct').length;
   const allCorrect = correctCount === totalShirts;
+  const targetSolved = targetShirts.filter(s => s.state === 'correct').length;
+  const opponentSolved = opponentShirts.filter(s => s.state === 'correct').length;
 
   // Map revealed players by shirtNumber for name lookup
   const revealedByName = new Map((revealedPlayers ?? []).map((p) => [p.shirtNumber, p.name]));
+
+  const [activeTab, setActiveTab] = useState<'target' | 'opponent'>('target');
 
   function renderTeamSection(teamName: string, shirts: ShirtData[]) {
     return (
@@ -211,10 +217,21 @@ export default function GameComplete({ match, targetShirts, opponentShirts, targ
           </div>
         </header>
 
-        {/* Player reveal list */}
-        <div className="px-6 pb-4 max-h-[50vh] overflow-y-auto">
-          {renderTeamSection(targetTeamName, targetShirts)}
-          {renderTeamSection(opponentTeamName, opponentShirts)}
+        {/* Player reveal list with team tabs */}
+        <div className="px-6 pb-4">
+          <TeamTabBar
+            targetTeamName={targetTeamName}
+            opponentTeamName={opponentTeamName}
+            activeBoard={activeTab}
+            targetSolved={targetSolved}
+            opponentSolved={opponentSolved}
+            onToggle={() => setActiveTab(prev => (prev === 'target' ? 'opponent' : 'target'))}
+          />
+          <div className="mt-4 max-h-[40vh] overflow-y-auto">
+            {activeTab === 'target'
+              ? renderTeamSection(targetTeamName, targetShirts)
+              : renderTeamSection(opponentTeamName, opponentShirts)}
+          </div>
         </div>
 
         {/* Match summary */}
