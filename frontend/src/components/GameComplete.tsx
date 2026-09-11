@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import TeamTabBar from '@/components/TeamTabBar';
-import type { Game, RevealPlayer } from '@/types';
+import type { Game } from '@/types';
 import type { ShirtGameData } from '@/lib/gameState';
 import { computeTotalScore } from '@/lib/scoring';
 import type { PerPlayerScore } from '@/lib/scoring';
@@ -18,8 +18,6 @@ interface GameCompleteProps {
   targetTeamName: string;
   /** Opponent team name */
   opponentTeamName: string;
-  /** Revealed player names from the server (POST /api/reveal) */
-  revealedPlayers: RevealPlayer[];
   /** Callback to start a new game */
   onPlayAgain: () => void;
 }
@@ -76,7 +74,7 @@ function getPositionLabel(position: string | null): string {
   return position ? labels[position] ?? position : '?';
 }
 
-export default function GameComplete({ match, targetShirts, opponentShirts, targetTeamName, opponentTeamName, revealedPlayers, onPlayAgain }: GameCompleteProps) {
+export default function GameComplete({ match, targetShirts, opponentShirts, targetTeamName, opponentTeamName, onPlayAgain }: GameCompleteProps) {
   const home = match.homeClub?.name ?? 'Home';
   const away = match.awayClub?.name ?? 'Away';
   const dateLabel = formatMatchDate(match.date) ?? match.season;
@@ -88,9 +86,6 @@ export default function GameComplete({ match, targetShirts, opponentShirts, targ
   const allCorrect = correctCount === totalShirts;
   const targetSolved = targetShirts.filter(s => s.state === 'correct').length;
   const opponentSolved = opponentShirts.filter(s => s.state === 'correct').length;
-
-  // Map revealed players by shirtNumber for name lookup
-  const revealedByName = new Map((revealedPlayers ?? []).map((p) => [p.shirtNumber, p.name]));
 
   const [activeTab, setActiveTab] = useState<'target' | 'opponent'>('target');
   
@@ -109,7 +104,6 @@ export default function GameComplete({ match, targetShirts, opponentShirts, targ
               const isCorrect = shirt.state === 'correct';
               const isFailed = shirt.state === 'failed';
               const showName = isCorrect || isFailed;
-              const revealedName = revealedByName.get(shirt.shirtNumber);
 
               return (
                 <div
@@ -136,7 +130,7 @@ export default function GameComplete({ match, targetShirts, opponentShirts, targ
                       color: isCorrect ? 'var(--color-correct)' : isFailed ? 'var(--color-failed)' : 'var(--color-ink/40)',
                     }}
                   >
-                    {showName && revealedName ? revealedName : '—'}
+                    {showName && shirt.name ? shirt.name : '—'}
                   </span>
                   {showName && (() => {
                     const score = scores.get(shirt.token);

@@ -10,6 +10,7 @@ import GameComplete from '@/components/GameComplete';
 import ScoreCounter from '@/components/ScoreCounter';
 import { computeTotalScore } from '@/lib/scoring';
 import type { ShirtData, RevealPlayer } from '@/types';
+import type { ShirtGameData } from '@/lib/gameState';
 
 function describeError(cause: unknown): string {
   return cause instanceof Error ? cause.message : 'Something went wrong.';
@@ -30,9 +31,21 @@ export default function MissingElevenPage() {
     toggleBoard,
   } = useGameState();
 
-  const [revealedPlayers, setRevealedPlayers] = useState<RevealPlayer[]>([]);
   const [confirmingSurrender, setConfirmingSurrender] = useState(false);
   const confirmTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const shirtsRef = useRef({ target: state.targetShirts, opponent: state.opponentShirts });
+
+  // Keep the ref in sync with the latest shirts without triggering re-renders.
+  useEffect(() => {
+    shirtsRef.current = { target: state.targetShirts, opponent: state.opponentShirts };
+  });
+
+  const revealTeam = useCallback((players: RevealPlayer[], shirts: ShirtGameData[]) => {
+    for (const player of players) {
+      const shirt = shirts.find(s => s.shirtNumber === player.shirtNumber && s.state !== 'correct');
+      if (shirt) revealName(shirt.token, player.name);
+    }
+  }, [revealName]);
 
   const handleSurrender = useCallback(async () => {
     if (confirmingSurrender) {
@@ -51,17 +64,11 @@ export default function MissingElevenPage() {
           fetchReveal(state.match.game.gameId, pickedSide),
           fetchReveal(state.match.game.gameId, oppositeSide),
         ]);
-        setRevealedPlayers([...picked.players, ...opposite.players]);
 
-        // Reveal names on all unresolved shirts
-        const allRevealed = [...picked.players, ...opposite.players];
-        const allShirts = [...state.targetShirts, ...state.opponentShirts];
-        for (const player of allRevealed) {
-          const shirt = allShirts.find(s => s.shirtNumber === player.shirtNumber && s.state !== 'correct');
-          if (shirt) {
-            revealName(shirt.token, player.name);
-          }
-        }
+        // Reveal names on unresolved shirts, matched per team to avoid
+        // shirt-number collisions between the two lineups.
+        revealTeam(picked.players, state.targetShirts);
+        revealTeam(opposite.players, state.opponentShirts);
 
         // Mark game as complete
         surrender();
@@ -75,7 +82,7 @@ export default function MissingElevenPage() {
         setConfirmingSurrender(false);
       }, 4000);
     }
-  }, [confirmingSurrender, state.match, state.teamSide, state.targetShirts, state.opponentShirts, revealName, surrender, setError]);
+  }, [confirmingSurrender, state.match, state.teamSide, state.targetShirts, state.opponentShirts, revealTeam, surrender, setError]);
 
   // Initialize game on mount (no localStorage restore — fixes hydration mismatch)
   useEffect(() => {
@@ -106,13 +113,17 @@ export default function MissingElevenPage() {
         fetchReveal(state.match.game.gameId, oppositeSide),
       ])
         .then(([picked, opposite]) => {
-          setRevealedPlayers([...picked.players, ...opposite.players]);
+          // Populate names on unresolved shirts so the board and GameComplete
+          // read shirt.name directly. Read from shirtsRef to avoid re-running
+          // this effect when revealName updates the shirts.
+          revealTeam(picked.players, shirtsRef.current.target);
+          revealTeam(opposite.players, shirtsRef.current.opponent);
         })
         .catch((cause: unknown) => {
           setError(describeError(cause));
         });
     }
-  }, [state.gameStatus, state.match, state.teamSide, setError]);
+  }, [state.gameStatus, state.match, state.teamSide, setError, revealTeam]);
 
   // Cleanup confirm timer on unmount
   useEffect(() => {
@@ -166,7 +177,6 @@ export default function MissingElevenPage() {
   }, [activeShirt, state.match, submitGuess, revealName, setError]);
 
   const handlePlayAgain = useCallback(() => {
-    setRevealedPlayers([]);
     newGame();
     // Fetch new match
     setLoading(true);
@@ -344,7 +354,6 @@ export default function MissingElevenPage() {
           opponentShirts={state.opponentShirts}
           targetTeamName={targetTeamName}
           opponentTeamName={opponentTeamName}
-          revealedPlayers={revealedPlayers}
           onPlayAgain={handlePlayAgain}
         />
       )}
