@@ -13,18 +13,10 @@ export interface PerPlayerScore {
   totalPoints: number;
 }
 
-/** One earned match bonus. */
-export interface BonusLine {
-  name: string;
-  points: number;
-  description: string;
-}
-
 /** Full score breakdown for a game. */
 export interface ScoreBreakdown {
   grandTotal: number;
   perPlayer: PerPlayerScore[];
-  bonuses: BonusLine[];
 }
 
 const BASE_CORRECT_SCORE = 1000;
@@ -58,42 +50,9 @@ export function scorePlayer(
 }
 
 /**
- * Compute earned match bonuses.
- *
- * - Full House: every shirt resolved (correct or failed) → +500
- * - Clean Sweep: every shirt correct → +2000
- * - One-Try Wonders: 10+ shirts guessed correctly on the first try → +1000
- *
- * Bonuses stack. Each carries a name, points, and a short description.
- */
-export function computeBonuses(
-  totalShirts: number,
-  correctCount: number,
-  failedCount: number,
-  firstTryCount: number,
-): BonusLine[] {
-  const bonuses: BonusLine[] = [];
-
-  if (totalShirts > 0 && correctCount + failedCount === totalShirts) {
-    bonuses.push({ name: 'Full House', points: 500, description: 'Every shirt resolved' });
-  }
-
-  if (totalShirts > 0 && correctCount === totalShirts) {
-    bonuses.push({ name: 'Clean Sweep', points: 2000, description: 'Every shirt correct' });
-  }
-
-  if (firstTryCount >= 10) {
-    bonuses.push({ name: 'One-Try Wonders', points: 1000, description: '10+ shirts guessed on the first try' });
-  }
-
-  return bonuses;
-}
-
-/**
  * Compute the full score breakdown for a game.
  *
- * Processes both shirt arrays into per-player scores, counts correct/failed/
- * first-try shirts across both arrays, computes bonuses, and sums everything
+ * Processes both shirt arrays into per-player scores and sums everything
  * into the grand total.
  */
 export function computeTotalScore(
@@ -127,19 +86,10 @@ export function computeTotalScore(
   const opponentScores = processTeam(opponentShirts, opponentTeamName);
   const perPlayer = [...targetScores, ...opponentScores];
 
-  const allShirts = [...targetShirts, ...opponentShirts];
-  const correctCount = allShirts.filter(s => s.state === 'correct').length;
-  const failedCount = allShirts.filter(s => s.state === 'failed').length;
-  const firstTryCount = allShirts.filter(s => s.state === 'correct' && s.attempts === 1).length;
-
-  const bonuses = computeBonuses(allShirts.length, correctCount, failedCount, firstTryCount);
-
   const playerPoints = perPlayer.reduce((sum, p) => sum + p.totalPoints, 0);
-  const bonusPoints = bonuses.reduce((sum, b) => sum + b.points, 0);
 
   return {
-    grandTotal: playerPoints + bonusPoints,
+    grandTotal: playerPoints,
     perPlayer,
-    bonuses,
   };
 }

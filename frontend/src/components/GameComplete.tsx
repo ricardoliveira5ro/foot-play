@@ -5,7 +5,7 @@ import TeamTabBar from '@/components/TeamTabBar';
 import type { Game, RevealPlayer } from '@/types';
 import type { ShirtGameData } from '@/lib/gameState';
 import { computeTotalScore } from '@/lib/scoring';
-import type { ScoreBreakdown, PerPlayerScore } from '@/lib/scoring';
+import type { PerPlayerScore } from '@/lib/scoring';
 
 interface GameCompleteProps {
   /** The match data */
@@ -95,15 +95,12 @@ export default function GameComplete({ match, targetShirts, opponentShirts, targ
   const [activeTab, setActiveTab] = useState<'target' | 'opponent'>('target');
   
   // Score breakdown — computed once from the final state
-  const scoreBreakdown: ScoreBreakdown = computeTotalScore(targetShirts,opponentShirts,targetTeamName,opponentTeamName,);
+  const scoreBreakdown = computeTotalScore(targetShirts, opponentShirts, targetTeamName, opponentTeamName);
   const scoreMap = new Map(scoreBreakdown.perPlayer.map(p => [p.token, p]));
 
-  function renderTeamSection(teamName: string, shirts: ShirtGameData[], scores: Map<string, PerPlayerScore>) {
+  function renderTeamSection(shirts: ShirtGameData[], scores: Map<string, PerPlayerScore>) {
     return (
-      <div className="mb-4">
-        <h3 className="mb-2 text-xs font-semibold uppercase tracking-[0.08em] text-ink/55">
-          {teamName}
-        </h3>
+      <div>
         <div className="space-y-2">
           {shirts
             .slice()
@@ -117,7 +114,7 @@ export default function GameComplete({ match, targetShirts, opponentShirts, targ
               return (
                 <div
                   key={shirt.token}
-                  className="flex items-center gap-3 p-3 rounded-lg transition-colors"
+                  className="flex items-center gap-2 p-2 rounded-lg transition-colors"
                   style={{
                     backgroundColor: isCorrect
                       ? 'var(--color-correct)/10'
@@ -127,14 +124,14 @@ export default function GameComplete({ match, targetShirts, opponentShirts, targ
                     border: `1px solid ${isCorrect ? 'var(--color-correct)/30' : isFailed ? 'var(--color-failed)/30' : 'var(--color-ink/10)'}`,
                   }}
                 >
-                  <span className="shrink-0 w-10 text-center font-display text-lg text-ink/60" aria-label={`Shirt ${shirt.shirtNumber ?? '?'}`}>
+                  <span className="shrink-0 w-8 text-center font-display text-base text-ink/60" aria-label={`Shirt ${shirt.shirtNumber ?? '?'}`}>
                     {shirt.shirtNumber ?? '?'}
                   </span>
-                  <span className="shrink-0 w-28 text-xs font-mono text-ink/50 text-left uppercase">
+                  <span className="shrink-0 min-w-[2.5rem] text-xs font-mono text-ink/50 text-left uppercase">
                     {getPositionLabel(shirt.position)}
                   </span>
                   <span
-                    className="flex-1 truncate font-semibold text-base"
+                    className="flex-1 truncate font-semibold text-sm"
                     style={{
                       color: isCorrect ? 'var(--color-correct)' : isFailed ? 'var(--color-failed)' : 'var(--color-ink/40)',
                     }}
@@ -157,16 +154,16 @@ export default function GameComplete({ match, targetShirts, opponentShirts, targ
                   })()}
                   {showName && (
                     <span
-                      className="flex-shrink-0 flex h-6 w-6 items-center justify-center rounded-full"
+                      className="flex-shrink-0 flex h-5 w-5 items-center justify-center rounded-full"
                       style={{ backgroundColor: isCorrect ? 'var(--color-correct)' : 'var(--color-failed)' }}
                       aria-label={isCorrect ? 'Correct' : 'Failed'}
                     >
                       {isCorrect ? (
-                        <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                        <svg width="10" height="10" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                           <path d="M2.5 6.5 L5 9 L9.5 3.5" />
                         </svg>
                       ) : (
-                        <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                        <svg width="10" height="10" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                           <path d="M3 3 L9 9 M9 3 L3 9" />
                         </svg>
                       )}
@@ -181,7 +178,7 @@ export default function GameComplete({ match, targetShirts, opponentShirts, targ
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4" role="dialog" aria-modal="true" aria-labelledby="game-complete-title">
+    <div className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto p-4" role="dialog" aria-modal="true" aria-labelledby="game-complete-title">
       {/* Backdrop */}
       <div
         className="absolute inset-0 bg-ink/70 backdrop-blur-sm"
@@ -190,60 +187,43 @@ export default function GameComplete({ match, targetShirts, opponentShirts, targ
       />
 
       {/* Modal content */}
-      <div className="relative w-full max-w-lg rounded-2xl bg-paper shadow-[0_32px_64px_-12px_rgba(16,24,32,0.5)] overflow-hidden">
+      <div className="relative w-full max-w-lg max-h-[90dvh] scrollbar-hide rounded-2xl bg-paper shadow-[0_32px_64px_-12px_rgba(16,24,32,0.5)] overflow-y-auto">
         {/* Header with result */}
-        <header className="relative p-6 pb-4 text-center overflow-hidden">
-          {/* Decorative background */}
-          <div
-            className="absolute inset-0 opacity-10"
-            aria-hidden="true"
-            style={{
-              background: allCorrect
-                ? 'radial-gradient(circle at center, var(--color-correct) 0%, transparent 70%)'
-                : 'radial-gradient(circle at center, var(--color-failed) 0%, transparent 70%)',
-            }}
-          />
-          
-          <div className="relative flex flex-col items-center gap-2">
-            {/* Icon circle */}
-            <div
-              className="flex h-20 w-20 items-center justify-center rounded-full mx-auto mb-2"
-              style={{
-                backgroundColor: allCorrect ? 'var(--color-correct)/15' : 'var(--color-failed)/15',
-                border: `2px solid ${allCorrect ? 'var(--color-correct)' : 'var(--color-failed)'}`,
-              }}
-              aria-hidden="true"
-            >
-              {allCorrect ? (
-                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ color: 'var(--color-correct)' }}>
-                  <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" />
-                </svg>
-              ) : (
-                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ color: 'var(--color-failed)' }}>
-                  <line x1="18" y1="6" x2="6" y2="18" />
-                  <line x1="6" y1="6" x2="18" y2="18" />
-                </svg>
-              )}
+        <header className="relative px-6 py-6 text-center overflow-hidden">
+          <div className="relative flex items-center justify-center gap-8  py-1">
+            {/* Result: icon + title */}
+            <div className="flex items-center gap-2.5">
+              <div
+                className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full"
+                style={{
+                  backgroundColor: allCorrect ? 'var(--color-correct)/15' : 'var(--color-failed)/15',
+                  border: `2px solid ${allCorrect ? 'var(--color-correct)' : 'var(--color-failed)'}`,
+                }}
+                aria-hidden="true"
+              >
+                {allCorrect ? (
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ color: 'var(--color-correct)' }}>
+                    <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" />
+                  </svg>
+                ) : (
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ color: 'var(--color-failed)' }}>
+                    <line x1="18" y1="6" x2="6" y2="18" />
+                    <line x1="6" y1="6" x2="18" y2="18" />
+                  </svg>
+                )}
+              </div>
+              <h1 id="game-complete-title" className="font-display uppercase text-[clamp(20px,3.5vw,26px)] leading-none" style={{ color: allCorrect ? 'var(--color-correct)' : 'var(--color-failed)' }}>
+                {allCorrect ? 'Perfect Score!' : 'Game Over'}
+              </h1>
             </div>
 
-            <h1 id="game-complete-title" className="font-display uppercase text-[clamp(28px,5vw,40px)] leading-tight" style={{ color: allCorrect ? 'var(--color-correct)' : 'var(--color-failed)' }}>
-              {allCorrect ? 'Perfect Score!' : 'Game Over'}
-            </h1>
+            {/* Divider */}
+            <div className="h-10 w-px bg-ink/10" aria-hidden="true" />
 
-            <p className="text-lg text-ink/70 max-w-xs">
-              {allCorrect
-                ? `You identified all ${totalShirts} players across both teams.`
-                : `You identified ${correctCount} of ${totalShirts} players across both teams.`}
-            </p>
-
-            <div className="mt-3 flex flex-col items-center gap-1">
-              <span className="font-mono text-[10px] uppercase tracking-[0.12em] text-ink/45">
-                Final Score
-              </span>
-              <span className="font-display text-[clamp(36px,6vw,48px)] leading-none text-ink">
-                {scoreBreakdown.grandTotal.toLocaleString('en-US')}
-              </span>
-            </div>
+            {/* Score — the hero */}
+            <span className="font-display text-[clamp(36px,6vw,44px)] leading-none text-ink">
+              {scoreBreakdown.grandTotal.toLocaleString('en-US')}
+            </span>
           </div>
         </header>
 
@@ -257,59 +237,40 @@ export default function GameComplete({ match, targetShirts, opponentShirts, targ
             opponentSolved={opponentSolved}
             onToggle={() => setActiveTab(prev => (prev === 'target' ? 'opponent' : 'target'))}
           />
-          <div className="mt-4 max-h-[40vh] overflow-y-auto">
+          <div className="mt-4 max-h-[40vh] scrollbar-hide overflow-y-auto">
             {activeTab === 'target'
-              ? renderTeamSection(targetTeamName, targetShirts, scoreMap)
-              : renderTeamSection(opponentTeamName, opponentShirts, scoreMap)}
+              ? renderTeamSection(targetShirts, scoreMap)
+              : renderTeamSection(opponentShirts, scoreMap)}
           </div>
         </div>
 
-        {/* Bonuses */}
-        {scoreBreakdown.bonuses.length > 0 && (
-          <div className="border-t border-ink/10 px-6 py-4">
-            <h3 className="mb-2 text-xs font-semibold uppercase tracking-[0.08em] text-ink/55">
-              Bonuses
-            </h3>
-            <div className="space-y-1.5">
-              {scoreBreakdown.bonuses.map(bonus => (
-                <div key={bonus.name} className="flex items-center gap-3">
-                  <span className="font-semibold text-sm text-ink">{bonus.name}</span>
-                  <span className="flex-1 text-xs text-ink/55">{bonus.description}</span>
-                  <span className="shrink-0 font-mono text-xs text-correct">
-                    +{bonus.points.toLocaleString('en-US')}
-                  </span>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
         {/* Match summary */}
-        <div className="border-t border-ink/10 px-6 py-4">
+        <div className="border-t border-ink/10 px-6 py-3">
           <div className="flex items-center justify-center gap-4">
-            <p className="font-display text-[36px] leading-none text-ink">
+            <p className="font-display text-[32px] leading-none text-ink">
               {match.homeScore} – {match.awayScore}
             </p>
             <div className="flex flex-col items-start gap-0.5">
-              <p className="font-semibold text-xl text-ink">{home}</p>
-              <p className="font-semibold text-xl text-ink">{away}</p>
+              <p className="font-semibold text-base text-ink">{home}</p>
+              <p className="font-semibold text-base text-ink">{away}</p>
             </div>
           </div>
 
           {(dateLabel || match.competition) && (
-            <div className="mt-3 flex flex-col items-center gap-0.5 text-xs uppercase tracking-[0.08em] text-ink/55">
-              {dateLabel && <p>{dateLabel}</p>}
-              {match.competition && <p>{match.competition}</p>}
+            <div className="mt-2 flex items-center justify-center gap-2 text-xs uppercase tracking-[0.08em] text-ink/55">
+              {dateLabel && <span>{dateLabel}</span>}
+              {dateLabel && match.competition && <span aria-hidden="true">·</span>}
+              {match.competition && <span>{match.competition}</span>}
             </div>
           )}
         </div>
 
         {/* Play Again button */}
-        <div className="border-t border-ink/10 px-6 py-4">
+        <div className="border-t border-ink/10 px-6 py-3">
           <button
             type="button"
             onClick={onPlayAgain}
-            className="w-full h-12 rounded-lg bg-ink text-chalk font-sans font-semibold text-base transition-colors hover:bg-flare focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-flare active:scale-[0.98]"
+            className="w-full h-11 rounded-lg bg-ink text-chalk font-sans font-semibold text-base transition-colors hover:bg-flare focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-flare active:scale-[0.98]"
           >
             Play Again
           </button>
