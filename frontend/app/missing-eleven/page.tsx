@@ -7,6 +7,8 @@ import MatchInfo from '@/components/MatchInfo';
 import TacticBoard from '@/components/TacticBoard';
 import WordleModal from '@/components/WordleModal';
 import GameComplete from '@/components/GameComplete';
+import ScoreCounter from '@/components/ScoreCounter';
+import { computeTotalScore } from '@/lib/scoring';
 import type { ShirtData, RevealPlayer } from '@/types';
 
 function describeError(cause: unknown): string {
@@ -250,6 +252,13 @@ export default function MissingElevenPage() {
   const targetSolved = state.targetShirts.filter(s => s.state === 'correct').length;
   const opponentSolved = state.opponentShirts.filter(s => s.state === 'correct').length;
 
+  // Live score — recomputed after each guess from the current state
+  const scoreBreakdown =
+    (state.gameStatus === 'playing' || state.gameStatus === 'complete') && state.match
+      ? computeTotalScore(state.targetShirts, state.opponentShirts, targetTeamName, opponentTeamName)
+      : null;
+  const liveScore = scoreBreakdown?.grandTotal ?? 0;
+
   return (
     <div className="mx-auto w-full max-w-6xl px-4 py-10 md:px-6 md:py-14">
       <div className="grid gap-6 lg:grid-cols-[340px_minmax(0,620px)] lg:items-start lg:gap-x-12 lg:gap-y-8">
@@ -263,8 +272,14 @@ export default function MissingElevenPage() {
           <MatchInfo match={state.match.game} />
         </div>
 
+        {state.gameStatus === 'playing' && (
+          <div className="lg:col-start-1 lg:row-start-3">
+            <ScoreCounter score={liveScore} />
+          </div>
+        )}
+
         {/* Tactic Board section */}
-        <section className="lg:col-start-2 lg:row-start-1 lg:row-span-3" aria-label="Tactic board">
+        <section className="lg:col-start-2 lg:row-start-1 lg:row-span-4" aria-label="Tactic board">
           <TacticBoard
             teamName={teamName}
             formation={formation}
@@ -280,7 +295,7 @@ export default function MissingElevenPage() {
           />
         </section>
 
-        <aside className="flex flex-col items-center gap-4 text-center lg:col-start-1 lg:row-start-3 lg:items-start lg:text-left">
+        <aside className="flex flex-col items-center gap-4 text-center lg:col-start-1 lg:row-start-4 lg:items-start lg:text-left">
           <p className="text-sm text-ink/70">Tap a shirt. Six tries per player.</p>
           <button
             type="button"

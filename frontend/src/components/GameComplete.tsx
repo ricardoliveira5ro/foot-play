@@ -2,15 +2,18 @@
 
 import { useState } from 'react';
 import TeamTabBar from '@/components/TeamTabBar';
-import type { Game, ShirtData, RevealPlayer } from '@/types';
+import type { Game, RevealPlayer } from '@/types';
+import type { ShirtGameData } from '@/lib/gameState';
+import { computeTotalScore } from '@/lib/scoring';
+import type { ScoreBreakdown, PerPlayerScore } from '@/lib/scoring';
 
 interface GameCompleteProps {
   /** The match data */
   match: Game;
   /** Target team shirts with their final states */
-  targetShirts: ShirtData[];
+  targetShirts: ShirtGameData[];
   /** Opponent team shirts with their final states */
-  opponentShirts: ShirtData[];
+  opponentShirts: ShirtGameData[];
   /** Target team name */
   targetTeamName: string;
   /** Opponent team name */
@@ -90,8 +93,12 @@ export default function GameComplete({ match, targetShirts, opponentShirts, targ
   const revealedByName = new Map((revealedPlayers ?? []).map((p) => [p.shirtNumber, p.name]));
 
   const [activeTab, setActiveTab] = useState<'target' | 'opponent'>('target');
+  
+  // Score breakdown — computed once from the final state
+  const scoreBreakdown: ScoreBreakdown = computeTotalScore(targetShirts,opponentShirts,targetTeamName,opponentTeamName,);
+  const scoreMap = new Map(scoreBreakdown.perPlayer.map(p => [p.token, p]));
 
-  function renderTeamSection(teamName: string, shirts: ShirtData[]) {
+  function renderTeamSection(teamName: string, shirts: ShirtGameData[], scores: Map<string, PerPlayerScore>) {
     return (
       <div className="mb-4">
         <h3 className="mb-2 text-xs font-semibold uppercase tracking-[0.08em] text-ink/55">
@@ -134,6 +141,20 @@ export default function GameComplete({ match, targetShirts, opponentShirts, targ
                   >
                     {showName && revealedName ? revealedName : '—'}
                   </span>
+                  {showName && (() => {
+                    const score = scores.get(shirt.token);
+                    if (!score) return null;
+                    return (
+                      <span
+                        className={`shrink-0 font-mono text-xs ${
+                          isCorrect ? 'text-correct' : 'text-failed'
+                        }`}
+                        aria-label={`${score.attempts} attempts, ${score.totalPoints} points`}
+                      >
+                        {score.attempts}T · {score.totalPoints}pt
+                      </span>
+                    );
+                  })()}
                   {showName && (
                     <span
                       className="flex-shrink-0 flex h-6 w-6 items-center justify-center rounded-full"
@@ -214,6 +235,15 @@ export default function GameComplete({ match, targetShirts, opponentShirts, targ
                 ? `You identified all ${totalShirts} players across both teams.`
                 : `You identified ${correctCount} of ${totalShirts} players across both teams.`}
             </p>
+
+            <div className="mt-3 flex flex-col items-center gap-1">
+              <span className="font-mono text-[10px] uppercase tracking-[0.12em] text-ink/45">
+                Final Score
+              </span>
+              <span className="font-display text-[clamp(36px,6vw,48px)] leading-none text-ink">
+                {scoreBreakdown.grandTotal.toLocaleString('en-US')}
+              </span>
+            </div>
           </div>
         </header>
 
@@ -229,10 +259,30 @@ export default function GameComplete({ match, targetShirts, opponentShirts, targ
           />
           <div className="mt-4 max-h-[40vh] overflow-y-auto">
             {activeTab === 'target'
-              ? renderTeamSection(targetTeamName, targetShirts)
-              : renderTeamSection(opponentTeamName, opponentShirts)}
+              ? renderTeamSection(targetTeamName, targetShirts, scoreMap)
+              : renderTeamSection(opponentTeamName, opponentShirts, scoreMap)}
           </div>
         </div>
+
+        {/* Bonuses */}
+        {scoreBreakdown.bonuses.length > 0 && (
+          <div className="border-t border-ink/10 px-6 py-4">
+            <h3 className="mb-2 text-xs font-semibold uppercase tracking-[0.08em] text-ink/55">
+              Bonuses
+            </h3>
+            <div className="space-y-1.5">
+              {scoreBreakdown.bonuses.map(bonus => (
+                <div key={bonus.name} className="flex items-center gap-3">
+                  <span className="font-semibold text-sm text-ink">{bonus.name}</span>
+                  <span className="flex-1 text-xs text-ink/55">{bonus.description}</span>
+                  <span className="shrink-0 font-mono text-xs text-correct">
+                    +{bonus.points.toLocaleString('en-US')}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* Match summary */}
         <div className="border-t border-ink/10 px-6 py-4">

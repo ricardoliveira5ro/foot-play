@@ -35,6 +35,10 @@ body {
   .animate-pill-solve {
     animation: pill-solve 300ms ease-out;
   }
+
+  .animate-score-pulse {
+    animation: score-pulse 300ms ease-out;
+  }
 }
 
 @keyframes pitch-in {
@@ -65,6 +69,18 @@ body {
   }
   50% {
     transform: scale(1.4);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+@keyframes score-pulse {
+  0% {
+    transform: scale(1);
+  }
+  40% {
+    transform: scale(1.15);
   }
   100% {
     transform: scale(1);

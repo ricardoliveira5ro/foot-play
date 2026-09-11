@@ -161,7 +161,7 @@ When bonuses exist, show a "Bonuses" section with one row per bonus: the bonus n
 - Per-player scoring, correct guesses: assert 1000 for the first try, 800 for the second, 600 for the third, 400 for the fourth, 200 for the fifth, and 100 for the sixth.
 - Per-player scoring, failed guesses: 0 letters found out of 6 → 0; 3 of 6 → 75; 6 of 6 → 150; zero total letters → 0 (edge case); a 1-letter name with the letter found → 150; a 1-letter name without it → 0.
 - Match bonuses: Full House only when all shirts are resolved with some failed; Clean Sweep plus Full House plus One-Try Wonders when all 22 are correct with 12 first-tries; One-Try Wonders plus Full House when 10 first-tries and 12 failed; no bonuses when not all resolved; Full House only when 18 correct and 4 failed; empty input → no bonuses.
-- Total score: all 22 correct on the first try → 25,500 total (22 × 1000 plus 3500 in bonuses) with all three bonuses present; a mixed set (one correct on the first try, one correct on the third try, one failed with 2 of 4 letters) → 1,675 with no bonuses; bonus stacking verified; partial completion → no bonuses.
+- Total score: all 22 correct on the first try → 25,500 total (22 × 1000 plus 3500 in bonuses) with all three bonuses present; a mixed set (one correct on the first try, one correct on the third try, one failed with 2 of 4 letters) → 2,175 with Full House; bonus stacking verified; partial completion → no bonuses.
 
 **Step 3**: Run the tests — all should pass. If using the plain Node approach, run with the tsx runner instead.
 
