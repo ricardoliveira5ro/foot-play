@@ -37,7 +37,7 @@ export function evaluateGuess(guess: string, target: string): GuessResult[]{
   const normalizedName = normalize(target);
   const normalizedGuess = normalize(guess);
 
-  let correctGuesses: IndexedResult[] = [];
+  const correctGuesses: IndexedResult[] = [];
   const correctIndexes: number[] = [];
 
   for (let i = 0; i < normalizedName.length; i++) {
@@ -47,7 +47,7 @@ export function evaluateGuess(guess: string, target: string): GuessResult[]{
     }
   }
 
-  let presentGuesses: IndexedResult[] = [];
+  const presentGuesses: IndexedResult[] = [];
   const presentIndexes: number[] = [];
   const presentGuessIndexes: number[] = [];
 
@@ -64,7 +64,7 @@ export function evaluateGuess(guess: string, target: string): GuessResult[]{
     }
   }
 
-  let absentGuesses: IndexedResult[] = [];
+  const absentGuesses: IndexedResult[] = [];
 
   for (let i = 0; i < normalizedName.length; i++) {
     if (!correctIndexes.includes(i) && !presentGuessIndexes.includes(i)) {
