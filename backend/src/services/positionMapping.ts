@@ -341,6 +341,73 @@ function fwdSlots(count: number): string[] | null {
   }
 }
 
+function dmSlots(count: number): string[] | null {
+  switch (count) {
+    case 2:
+      return ['DM1', 'DM2'];
+    case 1:
+      return ['DM3'];
+    case 0:
+      return [];
+    default:
+      return null;
+  }
+}
+
+function amSlots(count: number): string[] | null {
+  switch (count) {
+    case 2:
+      return ['AM1', 'AM2'];
+    case 1:
+      return ['AM'];
+    case 0:
+      return [];
+    default:
+      return null;
+  }
+}
+
+/** 3-band parser for 2- or 3-part input (2 bands -> treat as 3-band with c = 0). */
+function parseThreeBand(counts: number[]): LayoutDef | null {
+  const [a, b] = counts;
+  const c = counts.length === 3 ? counts[2] : 0;
+  if (a + b + c !== 10) return null;
+  const def = defSlots(a);
+  if (def === null) return null;
+  const mid = midSlots3(b);
+  if (mid === null) return null;
+  const fwd = fwdSlots(c);
+  if (fwd === null) return null;
+  return { family: '3-band', slots: ['GK', ...def, ...mid, ...fwd] };
+}
+
+/** 4-band parser a-b-c-d with the family heuristic (dm-4-band when b <= 2,
+ * mid-4-band when b >= 3). */
+function parseFourBand(counts: number[]): LayoutDef | null {
+  const [a, b, c, d] = counts;
+  if (a + b + c + d !== 10) return null;
+  const def = defSlots(a);
+  if (def === null) return null;
+  const fwd = fwdSlots(d);
+  if (fwd === null) return null;
+  if (b <= 2) {
+    // dm-4-band (DEF x a, DM x b, MID x c, FWD x d)
+    const dm = dmSlots(b);
+    if (dm === null) return null;
+    const mid = midSlots4(c);
+    if (mid === null) return null;
+    return { family: 'dm-4-band', slots: ['GK', ...def, ...dm, ...mid, ...fwd] };
+  }
+  // b >= 3 -> mid-4-band (DEF x a, MID x b, AM x c, FWD x d).
+  // NOTE: midSlots4(3) returns ['LW','AM','RW'] — NOT the b===3 value
+  // ['CM1','CM2','CM3']. Only the b===4 branch reuses midSlots4.
+  const mid = b === 4 ? midSlots4(4) : b === 3 ? ['CM1', 'CM2', 'CM3'] : null;
+  if (mid === null) return null;
+  const am = amSlots(c);
+  if (am === null) return null;
+  return { family: 'mid-4-band', slots: ['GK', ...def, ...mid, ...am, ...fwd] };
+}
+
 /** Generic band parser for unlisted formations. Returns null when the value
  * cannot be parsed into a valid 11-slot layout (including >=5 bands,
  * non-numeric residue, or band counts outside the defined ranges). */
@@ -351,40 +418,9 @@ function parseGenericFormation(norm: string): LayoutDef | null {
   if (counts.some((n) => Number.isNaN(n))) return null;
 
   if (parts.length === 2 || parts.length === 3) {
-    // 3 bands a-b-c (2 bands -> treat as 3-band with c = 0)
-    const [a, b] = counts;
-    const c = parts.length === 3 ? counts[2] : 0;
-    if (a + b + c !== 10) return null;
-    const def = defSlots(a);
-    if (def === null) return null;
-    const mid = midSlots3(b);
-    if (mid === null) return null;
-    const fwd = fwdSlots(c);
-    if (fwd === null) return null;
-    return { family: '3-band', slots: ['GK', ...def, ...mid, ...fwd] };
+    return parseThreeBand(counts);
   }
-
-  // 4 bands a-b-c-d -> family heuristic
-  const [a, b, c, d] = counts;
-  if (a + b + c + d !== 10) return null;
-  const def = defSlots(a);
-  if (def === null) return null;
-  const fwd = fwdSlots(d);
-  if (fwd === null) return null;
-  if (b <= 2) {
-    // dm-4-band (DEF x a, DM x b, MID x c, FWD x d)
-    const dm = b === 2 ? ['DM1', 'DM2'] : b === 1 ? ['DM3'] : b === 0 ? [] : null;
-    if (dm === null) return null;
-    const mid = midSlots4(c);
-    if (mid === null) return null;
-    return { family: 'dm-4-band', slots: ['GK', ...def, ...dm, ...mid, ...fwd] };
-  }
-  // b >= 3 -> mid-4-band (DEF x a, MID x b, AM x c, FWD x d)
-  const mid = b === 4 ? ['LM', 'CM1', 'CM2', 'RM'] : b === 3 ? ['CM1', 'CM2', 'CM3'] : null;
-  if (mid === null) return null;
-  const am = c === 2 ? ['AM1', 'AM2'] : c === 1 ? ['AM'] : c === 0 ? [] : null;
-  if (am === null) return null;
-  return { family: 'mid-4-band', slots: ['GK', ...def, ...mid, ...am, ...fwd] };
+  return parseFourBand(counts);
 }
 
 function resolveLayout(norm: string): LayoutDef | null {
@@ -565,6 +601,37 @@ function bestRemaining(
   return best;
 }
 
+/** True when player i is assigned and classifies 'static' in its current slot. */
+function isStaticAt(
+  players: LineupPlayer[],
+  slots: FormationSlot[],
+  family: NonUnknownFamily,
+  assigned: (SlotAssignment | null)[],
+  i: number,
+): boolean {
+  const assignment = assigned[i];
+  if (assignment === null) return false;
+  return classify(players[i].position, slots[assignment.slotIndex], family) === 'static';
+}
+
+/** Number of players (0-2) that would classify 'static' after swapping a and b.
+ * Callers must guard `assigned[a] !== null` and `assigned[b] !== null` first. */
+function swapImprovementCount(
+  players: LineupPlayer[],
+  slots: FormationSlot[],
+  family: NonUnknownFamily,
+  assigned: (SlotAssignment | null)[],
+  a: number,
+  b: number,
+): number {
+  const assignmentA = assigned[a]!;
+  const assignmentB = assigned[b]!;
+  return (
+    (classify(players[a].position, slots[assignmentB.slotIndex], family) === 'static' ? 1 : 0) +
+    (classify(players[b].position, slots[assignmentA.slotIndex], family) === 'static' ? 1 : 0)
+  );
+}
+
 /** Pass 3 — repair: swap slot assignments while a swap strictly reduces the
  * number of static-assigned players (bounded: <= lineup-length iterations). */
 function repair(
@@ -582,21 +649,15 @@ function repair(
   for (let iteration = 0; iteration < n; iteration += 1) {
     let improved = false;
     for (let a = 0; a < n && !improved; a += 1) {
-      const assignmentA = assigned[a];
-      if (assignmentA === null) continue;
-      if (classify(players[a].position, slots[assignmentA.slotIndex], family) !== 'static') continue;
+      if (!isStaticAt(players, slots, family, assigned, a)) continue;
       for (let b = 0; b < n && !improved; b += 1) {
         if (a === b) continue;
-        const assignmentB = assigned[b];
-        if (assignmentB === null) continue;
-        const before =
-          1 + (classify(players[b].position, slots[assignmentB.slotIndex], family) === 'static' ? 1 : 0);
-        const after =
-          (classify(players[a].position, slots[assignmentB.slotIndex], family) === 'static' ? 1 : 0) +
-          (classify(players[b].position, slots[assignmentA.slotIndex], family) === 'static' ? 1 : 0);
+        if (assigned[b] === null) continue;
+        const before = 1 + (isStaticAt(players, slots, family, assigned, b) ? 1 : 0);
+        const after = swapImprovementCount(players, slots, family, assigned, a, b);
         if (after < before) {
-          const slotA = assignmentA.slotIndex;
-          assigned[a] = { slotIndex: assignmentB.slotIndex };
+          const slotA = assigned[a]!.slotIndex;
+          assigned[a] = { slotIndex: assigned[b]!.slotIndex };
           assigned[b] = { slotIndex: slotA };
           improved = true;
         }
@@ -606,19 +667,16 @@ function repair(
   }
 }
 
-/** Passes 1-3: GK first, greedy deficit-filling in band order, repair. */
-function fitPlayers(
+/** Pass 1 — GK first: exactly one Goalkeeper -> slot GK; zero -> first entry
+ * (input order) to GK (becomes 'static'); more than one -> first to GK, rest
+ * flow through Pass 2. Mutates assigned/slotTaken in place. */
+function assignGoalkeeper(
   players: LineupPlayer[],
   slots: FormationSlot[],
-  family: NonUnknownFamily,
-): (SlotAssignment | null)[] {
+  assigned: (SlotAssignment | null)[],
+  slotTaken: boolean[],
+): void {
   const n = players.length;
-  const assigned: (SlotAssignment | null)[] = players.map(() => null);
-  const slotTaken: boolean[] = slots.map(() => false);
-
-  // Pass 1 — GK first: exactly one Goalkeeper -> slot GK; zero -> first entry
-  // (input order) to GK (becomes 'static'); more than one -> first to GK, rest
-  // flow through Pass 2.
   const gkSlotIndex = slots.findIndex((slot) => slot.id === 'GK');
   if (gkSlotIndex >= 0 && n > 0) {
     let firstGk = -1;
@@ -632,10 +690,18 @@ function fitPlayers(
     assigned[gkPlayer] = { slotIndex: gkSlotIndex };
     slotTaken[gkSlotIndex] = true;
   }
+}
 
-  // Pass 2 — greedy deficit-filling in band order DEF -> DM -> MID -> FWD;
-  // each slot picks the best remaining player by its preferredPositions rank
-  // (ties by input order; assigned players never re-picked).
+/** Pass 2 — greedy deficit-filling in band order DEF -> DM -> MID -> FWD;
+ * each slot picks the best remaining player by its preferredPositions rank
+ * (ties by input order; assigned players never re-picked). Mutates
+ * assigned/slotTaken in place. */
+function greedyFillByBand(
+  players: LineupPlayer[],
+  slots: FormationSlot[],
+  assigned: (SlotAssignment | null)[],
+  slotTaken: boolean[],
+): void {
   const bandOrder: FormationBand[] = ['DEF', 'DM', 'MID', 'FWD'];
   let playersExhausted = false;
   for (const band of bandOrder) {
@@ -650,76 +716,42 @@ function fitPlayers(
       slotTaken[s] = true;
     }
   }
+}
 
-  // Pass 3 — repair.
+/** Passes 1-3: GK first, greedy deficit-filling in band order, repair. */
+function fitPlayers(
+  players: LineupPlayer[],
+  slots: FormationSlot[],
+  family: NonUnknownFamily,
+): (SlotAssignment | null)[] {
+  const assigned: (SlotAssignment | null)[] = players.map(() => null);
+  const slotTaken: boolean[] = slots.map(() => false);
+
+  assignGoalkeeper(players, slots, assigned, slotTaken);
+  greedyFillByBand(players, slots, assigned, slotTaken);
   repair(players, slots, family, assigned);
 
   return assigned;
 }
 
-/**
- * Fit a starting XI (0-11 entries) into a formation's 11-slot layout.
- * Missing/null/unknown/unparseable formation -> static coords directly,
- * never crashes. Output in input order; deterministic.
- */
-export function fitStartingXI(lineup: LineupPlayer[], formation?: string | null): FittedPlayer[] {
-  const players = Array.isArray(lineup) ? lineup : [];
-  const norm = normalizeFormation(formation);
-  const layout = resolveLayout(norm);
+/** Shared builder for static fitted players (layout === null branch and the
+ * unassigned branch). */
+function toStaticFittedPlayer(player: LineupPlayer): FittedPlayer {
+  return {
+    playerId: player.playerId,
+    position: player.position,
+    slotId: null,
+    band: null,
+    fitQuality: 'static',
+    coords: getPositionCoords(player.position ?? ''),
+  };
+}
 
-  if (layout === null) {
-    // Pass 0 — static mode (missing/null/unknown/unparseable formation).
-    if (norm !== '') {
-      formationStats.unknownFormations[norm] = (formationStats.unknownFormations[norm] ?? 0) + 1;
-      warnUnknownFormation(norm);
-    }
-    return players.map((player) => ({
-      playerId: player.playerId,
-      position: player.position,
-      slotId: null,
-      band: null,
-      fitQuality: 'static' as const,
-      coords: getPositionCoords(player.position ?? ''),
-    }));
-  }
-
-  formationStats.sidesFitted += 1;
-  const family = layout.family;
-  const slots = layout.slots.map((id) => buildSlot(id, family));
-  const assignments = fitPlayers(players, slots, family);
-
-  const fitted: FittedPlayer[] = [];
-  for (let i = 0; i < players.length; i += 1) {
-    const assignment = assignments[i];
-    const player = players[i];
-    if (assignment === null) {
-      // Unassigned (lineup longer than slots): static, like Pass 0.
-      fitted.push({
-        playerId: player.playerId,
-        position: player.position,
-        slotId: null,
-        band: null,
-        fitQuality: 'static',
-        coords: getPositionCoords(player.position ?? ''),
-      });
-      continue;
-    }
-    const slot = slots[assignment.slotIndex];
-    const quality = classify(player.position, slot, family);
-    if (quality === 'static') warnStaticAssigned(player.position ?? '');
-    fitted.push({
-      playerId: player.playerId,
-      position: player.position,
-      slotId: slot.id,
-      band: slot.band,
-      fitQuality: quality,
-      coords: quality === 'static' ? getPositionCoords(player.position ?? '') : slot.coords,
-    });
-  }
-
-  // Post-processing: narrow paired-slot spacing when only 2 players occupy a
-  // band. Paired slots use x=30/x=70 which looks right with 3 players (center
-  // slot fills the gap) but is too wide for just 2. Pull them to x=40/x=60.
+/** Post-processing: narrow paired-slot spacing when only 2 players occupy a
+ * band. Paired slots use x=30/x=70 which looks right with 3 players (center
+ * slot fills the gap) but is too wide for just 2. Pull them to x=40/x=60.
+ * Mutates fitted coords in place. */
+function narrowPairedSpacing(fitted: FittedPlayer[]): void {
   const bandGroups = new Map<number, FittedPlayer[]>();
   for (const f of fitted) {
     if (f.fitQuality === 'static') continue;
@@ -743,12 +775,65 @@ export function fitStartingXI(lineup: LineupPlayer[], formation?: string | null)
       b.coords = { x: targetA, y: b.coords.y };
     }
   }
+}
 
+/** Formation-fitting counters: exact/tolerant/static rows. */
+function trackFitStats(fitted: FittedPlayer[]): void {
   for (const f of fitted) {
     if (f.fitQuality === 'exact') formationStats.exactPlayers += 1;
     else if (f.fitQuality === 'tolerant') formationStats.tolerantPlayers += 1;
     else formationStats.staticPlayers += 1;
   }
+}
+
+/**
+ * Fit a starting XI (0-11 entries) into a formation's 11-slot layout.
+ * Missing/null/unknown/unparseable formation -> static coords directly,
+ * never crashes. Output in input order; deterministic.
+ */
+export function fitStartingXI(lineup: LineupPlayer[], formation?: string | null): FittedPlayer[] {
+  const players = Array.isArray(lineup) ? lineup : [];
+  const norm = normalizeFormation(formation);
+  const layout = resolveLayout(norm);
+
+  if (layout === null) {
+    // Pass 0 — static mode (missing/null/unknown/unparseable formation).
+    if (norm !== '') {
+      formationStats.unknownFormations[norm] = (formationStats.unknownFormations[norm] ?? 0) + 1;
+      warnUnknownFormation(norm);
+    }
+    return players.map((player) => toStaticFittedPlayer(player));
+  }
+
+  formationStats.sidesFitted += 1;
+  const family = layout.family;
+  const slots = layout.slots.map((id) => buildSlot(id, family));
+  const assignments = fitPlayers(players, slots, family);
+
+  const fitted: FittedPlayer[] = [];
+  for (let i = 0; i < players.length; i += 1) {
+    const assignment = assignments[i];
+    const player = players[i];
+    if (assignment === null) {
+      // Unassigned (lineup longer than slots): static, like Pass 0.
+      fitted.push(toStaticFittedPlayer(player));
+      continue;
+    }
+    const slot = slots[assignment.slotIndex];
+    const quality = classify(player.position, slot, family);
+    if (quality === 'static') warnStaticAssigned(player.position ?? '');
+    fitted.push({
+      playerId: player.playerId,
+      position: player.position,
+      slotId: slot.id,
+      band: slot.band,
+      fitQuality: quality,
+      coords: quality === 'static' ? getPositionCoords(player.position ?? '') : slot.coords,
+    });
+  }
+
+  narrowPairedSpacing(fitted);
+  trackFitStats(fitted);
 
   return fitted;
 }
