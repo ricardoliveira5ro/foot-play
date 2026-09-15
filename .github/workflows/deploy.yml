@@ -109,17 +109,24 @@ jobs:
       - name: Run tests with coverage gate
         working-directory: backend
         run: npm run test:coverage
+        env:
+          DATABASE_URL: "postgresql://dummy:dummy@localhost:5432/dummy"
+          SHADOW_DATABASE_URL: "postgresql://dummy:dummy@localhost:5432/dummy_shadow"
 
       - name: SonarQube Scan
         uses: SonarSource/sonarqube-scan-action@v8
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          DATABASE_URL: "postgresql://dummy:dummy@localhost:5432/dummy"
+          SHADOW_DATABASE_URL: "postgresql://dummy:dummy@localhost:5432/dummy_shadow"
 
       - name: SonarQube Quality Gate check
         uses: SonarSource/sonarqube-quality-gate-action@v1
         timeout-minutes: 5
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          DATABASE_URL: "postgresql://dummy:dummy@localhost:5432/dummy"
+          SHADOW_DATABASE_URL: "postgresql://dummy:dummy@localhost:5432/dummy_shadow"
 
   deploy:
     name: Deploy to Oracle Cloud
