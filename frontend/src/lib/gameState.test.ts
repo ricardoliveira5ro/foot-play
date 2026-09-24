@@ -6,7 +6,7 @@
 
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { gameReducer, initialState, MAX_ATTEMPTS } from './gameState';
-import type { GameState } from './gameState';
+import type { GameState, GameAction } from './gameState';
 import type { GameResponse, LineupPlayer, GuessResult } from '@/types';
 
 // --- Fixtures ---
@@ -153,6 +153,42 @@ describe('gameReducer', () => {
       });
       const state = gameReducer(initialState, { type: 'SET_MATCH', payload: neitherCurated });
       expect(state.teamSide).toBe('away');
+    });
+
+    it('falls back to the non-curated side when the curated home side has no lineup', () => {
+      // Home is curated (294) and preferred, but its lineup is empty — pickSide
+      // must fall back to the away side instead of returning an empty board.
+      const match = makeMatch({ homeLineup: [], awayLineup: [player('away-1')] });
+      const state = gameReducer(initialState, { type: 'SET_MATCH', payload: match });
+      expect(state.teamSide).toBe('away');
+      expect(state.targetShirts).toHaveLength(1);
+      expect(state.targetShirts[0].token).toBe('away-1');
+      expect(state.opponentShirts).toHaveLength(0);
+    });
+
+    it('falls back to the non-curated side when the curated away side has no lineup', () => {
+      // Away is curated (281) and preferred, but its lineup is empty — pickSide
+      // must fall back to the home side instead of returning an empty board.
+      const match = makeMatch({
+        game: {
+          ...makeMatch().game,
+          homeClub: { clubId: 998, name: 'Team A' },
+          awayClub: { clubId: 281, name: 'Manchester City' },
+        },
+        homeLineup: [player('home-1')],
+        awayLineup: [],
+      });
+      const state = gameReducer(initialState, { type: 'SET_MATCH', payload: match });
+      expect(state.teamSide).toBe('home');
+      expect(state.targetShirts).toHaveLength(1);
+      expect(state.targetShirts[0].token).toBe('home-1');
+      expect(state.opponentShirts).toHaveLength(0);
+    });
+
+    it('returns the state unchanged for an unknown action type', () => {
+      const state = playingState();
+      const next = gameReducer(state, { type: 'UNKNOWN' } as unknown as GameAction);
+      expect(next).toBe(state);
     });
   });
 
