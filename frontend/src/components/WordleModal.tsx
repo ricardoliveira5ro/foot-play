@@ -384,12 +384,13 @@ export default function WordleModal({
           tabIndex={0}
           onKeyDown={handleKeyDown}
           className="p-4 pb-2 flex flex-col items-center gap-1.5 outline-none"
-          role="group"
+          role="grid"
           aria-label="Guessing grid"
         >
           {gridRows.map((row) => (
             <div
               key={row.key}
+              role="row"
               className="flex items-center justify-center gap-1.5"
             >
               {row.tiles.map((tile, i) => {
@@ -413,6 +414,7 @@ export default function WordleModal({
                 return (
                   <div
                     key={`${row.key}-${i}`}
+                    role="gridcell"
                     className="relative flex h-10 w-10 items-center justify-center font-mono font-semibold text-[18px] select-none"
                     style={{
                       backgroundColor: bg,

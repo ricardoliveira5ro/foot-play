@@ -77,7 +77,7 @@ function pickSide(response: GameResponse): TeamSide {
   } else if (awayCurated && !homeCurated) {
     preferred = 'away';
   } else {
-    preferred = Math.random() < 0.5 ? 'home' : 'away';
+    preferred = crypto.getRandomValues(new Uint32Array(1))[0] % 2 === 0 ? 'home' : 'away';
   }
 
   const preferredLineup = preferred === 'home' ? response.homeLineup : response.awayLineup;
