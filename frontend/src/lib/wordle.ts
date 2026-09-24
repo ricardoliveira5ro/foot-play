@@ -35,7 +35,7 @@ export function getWordBoundaries(name: string): number[] {
   let normalizedIndex = 0;
   for (const char of name) {
     if (char === ' ' || char === '-' || char === "'") {
-      if (boundaries[boundaries.length - 1] !== normalizedIndex) {
+      if (boundaries.at(-1) !== normalizedIndex) {
         boundaries.push(normalizedIndex);
       }
     } else if (/[\u0300-\u036f]/.test(char)) {

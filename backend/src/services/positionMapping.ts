@@ -322,6 +322,15 @@ function midSlots4(count: number): string[] | null {
   }
 }
 
+/** Mid-band slots for the mid-4-band family (b >= 3). NOTE: midSlots4(3)
+ * returns ['LW','AM','RW'] — NOT the b===3 value ['CM1','CM2','CM3']. Only
+ * the b===4 branch reuses midSlots4. */
+function midSlotsForMidFamily(b: number): string[] | null {
+  if (b === 4) return midSlots4(4);
+  if (b === 3) return ['CM1', 'CM2', 'CM3'];
+  return null;
+}
+
 function fwdSlots(count: number): string[] | null {
   switch (count) {
     case 5:
@@ -399,9 +408,7 @@ function parseFourBand(counts: number[]): LayoutDef | null {
     return { family: 'dm-4-band', slots: ['GK', ...def, ...dm, ...mid, ...fwd] };
   }
   // b >= 3 -> mid-4-band (DEF x a, MID x b, AM x c, FWD x d).
-  // NOTE: midSlots4(3) returns ['LW','AM','RW'] — NOT the b===3 value
-  // ['CM1','CM2','CM3']. Only the b===4 branch reuses midSlots4.
-  const mid = b === 4 ? midSlots4(4) : b === 3 ? ['CM1', 'CM2', 'CM3'] : null;
+  const mid = midSlotsForMidFamily(b);
   if (mid === null) return null;
   const am = amSlots(c);
   if (am === null) return null;
@@ -414,7 +421,7 @@ function parseFourBand(counts: number[]): LayoutDef | null {
 function parseGenericFormation(norm: string): LayoutDef | null {
   const parts = norm.split('-');
   if (parts.length < 2 || parts.length > 4) return null;
-  const counts = parts.map((part) => Number(part));
+  const counts = parts.map(Number);
   if (counts.some((n) => Number.isNaN(n))) return null;
 
   if (parts.length === 2 || parts.length === 3) {
@@ -575,7 +582,7 @@ function classify(
 ): FitQuality {
   const p = normalizePosition(position);
   const posBand = FAMILY_BAND[p];
-  if (posBand !== undefined && posBand[family] === slot.band) return 'exact';
+  if (posBand?.[family] === slot.band) return 'exact';
   if (rankOf(position, slot) !== Number.POSITIVE_INFINITY) return 'tolerant';
   return 'static';
 }
@@ -632,6 +639,58 @@ function swapImprovementCount(
   );
 }
 
+/** Attempt a swap between static player a and candidate b; returns true when
+ * the swap happened. Callers must guard `assigned[a] !== null` and
+ * `assigned[b] !== null` first. */
+function trySwap(
+  players: LineupPlayer[],
+  slots: FormationSlot[],
+  family: NonUnknownFamily,
+  assigned: (SlotAssignment | null)[],
+  a: number,
+  b: number,
+): boolean {
+  const before = 1 + (isStaticAt(players, slots, family, assigned, b) ? 1 : 0);
+  const after = swapImprovementCount(players, slots, family, assigned, a, b);
+  if (after >= before) return false;
+  const slotA = assigned[a]!.slotIndex;
+  assigned[a] = { slotIndex: assigned[b]!.slotIndex };
+  assigned[b] = { slotIndex: slotA };
+  return true;
+}
+
+/** Try to find a swap partner for static player a; returns true on success. */
+function trySwapFor(
+  players: LineupPlayer[],
+  slots: FormationSlot[],
+  family: NonUnknownFamily,
+  assigned: (SlotAssignment | null)[],
+  a: number,
+): boolean {
+  const n = players.length;
+  for (let b = 0; b < n; b += 1) {
+    if (a === b || assigned[b] === null) continue;
+    if (trySwap(players, slots, family, assigned, a, b)) return true;
+  }
+  return false;
+}
+
+/** One repair pass: swap the first improvable static player; true when any
+ * swap happened. */
+function repairPass(
+  players: LineupPlayer[],
+  slots: FormationSlot[],
+  family: NonUnknownFamily,
+  assigned: (SlotAssignment | null)[],
+): boolean {
+  const n = players.length;
+  for (let a = 0; a < n; a += 1) {
+    if (!isStaticAt(players, slots, family, assigned, a)) continue;
+    if (trySwapFor(players, slots, family, assigned, a)) return true;
+  }
+  return false;
+}
+
 /** Pass 3 — repair: swap slot assignments while a swap strictly reduces the
  * number of static-assigned players (bounded: <= lineup-length iterations). */
 function repair(
@@ -647,23 +706,7 @@ function repair(
   // Goalkeeper puts its first entry in the GK slot as 'static' and may swap.)
   const n = players.length;
   for (let iteration = 0; iteration < n; iteration += 1) {
-    let improved = false;
-    for (let a = 0; a < n && !improved; a += 1) {
-      if (!isStaticAt(players, slots, family, assigned, a)) continue;
-      for (let b = 0; b < n && !improved; b += 1) {
-        if (a === b) continue;
-        if (assigned[b] === null) continue;
-        const before = 1 + (isStaticAt(players, slots, family, assigned, b) ? 1 : 0);
-        const after = swapImprovementCount(players, slots, family, assigned, a, b);
-        if (after < before) {
-          const slotA = assigned[a]!.slotIndex;
-          assigned[a] = { slotIndex: assigned[b]!.slotIndex };
-          assigned[b] = { slotIndex: slotA };
-          improved = true;
-        }
-      }
-    }
-    if (!improved) break;
+    if (!repairPass(players, slots, family, assigned)) break;
   }
 }
 
@@ -686,7 +729,7 @@ function assignGoalkeeper(
         break;
       }
     }
-    const gkPlayer = firstGk >= 0 ? firstGk : 0;
+    const gkPlayer = Math.max(firstGk, 0);
     assigned[gkPlayer] = { slotIndex: gkSlotIndex };
     slotTaken[gkSlotIndex] = true;
   }
@@ -747,6 +790,23 @@ function toStaticFittedPlayer(player: LineupPlayer): FittedPlayer {
   };
 }
 
+/** Narrow a 2-player band group to its per-band spacing targets. Mutates
+ * fitted coords in place. */
+function narrowGroupSpacing(a: FittedPlayer, b: FittedPlayer): void {
+  // Per-band spacing: CBs x=35/65, strikers x=37/63, others x=40/60
+  let targetA = 40;
+  let targetB = 60;
+  if (a.coords.y === 72) { targetA = 35; targetB = 65; }        // CBs
+  else if (a.coords.y === 15) { targetA = 37; targetB = 63; }   // strikers
+  if (a.coords.x === 30 && b.coords.x === 70) {
+    a.coords = { x: targetA, y: a.coords.y };
+    b.coords = { x: targetB, y: b.coords.y };
+  } else if (a.coords.x === 70 && b.coords.x === 30) {
+    a.coords = { x: targetB, y: a.coords.y };
+    b.coords = { x: targetA, y: b.coords.y };
+  }
+}
+
 /** Post-processing: narrow paired-slot spacing when only 2 players occupy a
  * band. Paired slots use x=30/x=70 which looks right with 3 players (center
  * slot fills the gap) but is too wide for just 2. Pull them to x=40/x=60.
@@ -761,19 +821,7 @@ function narrowPairedSpacing(fitted: FittedPlayer[]): void {
   }
   for (const group of bandGroups.values()) {
     if (group.length !== 2) continue;
-    const [a, b] = group;
-    // Per-band spacing: CBs x=35/65, strikers x=37/63, others x=40/60
-    let targetA = 40;
-    let targetB = 60;
-    if (a.coords.y === 72) { targetA = 35; targetB = 65; }        // CBs
-    else if (a.coords.y === 15) { targetA = 37; targetB = 63; }   // strikers
-    if (a.coords.x === 30 && b.coords.x === 70) {
-      a.coords = { x: targetA, y: a.coords.y };
-      b.coords = { x: targetB, y: b.coords.y };
-    } else if (a.coords.x === 70 && b.coords.x === 30) {
-      a.coords = { x: targetB, y: a.coords.y };
-      b.coords = { x: targetA, y: b.coords.y };
-    }
+    narrowGroupSpacing(group[0], group[1]);
   }
 }
 

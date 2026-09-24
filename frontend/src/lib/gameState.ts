@@ -81,7 +81,8 @@ function pickSide(response: GameResponse): TeamSide {
   }
 
   const preferredLineup = preferred === 'home' ? response.homeLineup : response.awayLineup;
-  return preferredLineup.length > 0 ? preferred : preferred === 'home' ? 'away' : 'home';
+  if (preferredLineup.length > 0) return preferred;
+  return preferred === 'home' ? 'away' : 'home';
 }
 
 function createShirts(lineup: LineupPlayer[]): ShirtGameData[] {
@@ -177,6 +178,76 @@ function handleSubmitGuess(state: GameState, action: Extract<GameAction, { type:
   };
 }
 
+/** Full SELECT_TEAM handling — extracted so the reducer case stays thin. */
+function handleSelectTeam(state: GameState, action: Extract<GameAction, { type: 'SELECT_TEAM' }>): GameState {
+  if (!state.match) return state;
+  const { targetLineup, opponentLineup } = lineupsForSide(state.match, action.payload);
+  return {
+    ...state,
+    teamSide: action.payload,
+    targetShirts: createShirts(targetLineup),
+    opponentShirts: createShirts(opponentLineup),
+    activeBoard: 'target',
+    activeShirtIndex: null,
+  };
+}
+
+/** Full OPEN_SHIRT handling — extracted so the reducer case stays thin. */
+function handleOpenShirt(state: GameState, action: Extract<GameAction, { type: 'OPEN_SHIRT' }>): GameState {
+  const activeShirts = state.activeBoard === 'target' ? state.targetShirts : state.opponentShirts;
+  const shirtIndex = activeShirts.findIndex(s => s.token === action.payload);
+  if (shirtIndex === -1) return state;
+  const shirt = activeShirts[shirtIndex];
+  if (shirt.state === 'correct' || shirt.state === 'failed') return state;
+  return {
+    ...state,
+    activeShirtIndex: shirtIndex,
+  };
+}
+
+/** Full REVEAL_NAME handling — extracted so the reducer case stays thin. */
+function handleRevealName(state: GameState, action: Extract<GameAction, { type: 'REVEAL_NAME' }>): GameState {
+  const reveal = (shirts: ShirtGameData[]) =>
+    shirts.map(s => (s.token === action.payload.token ? { ...s, name: action.payload.name } : s));
+  return {
+    ...state,
+    targetShirts: reveal(state.targetShirts),
+    opponentShirts: reveal(state.opponentShirts),
+  };
+}
+
+/** Full SURRENDER handling — extracted so the reducer case stays thin. */
+function handleSurrender(state: GameState): GameState {
+  if (state.gameStatus !== 'playing') return state;
+
+  const markFailed = (shirts: ShirtGameData[]) =>
+    shirts.map(s => (s.state === 'correct' ? s : { ...s, state: 'failed' as ShirtState }));
+
+  return {
+    ...state,
+    gameStatus: 'complete',
+    targetShirts: markFailed(state.targetShirts),
+    opponentShirts: markFailed(state.opponentShirts),
+  };
+}
+
+/** Full SET_ERROR handling — extracted so the reducer case stays thin. */
+function handleSetError(state: GameState, error: string | null): GameState {
+  return {
+    ...state,
+    error,
+    gameStatus: error ? 'idle' : state.gameStatus,
+  };
+}
+
+/** Full SET_LOADING handling — extracted so the reducer case stays thin. */
+function handleSetLoading(state: GameState, loading: boolean): GameState {
+  return {
+    ...state,
+    gameStatus: loading ? 'loading' : state.gameStatus,
+  };
+}
+
 // --- Reducer ---
 
 export function gameReducer(state: GameState, action: GameAction): GameState {
@@ -198,16 +269,7 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
     }
 
     case 'SELECT_TEAM': {
-      if (!state.match) return state;
-      const { targetLineup, opponentLineup } = lineupsForSide(state.match, action.payload);
-      return {
-        ...state,
-        teamSide: action.payload,
-        targetShirts: createShirts(targetLineup),
-        opponentShirts: createShirts(opponentLineup),
-        activeBoard: 'target',
-        activeShirtIndex: null,
-      };
+      return handleSelectTeam(state, action);
     }
 
     case 'TOGGLE_BOARD': {
@@ -219,15 +281,7 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
     }
 
     case 'OPEN_SHIRT': {
-      const activeShirts = state.activeBoard === 'target' ? state.targetShirts : state.opponentShirts;
-      const shirtIndex = activeShirts.findIndex(s => s.token === action.payload);
-      if (shirtIndex === -1) return state;
-      const shirt = activeShirts[shirtIndex];
-      if (shirt.state === 'correct' || shirt.state === 'failed') return state;
-      return {
-        ...state,
-        activeShirtIndex: shirtIndex,
-      };
+      return handleOpenShirt(state, action);
     }
 
     case 'CLOSE_SHIRT': {
@@ -242,31 +296,11 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
     }
 
     case 'REVEAL_NAME': {
-      return {
-        ...state,
-        targetShirts: state.targetShirts.map(s =>
-          s.token === action.payload.token ? { ...s, name: action.payload.name } : s
-        ),
-        opponentShirts: state.opponentShirts.map(s =>
-          s.token === action.payload.token ? { ...s, name: action.payload.name } : s
-        ),
-      };
+      return handleRevealName(state, action);
     }
 
     case 'SURRENDER': {
-      if (state.gameStatus !== 'playing') return state;
-
-      const markFailed = (shirts: typeof state.targetShirts) =>
-        shirts.map(s =>
-          s.state === 'correct' ? s : { ...s, state: 'failed' as ShirtState }
-        );
-
-      return {
-        ...state,
-        gameStatus: 'complete',
-        targetShirts: markFailed(state.targetShirts),
-        opponentShirts: markFailed(state.opponentShirts),
-      };
+      return handleSurrender(state);
     }
 
     case 'NEW_GAME': {
@@ -274,18 +308,11 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
     }
 
     case 'SET_ERROR': {
-      return {
-        ...state,
-        error: action.payload,
-        gameStatus: action.payload ? 'idle' : state.gameStatus,
-      };
+      return handleSetError(state, action.payload);
     }
 
     case 'SET_LOADING': {
-      return {
-        ...state,
-        gameStatus: action.payload ? 'loading' : state.gameStatus,
-      };
+      return handleSetLoading(state, action.payload);
     }
 
     default:
