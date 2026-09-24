@@ -2,29 +2,31 @@
  * Test cases for the WCAG 2.1 color contrast utility.
  */
 
+import { describe, it, expect } from 'vitest';
 import { getTextColor } from './colorUtils';
 
-function assertEqual<T>(actual: T, expected: T, message: string): void {
-  const actualStr = JSON.stringify(actual);
-  const expectedStr = JSON.stringify(expected);
-  if (actualStr !== expectedStr) {
-    throw new Error(`FAIL: ${message}\n  Expected: ${expectedStr}\n  Actual:   ${actualStr}`);
-  }
-  console.log(`PASS: ${message}`);
-}
+describe('getTextColor', () => {
+  it('returns dark text for a white background', () => {
+    expect(getTextColor('#FFFFFF')).toBe('dark');
+  });
 
-console.log('Running colorUtils tests...\n');
+  it('returns light text for a black background', () => {
+    expect(getTextColor('#000000')).toBe('light');
+  });
 
-// --- getTextColor tests ---
-console.log('--- getTextColor tests ---');
+  it('returns light text for Barcelona red', () => {
+    expect(getTextColor('#A50044')).toBe('light');
+  });
 
-assertEqual(getTextColor('#FFFFFF'), 'dark', 'getTextColor: white background -> dark text');
-assertEqual(getTextColor('#000000'), 'light', 'getTextColor: black background -> light text');
-assertEqual(getTextColor('#A50044'), 'light', 'getTextColor: Barcelona red -> light text');
-assertEqual(getTextColor('#6CABDD'), 'dark', 'getTextColor: Man City sky blue -> dark text');
+  it('returns dark text for Man City sky blue', () => {
+    expect(getTextColor('#6CABDD')).toBe('dark');
+  });
 
-// 3-digit hex expansion (#RGB -> #RRGGBB) must behave like the 6-digit form
-assertEqual(getTextColor('#FFF'), getTextColor('#FFFFFF'), 'getTextColor: 3-digit #FFF expands to #FFFFFF');
-assertEqual(getTextColor('#000'), getTextColor('#000000'), 'getTextColor: 3-digit #000 expands to #000000');
+  it('expands 3-digit #FFF like #FFFFFF', () => {
+    expect(getTextColor('#FFF')).toBe(getTextColor('#FFFFFF'));
+  });
 
-console.log('\n✅ All tests passed!');
+  it('expands 3-digit #000 like #000000', () => {
+    expect(getTextColor('#000')).toBe(getTextColor('#000000'));
+  });
+});

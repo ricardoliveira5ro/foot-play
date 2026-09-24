@@ -60,7 +60,7 @@ export const validateNonNegativeIntParam = (
     );
   }
 
-  return parseInt(value, 10);
+  return Number.parseInt(value, 10);
 };
 
 /**
