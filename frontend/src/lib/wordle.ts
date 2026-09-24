@@ -48,6 +48,65 @@ export function getWordBoundaries(name: string): number[] {
 }
 
 /**
+ * Mark guess position i as CORRECT.
+ * NOTE: mutates the shared tracking arrays (results, targetMatched,
+ * guessProcessed) in place.
+ */
+function markCorrectPass(
+  i: number,
+  guess: string,
+  results: GuessResult[],
+  targetMatched: boolean[],
+  guessProcessed: boolean[]
+): void {
+  results[i] = { letter: guess[i], result: 'CORRECT' };
+  targetMatched[i] = true;
+  guessProcessed[i] = true;
+}
+
+/**
+ * Mark guess position i as PRESENT against target position foundIndex.
+ * NOTE: mutates the shared tracking arrays (results, targetMatched,
+ * guessProcessed) in place.
+ */
+function markPresentPass(
+  i: number,
+  guess: string,
+  foundIndex: number,
+  results: GuessResult[],
+  targetMatched: boolean[],
+  guessProcessed: boolean[]
+): void {
+  results[i] = { letter: guess[i], result: 'PRESENT' };
+  targetMatched[foundIndex] = true;
+  guessProcessed[i] = true;
+}
+
+/**
+ * Mark guess position i as ABSENT.
+ * NOTE: mutates the shared results array in place.
+ */
+function markAbsentPass(i: number, guess: string, results: GuessResult[]): void {
+  results[i] = { letter: guess[i], result: 'ABSENT' };
+}
+
+/**
+ * Find the first unmatched target position holding guessChar, or -1.
+ */
+function findUnmatchedTargetIndex(
+  guessChar: string,
+  normalizedTarget: string,
+  targetMatched: boolean[]
+): number {
+  for (let j = 0; j < normalizedTarget.length; j++) {
+    if (!targetMatched[j] && normalizedTarget[j] === guessChar) {
+      return j;
+    }
+  }
+  return -1;
+}
+
+/**
  * Evaluate a guess against a target name using Wordle rules.
  * 
  * Algorithm:
@@ -77,9 +136,7 @@ export function evaluateGuess(guess: string, target: string): GuessResult[] {
   // First pass: mark correct positions (green)
   for (let i = 0; i < Math.min(guessLength, targetLength); i++) {
     if (normalizedGuess[i] === normalizedTarget[i]) {
-      results[i] = { letter: guess[i], result: 'CORRECT' };
-      targetMatched[i] = true;
-      guessProcessed[i] = true;
+      markCorrectPass(i, guess, results, targetMatched, guessProcessed);
     }
   }
   
@@ -87,28 +144,17 @@ export function evaluateGuess(guess: string, target: string): GuessResult[] {
   for (let i = 0; i < guessLength; i++) {
     if (guessProcessed[i]) continue;
     
-    const guessChar = normalizedGuess[i];
-    
-    // Find first unmatched occurrence in target
-    let foundIndex = -1;
-    for (let j = 0; j < targetLength; j++) {
-      if (!targetMatched[j] && normalizedTarget[j] === guessChar) {
-        foundIndex = j;
-        break;
-      }
-    }
+    const foundIndex = findUnmatchedTargetIndex(normalizedGuess[i], normalizedTarget, targetMatched);
     
     if (foundIndex !== -1) {
-      results[i] = { letter: guess[i], result: 'PRESENT' };
-      targetMatched[foundIndex] = true;
-      guessProcessed[i] = true;
+      markPresentPass(i, guess, foundIndex, results, targetMatched, guessProcessed);
     }
   }
   
   // Third pass: remaining letters are absent (grey)
   for (let i = 0; i < guessLength; i++) {
     if (!guessProcessed[i]) {
-      results[i] = { letter: guess[i], result: 'ABSENT' };
+      markAbsentPass(i, guess, results);
     }
   }
   

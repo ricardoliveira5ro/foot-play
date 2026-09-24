@@ -2,215 +2,227 @@
  * Test cases for the Wordle algorithm
  */
 
+import { describe, it, expect } from 'vitest';
 import { evaluateGuess, isCorrectGuess, getTargetLength, normalize, getCorrectLetters, getWordBoundaries } from './wordle';
 
-function assertEqual<T>(actual: T, expected: T, message: string): void {
-  const actualStr = JSON.stringify(actual);
-  const expectedStr = JSON.stringify(expected);
-  if (actualStr !== expectedStr) {
-    throw new Error(`FAIL: ${message}\n  Expected: ${expectedStr}\n  Actual:   ${actualStr}`);
-  }
-  console.log(`PASS: ${message}`);
-}
+describe('normalize', () => {
+  it('lowercases uppercase input', () => {
+    expect(normalize('MESSI')).toBe('messi');
+  });
 
-function assertTrue(actual: boolean, message: string): void {
-  if (!actual) {
-    throw new Error(`FAIL: ${message} - expected true`);
-  }
-  console.log(`PASS: ${message}`);
-}
+  it('lowercases mixed case input', () => {
+    expect(normalize('Messi')).toBe('messi');
+  });
 
-function assertFalse(actual: boolean, message: string): void {
-  if (actual) {
-    throw new Error(`FAIL: ${message} - expected false`);
-  }
-  console.log(`PASS: ${message}`);
-}
+  it('strips diacritics', () => {
+    expect(normalize('Pelé')).toBe('pele');
+  });
 
-console.log('Running Wordle algorithm tests...\n');
+  it('removes spaces', () => {
+    expect(normalize('Van Dijk')).toBe('vandijk');
+  });
 
-// Test normalize function
-console.log('--- Normalize tests ---');
-assertEqual(normalize('MESSI'), 'messi', 'normalize: uppercase');
-assertEqual(normalize('Messi'), 'messi', 'normalize: mixed case');
-assertEqual(normalize('Pelé'), 'pele', 'normalize: diacritics');
-assertEqual(normalize('Van Dijk'), 'vandijk', 'normalize: spaces');
-assertEqual(normalize('O\'Brien'), 'obrien', 'normalize: apostrophe');
-assertEqual(normalize('San-Jose'), 'sanjose', 'normalize: hyphen');
+  it("removes apostrophes", () => {
+    expect(normalize("O'Brien")).toBe('obrien');
+  });
 
-// Test getTargetLength
-console.log('\n--- Target length tests ---');
-assertEqual(getTargetLength('Messi'), 5, 'getTargetLength: Messi');
-assertEqual(getTargetLength('Pelé'), 4, 'getTargetLength: Pelé');
-assertEqual(getTargetLength('Van Dijk'), 7, 'getTargetLength: Van Dijk');
-assertEqual(getTargetLength('O\'Brien'), 6, 'getTargetLength: O\'Brien');
+  it('removes hyphens', () => {
+    expect(normalize('San-Jose')).toBe('sanjose');
+  });
+});
 
-// Test evaluateGuess - basic cases from spec
-console.log('\n--- evaluateGuess tests (spec cases) ---');
+describe('getTargetLength', () => {
+  it('returns length for a simple name', () => {
+    expect(getTargetLength('Messi')).toBe(5);
+  });
 
-// evaluateGuess("MESSI", "Messi") → all correct
-assertEqual(
-  evaluateGuess('MESSI', 'Messi').map(r => r.result),
-  ['CORRECT', 'CORRECT', 'CORRECT', 'CORRECT', 'CORRECT'],
-  'MESSI vs Messi: all correct'
-);
+  it('returns length for a name with diacritics', () => {
+    expect(getTargetLength('Pelé')).toBe(4);
+  });
 
-// evaluateGuess("MEESI", "Messi") → M:correct, E:correct, E:absent, S:correct, I:correct
-// Note: The 4th letter (index 3) of both "meesi" and "messi" is 's', so it's correct, not present
-assertEqual(
-  evaluateGuess('MEESI', 'Messi').map(r => r.result),
-  ['CORRECT', 'CORRECT', 'ABSENT', 'CORRECT', 'CORRECT'],
-  'MEESI vs Messi: duplicate E handling (S at pos 3 matches)'
-);
+  it('returns length for a name with spaces', () => {
+    expect(getTargetLength('Van Dijk')).toBe(7);
+  });
 
-// evaluateGuess("MMMMM", "Messi") → M:correct, M:absent, M:absent, M:absent, M:absent
-assertEqual(
-  evaluateGuess('MMMMM', 'Messi').map(r => r.result),
-  ['CORRECT', 'ABSENT', 'ABSENT', 'ABSENT', 'ABSENT'],
-  'MMMMM vs Messi: duplicate M handling'
-);
+  it("returns length for a name with an apostrophe", () => {
+    expect(getTargetLength("O'Brien")).toBe(6);
+  });
+});
 
-// evaluateGuess("ronaldo", "Ronaldo") → all correct (case-insensitive)
-assertEqual(
-  evaluateGuess('ronaldo', 'Ronaldo').map(r => r.result),
-  ['CORRECT', 'CORRECT', 'CORRECT', 'CORRECT', 'CORRECT', 'CORRECT', 'CORRECT'],
-  'ronaldo vs Ronaldo: case insensitive'
-);
+describe('evaluateGuess (spec cases)', () => {
+  it('marks all letters correct for an exact match', () => {
+    expect(evaluateGuess('MESSI', 'Messi').map(r => r.result)).toEqual([
+      'CORRECT', 'CORRECT', 'CORRECT', 'CORRECT', 'CORRECT',
+    ]);
+  });
 
-// evaluateGuess("messi", "Ronaldo") → all absent
-assertEqual(
-  evaluateGuess('messi', 'Ronaldo').map(r => r.result),
-  ['ABSENT', 'ABSENT', 'ABSENT', 'ABSENT', 'ABSENT', 'ABSENT', 'ABSENT'],
-  'messi vs Ronaldo: all absent'
-);
+  it('handles duplicate E correctly (MEESI vs Messi)', () => {
+    // Note: The 4th letter (index 3) of both "meesi" and "messi" is 's', so it's correct, not present
+    expect(evaluateGuess('MEESI', 'Messi').map(r => r.result)).toEqual([
+      'CORRECT', 'CORRECT', 'ABSENT', 'CORRECT', 'CORRECT',
+    ]);
+  });
 
-// Test diacritics handling
-console.log('\n--- Diacritics tests ---');
-assertEqual(
-  evaluateGuess('Pele', 'Pelé').map(r => r.result),
-  ['CORRECT', 'CORRECT', 'CORRECT', 'CORRECT'],
-  'Pele vs Pelé: diacritics handled'
-);
+  it('handles duplicate M correctly (MMMMM vs Messi)', () => {
+    expect(evaluateGuess('MMMMM', 'Messi').map(r => r.result)).toEqual([
+      'CORRECT', 'ABSENT', 'ABSENT', 'ABSENT', 'ABSENT',
+    ]);
+  });
 
-// Test spaces/hyphens handling
-console.log('\n--- Spaces/hyphens tests ---');
-assertEqual(
-  evaluateGuess('van dijk', 'Van Dijk').map(r => r.result),
-  ['CORRECT', 'CORRECT', 'CORRECT', 'CORRECT', 'CORRECT', 'CORRECT', 'CORRECT'],
-  'van dijk vs Van Dijk: spaces handled'
-);
+  it('is case insensitive (ronaldo vs Ronaldo)', () => {
+    expect(evaluateGuess('ronaldo', 'Ronaldo').map(r => r.result)).toEqual([
+      'CORRECT', 'CORRECT', 'CORRECT', 'CORRECT', 'CORRECT', 'CORRECT', 'CORRECT',
+    ]);
+  });
 
-// Additional edge cases
-console.log('\n--- Additional edge cases ---');
+  it('marks all absent for a completely different name', () => {
+    expect(evaluateGuess('messi', 'Ronaldo').map(r => r.result)).toEqual([
+      'ABSENT', 'ABSENT', 'ABSENT', 'ABSENT', 'ABSENT', 'ABSENT', 'ABSENT',
+    ]);
+  });
+});
 
-// Test with shorter guess
-const shortResult = evaluateGuess('Ron', 'Ronaldo');
-assertEqual(shortResult.length, 7, 'Short guess: result length matches target');
-assertEqual(shortResult[0].result, 'CORRECT', 'Short guess: first letter correct');
-assertEqual(shortResult[1].result, 'CORRECT', 'Short guess: second letter correct');
-assertEqual(shortResult[2].result, 'CORRECT', 'Short guess: third letter correct');
+describe('evaluateGuess (diacritics)', () => {
+  it('handles diacritics (Pele vs Pelé)', () => {
+    expect(evaluateGuess('Pele', 'Pelé').map(r => r.result)).toEqual([
+      'CORRECT', 'CORRECT', 'CORRECT', 'CORRECT',
+    ]);
+  });
+});
 
-// Test with longer guess
-const longResult = evaluateGuess('Ronaldinho', 'Ronaldo');
-assertEqual(longResult.length, 7, 'Long guess: result length matches target');
+describe('evaluateGuess (spaces/hyphens)', () => {
+  it('handles spaces (van dijk vs Van Dijk)', () => {
+    expect(evaluateGuess('van dijk', 'Van Dijk').map(r => r.result)).toEqual([
+      'CORRECT', 'CORRECT', 'CORRECT', 'CORRECT', 'CORRECT', 'CORRECT', 'CORRECT',
+    ]);
+  });
+});
 
-// Classic Wordle duplicate handling test cases
-// Target: "APPLE", Guess: "ALARM"
-// A: correct, L: present, A: absent (already matched), R: absent, M: absent
-const appleAlarm = evaluateGuess('ALARM', 'APPLE');
-assertEqual(appleAlarm[0].result, 'CORRECT', 'ALARM vs APPLE: A correct');
-assertEqual(appleAlarm[1].result, 'PRESENT', 'ALARM vs APPLE: L present');
-assertEqual(appleAlarm[2].result, 'ABSENT', 'ALARM vs APPLE: second A absent');
-assertEqual(appleAlarm[3].result, 'ABSENT', 'ALARM vs APPLE: R absent');
-assertEqual(appleAlarm[4].result, 'ABSENT', 'ALARM vs APPLE: M absent');
+describe('evaluateGuess (additional edge cases)', () => {
+  it('pads a short guess to the target length', () => {
+    const shortResult = evaluateGuess('Ron', 'Ronaldo');
+    expect(shortResult.length).toBe(7);
+    expect(shortResult[0].result).toBe('CORRECT');
+    expect(shortResult[1].result).toBe('CORRECT');
+    expect(shortResult[2].result).toBe('CORRECT');
+  });
 
-// Target: "SPEAR", Guess: "SPARE"
-// S: correct, P: correct, A: present, R: present, E: present
-const spearSpare = evaluateGuess('SPARE', 'SPEAR');
-assertEqual(spearSpare[0].result, 'CORRECT', 'SPARE vs SPEAR: S correct');
-assertEqual(spearSpare[1].result, 'CORRECT', 'SPARE vs SPEAR: P correct');
-assertEqual(spearSpare[2].result, 'PRESENT', 'SPARE vs SPEAR: A present');
-assertEqual(spearSpare[3].result, 'PRESENT', 'SPARE vs SPEAR: R present');
-assertEqual(spearSpare[4].result, 'PRESENT', 'SPARE vs SPEAR: E present');
+  it('truncates a long guess to the target length', () => {
+    const longResult = evaluateGuess('Ronaldinho', 'Ronaldo');
+    expect(longResult.length).toBe(7);
+  });
 
-// Target: "BANANA", Guess: "BANANA" - all correct
-assertEqual(
-  evaluateGuess('BANANA', 'BANANA').map(r => r.result),
-  ['CORRECT', 'CORRECT', 'CORRECT', 'CORRECT', 'CORRECT', 'CORRECT'],
-  'BANANA vs BANANA: all correct'
-);
+  it('handles classic Wordle duplicate case (ALARM vs APPLE)', () => {
+    const appleAlarm = evaluateGuess('ALARM', 'APPLE');
+    expect(appleAlarm[0].result).toBe('CORRECT');
+    expect(appleAlarm[1].result).toBe('PRESENT');
+    expect(appleAlarm[2].result).toBe('ABSENT');
+    expect(appleAlarm[3].result).toBe('ABSENT');
+    expect(appleAlarm[4].result).toBe('ABSENT');
+  });
 
-// Target: "BANANA", Guess: "BANANA" with different arrangement
-// Target: "BANANA" (b,a,n,a,n,a), Guess: "ANANAB" (a,n,a,n,a,b)
-// pos 0: a vs b = absent (but a exists in target)
-// pos 1: n vs a = absent (but n exists)
-// pos 2: a vs n = absent
-// pos 3: n vs a = absent
-// pos 4: a vs n = absent
-// pos 5: b vs a = absent
-// Actually let's trace through properly
-const bananaTest = evaluateGuess('ANANAB', 'BANANA');
-console.log('ANANAB vs BANANA:', bananaTest.map(r => r.result));
+  it('handles classic Wordle duplicate case (SPARE vs SPEAR)', () => {
+    const spearSpare = evaluateGuess('SPARE', 'SPEAR');
+    expect(spearSpare[0].result).toBe('CORRECT');
+    expect(spearSpare[1].result).toBe('CORRECT');
+    expect(spearSpare[2].result).toBe('PRESENT');
+    expect(spearSpare[3].result).toBe('PRESENT');
+    expect(spearSpare[4].result).toBe('PRESENT');
+  });
 
-// Test isCorrectGuess
-console.log('\n--- isCorrectGuess tests ---');
-assertTrue(isCorrectGuess('Messi', 'Messi'), 'isCorrectGuess: exact match');
-assertTrue(isCorrectGuess('messi', 'Messi'), 'isCorrectGuess: case insensitive');
-assertTrue(isCorrectGuess('Pele', 'Pelé'), 'isCorrectGuess: diacritics');
-assertFalse(isCorrectGuess('Messi', 'Ronaldo'), 'isCorrectGuess: different names');
-assertFalse(isCorrectGuess('Mess', 'Messi'), 'isCorrectGuess: too short');
+  it('marks all correct for an exact match (BANANA vs BANANA)', () => {
+    expect(evaluateGuess('BANANA', 'BANANA').map(r => r.result)).toEqual([
+      'CORRECT', 'CORRECT', 'CORRECT', 'CORRECT', 'CORRECT', 'CORRECT',
+    ]);
+  });
 
-// --- getCorrectLetters tests ---
-console.log('\n--- getCorrectLetters tests ---');
+  it('handles a rearranged duplicate-heavy guess (ANANAB vs BANANA)', () => {
+    // Every letter exists in the target, so every letter is PRESENT.
+    const bananaTest = evaluateGuess('ANANAB', 'BANANA');
+    expect(bananaTest.map(r => r.result)).toEqual([
+      'PRESENT', 'PRESENT', 'PRESENT', 'PRESENT', 'PRESENT', 'PRESENT',
+    ]);
+  });
+});
 
-// No guesses → all null
-assertEqual(
-  getCorrectLetters([], 'RAFAEL'),
-  [null, null, null, null, null, null],
-  'getCorrectLetters: no guesses returns all null'
-);
+describe('evaluateGuess (casing lock)', () => {
+  it('preserves the original guess casing in the letter field', () => {
+    // Frontend intentionally preserves the guess casing; the backend uppercases.
+    expect(evaluateGuess('messi', 'Messi')[0].letter).toBe('m');
+  });
+});
 
-// One wrong guess → all null
-const wrongGuess1 = evaluateGuess('ALEXIS', 'RAFAEL');
-assertEqual(
-  getCorrectLetters([wrongGuess1], 'RAFAEL'),
-  [null, null, null, null, null, null],
-  'getCorrectLetters: wrong guess returns all null'
-);
+describe('isCorrectGuess', () => {
+  it('returns true for an exact match', () => {
+    expect(isCorrectGuess('Messi', 'Messi')).toBe(true);
+  });
 
-// One correct guess → all filled
-const correctGuess = evaluateGuess('RAFAEL', 'RAFAEL');
-assertEqual(
-  getCorrectLetters([correctGuess], 'RAFAEL'),
-  ['R', 'A', 'F', 'A', 'E', 'L'],
-  'getCorrectLetters: correct guess fills all'
-);
+  it('returns true for a case-insensitive match', () => {
+    expect(isCorrectGuess('messi', 'Messi')).toBe(true);
+  });
 
-// Partial correct → mix of letters and null
-const partialGuess = evaluateGuess('RFAELI', 'RAFAEL');
-assertEqual(
-  getCorrectLetters([partialGuess], 'RAFAEL'),
-  ['R', null, null, null, null, null],
-  'getCorrectLetters: only correct positions filled'
-);
+  it('returns true when only diacritics differ', () => {
+    expect(isCorrectGuess('Pele', 'Pelé')).toBe(true);
+  });
 
-// Multiple guesses → accumulates correct letters
-const guess1 = evaluateGuess('ALEXIS', 'RAFAEL');
-const guess2 = evaluateGuess('RAFAEL', 'RAFAEL');
-assertEqual(
-  getCorrectLetters([guess1, guess2], 'RAFAEL'),
-  ['R', 'A', 'F', 'A', 'E', 'L'],
-  'getCorrectLetters: accumulates across guesses'
-);
+  it('returns false for different names', () => {
+    expect(isCorrectGuess('Messi', 'Ronaldo')).toBe(false);
+  });
 
-// --- getWordBoundaries tests ---
-console.log('\n--- getWordBoundaries tests ---');
+  it('returns false for a too-short guess', () => {
+    expect(isCorrectGuess('Mess', 'Messi')).toBe(false);
+  });
+});
 
-assertEqual(getWordBoundaries('Messi'), [], 'getWordBoundaries: single word');
-assertEqual(getWordBoundaries('Nico Gaitan'), [4], 'getWordBoundaries: space separator');
-assertEqual(getWordBoundaries('Nico Gaitán'), [4], 'getWordBoundaries: diacritic does not shift index');
-assertEqual(getWordBoundaries("O'Brien"), [1], 'getWordBoundaries: apostrophe separator');
-assertEqual(getWordBoundaries('San-Jose'), [3], 'getWordBoundaries: hyphen separator');
-assertEqual(getWordBoundaries('De Bruyne'), [2], 'getWordBoundaries: De Bruyne');
+describe('getCorrectLetters', () => {
+  it('returns all null with no guesses', () => {
+    expect(getCorrectLetters([], 'RAFAEL')).toEqual([null, null, null, null, null, null]);
+  });
 
-console.log('\n✅ All tests passed!');
+  it('returns all null for a wrong guess', () => {
+    const wrongGuess1 = evaluateGuess('ALEXIS', 'RAFAEL');
+    expect(getCorrectLetters([wrongGuess1], 'RAFAEL')).toEqual([null, null, null, null, null, null]);
+  });
+
+  it('fills all positions for a correct guess', () => {
+    const correctGuess = evaluateGuess('RAFAEL', 'RAFAEL');
+    expect(getCorrectLetters([correctGuess], 'RAFAEL')).toEqual(['R', 'A', 'F', 'A', 'E', 'L']);
+  });
+
+  it('fills only correct positions for a partial guess', () => {
+    const partialGuess = evaluateGuess('RFAELI', 'RAFAEL');
+    expect(getCorrectLetters([partialGuess], 'RAFAEL')).toEqual(['R', null, null, null, null, null]);
+  });
+
+  it('accumulates correct letters across guesses', () => {
+    const guess1 = evaluateGuess('ALEXIS', 'RAFAEL');
+    const guess2 = evaluateGuess('RAFAEL', 'RAFAEL');
+    expect(getCorrectLetters([guess1, guess2], 'RAFAEL')).toEqual(['R', 'A', 'F', 'A', 'E', 'L']);
+  });
+});
+
+describe('getWordBoundaries', () => {
+  it('returns no boundaries for a single word', () => {
+    expect(getWordBoundaries('Messi')).toEqual([]);
+  });
+
+  it('returns the boundary index for a space separator', () => {
+    expect(getWordBoundaries('Nico Gaitan')).toEqual([4]);
+  });
+
+  it('does not shift the index for a diacritic', () => {
+    expect(getWordBoundaries('Nico Gaitán')).toEqual([4]);
+  });
+
+  it("returns the boundary index for an apostrophe separator", () => {
+    expect(getWordBoundaries("O'Brien")).toEqual([1]);
+  });
+
+  it('returns the boundary index for a hyphen separator', () => {
+    expect(getWordBoundaries('San-Jose')).toEqual([3]);
+  });
+
+  it('returns the boundary index for De Bruyne', () => {
+    expect(getWordBoundaries('De Bruyne')).toEqual([2]);
+  });
+});
