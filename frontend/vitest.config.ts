@@ -15,6 +15,13 @@ export default defineConfig({
   test: {
     include: ['src/**/*.test.{ts,tsx}'],
     environment: 'node',
+    setupFiles: ['./vitest.setup.ts'],
+    // vitest 5.0.0's forks pool races on the shared tmp-copy cache when any
+    // setup file is transformed by multiple parallel workers (ENOENT on the
+    // setup file's cached transform). The threads pool transfers transformed
+    // code in-memory and has no such cache, so it is stable. Revisit once
+    // vitest ships a fix (5.0.1+ is blocked by a @types/node peer conflict).
+    pool: 'threads',
     coverage: {
       provider: 'v8',
       reporter: ['text', 'json-summary', 'lcov'],
