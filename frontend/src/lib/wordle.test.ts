@@ -217,8 +217,8 @@ describe('getCorrectLettersByLength', () => {
   });
 
   it('accumulates correct letters across guesses', () => {
-    const guess1 = evaluateGuess('ALEXIS', 'RAFAEL');
-    const guess2 = evaluateGuess('RAFAEL', 'RAFAEL');
+    const guess1 = evaluateGuess('RAFAXL', 'RAFAEL');
+    const guess2 = evaluateGuess('RAFAEX', 'RAFAEL');
     expect(getCorrectLettersByLength([guess1, guess2], 6)).toEqual(['R', 'A', 'F', 'A', 'E', 'L']);
   });
 
@@ -249,6 +249,7 @@ describe('getWordBoundaries', () => {
     // 'a' + U+0301 (combining acute) — the precomposed 'á' above never hits
     // the [\u0300-\u036f] branch; the decomposed form does.
     expect(getWordBoundaries('Nico Gaita\u0301n')).toEqual([4]);
+    expect(getWordBoundaries('Gaita\u0301n FC')).toEqual([6]);
   });
 
   it("returns the boundary index for an apostrophe separator", () => {
