@@ -4,12 +4,12 @@ import path from 'path';
 export default defineConfig({
   resolve: {
     alias: {
-      // IMPORTANT: '@' resolves to the frontend ROOT, not src/.
-      // tsconfig paths are "@/*": ["./src/*", "./*"] — the "./*" fallback is
-      // what makes "@/types" -> frontend/types/index.ts and
-      // "@/lib/curatedTeams" -> frontend/lib/curatedTeams.ts work (neither
-      // exists under src/). Mirror that fallback here.
-      '@': path.resolve(__dirname, '.'),
+      // Mirror tsconfig's "@/*": ["./src/*", "./*"] mapping. Most modules
+      // live under src; these imports currently resolve from the frontend root.
+      '@/types': path.resolve(__dirname, 'types'),
+      '@/lib/curatedTeams': path.resolve(__dirname, 'lib/curatedTeams'),
+      '@/components/TeamTabBar': path.resolve(__dirname, 'components/TeamTabBar'),
+      '@': path.resolve(__dirname, 'src'),
     },
   },
   test: {
