@@ -3,7 +3,7 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import { evaluateGuess, isCorrectGuess, getTargetLength, normalize, getCorrectLetters, getWordBoundaries } from './wordle';
+import { evaluateGuess, isCorrectGuess, getTargetLength, normalize, getCorrectLetters, getCorrectLettersByLength, getWordBoundaries } from './wordle';
 
 describe('normalize', () => {
   it('lowercases uppercase input', () => {
@@ -201,6 +201,37 @@ describe('getCorrectLetters', () => {
   });
 });
 
+describe('getCorrectLettersByLength', () => {
+  it('returns all null with no guesses', () => {
+    expect(getCorrectLettersByLength([], 6)).toEqual([null, null, null, null, null, null]);
+  });
+
+  it('fills all positions for a correct guess (uppercased)', () => {
+    const correctGuess = evaluateGuess('RAFAEL', 'RAFAEL');
+    expect(getCorrectLettersByLength([correctGuess], 6)).toEqual(['R', 'A', 'F', 'A', 'E', 'L']);
+  });
+
+  it('fills only correct positions for a partial guess', () => {
+    const partialGuess = evaluateGuess('RFAELI', 'RAFAEL');
+    expect(getCorrectLettersByLength([partialGuess], 6)).toEqual(['R', null, null, null, null, null]);
+  });
+
+  it('accumulates correct letters across guesses', () => {
+    const guess1 = evaluateGuess('RAFAXL', 'RAFAEL');
+    const guess2 = evaluateGuess('RAFAEX', 'RAFAEL');
+    expect(getCorrectLettersByLength([guess1, guess2], 6)).toEqual(['R', 'A', 'F', 'A', 'E', 'L']);
+  });
+
+  it('truncates guesses longer than the given length', () => {
+    const correctGuess = evaluateGuess('RAFAEL', 'RAFAEL');
+    expect(getCorrectLettersByLength([correctGuess], 3)).toEqual(['R', 'A', 'F']);
+  });
+
+  it('returns an empty array for length 0', () => {
+    expect(getCorrectLettersByLength([evaluateGuess('RAFAEL', 'RAFAEL')], 0)).toEqual([]);
+  });
+});
+
 describe('getWordBoundaries', () => {
   it('returns no boundaries for a single word', () => {
     expect(getWordBoundaries('Messi')).toEqual([]);
@@ -212,6 +243,13 @@ describe('getWordBoundaries', () => {
 
   it('does not shift the index for a diacritic', () => {
     expect(getWordBoundaries('Nico Gaitán')).toEqual([4]);
+  });
+
+  it('does not advance the index for a decomposed combining diacritic', () => {
+    // 'a' + U+0301 (combining acute) — the precomposed 'á' above never hits
+    // the [\u0300-\u036f] branch; the decomposed form does.
+    expect(getWordBoundaries('Nico Gaita\u0301n')).toEqual([4]);
+    expect(getWordBoundaries('Gaita\u0301n FC')).toEqual([6]);
   });
 
   it("returns the boundary index for an apostrophe separator", () => {

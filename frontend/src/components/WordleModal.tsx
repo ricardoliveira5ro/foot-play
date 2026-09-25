@@ -238,15 +238,6 @@ export default function WordleModal({
     [isGameOver, inputValue, targetLength, onGuess],
   );
 
-  // Handle backdrop click to close (clicks on the dialog element itself,
-  // outside the modal content).
-  const handleDialogClick = useCallback(
-    (e: React.MouseEvent<HTMLDialogElement>) => {
-      if (e.target === dialogRef.current) onClose();
-    },
-    [onClose],
-  );
-
   // Handle on-screen keyboard press
   const handleKeyPress = useCallback(
     (key: string) => {
@@ -379,15 +370,22 @@ export default function WordleModal({
     <dialog
       ref={dialogRef}
       className="fixed inset-0 z-50 m-0 flex max-h-none max-w-none items-center justify-center bg-transparent p-4"
-      onClick={handleDialogClick}
       onCancel={onClose}
       aria-labelledby="wordle-modal-title"
       aria-describedby="wordle-modal-desc"
     >
-      {/* Backdrop */}
-      <div
-        className="pointer-events-none absolute inset-0 bg-ink/60 backdrop-blur-sm"
-        aria-hidden="true"
+      {/*
+        Backdrop: an interactive full-screen button handles click-to-close.
+        tabIndex={-1} keeps it out of sequential tab order because it is a
+        redundant dismissal control — keyboard users already have Escape
+        (onCancel) and the visible close / Give Up buttons.
+      */}
+      <button
+        type="button"
+        aria-label="Close modal"
+        tabIndex={-1}
+        onClick={onClose}
+        className="absolute inset-0 bg-ink/60 backdrop-blur-sm"
         style={{ animation: 'fade-in 150ms ease-out' }}
       />
 
