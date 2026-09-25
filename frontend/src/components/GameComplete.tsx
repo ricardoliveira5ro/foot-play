@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import TeamTabBar from '@/components/TeamTabBar';
 import type { Game } from '@/types';
 import type { ShirtGameData } from '@/lib/gameState';
@@ -27,6 +27,24 @@ function formatMatchDate(date: string | null): string | null {
   const parsed = new Date(`${date}T00:00:00`);
   if (Number.isNaN(parsed.getTime())) return date;
   return parsed.toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' });
+}
+
+function getRowBackground(isCorrect: boolean, isFailed: boolean): string {
+  if (isCorrect) return 'var(--color-correct)/10';
+  if (isFailed) return 'var(--color-failed)/10';
+  return 'var(--color-ink/5)';
+}
+
+function getRowBorder(isCorrect: boolean, isFailed: boolean): string {
+  if (isCorrect) return 'var(--color-correct)/30';
+  if (isFailed) return 'var(--color-failed)/30';
+  return 'var(--color-ink/10)';
+}
+
+function getNameColor(isCorrect: boolean, isFailed: boolean): string {
+  if (isCorrect) return 'var(--color-correct)';
+  if (isFailed) return 'var(--color-failed)';
+  return 'var(--color-ink/40)';
 }
 
 const POSITION_ORDER: Record<string, number> = {
@@ -74,10 +92,21 @@ function getPositionLabel(position: string | null): string {
   return position ? labels[position] ?? position : '?';
 }
 
-export default function GameComplete({ match, targetShirts, opponentShirts, targetTeamName, opponentTeamName, onPlayAgain }: GameCompleteProps) {
+export default function GameComplete({ match, targetShirts, opponentShirts, targetTeamName, opponentTeamName, onPlayAgain }: Readonly<GameCompleteProps>) {
   const home = match.homeClub?.name ?? 'Home';
   const away = match.awayClub?.name ?? 'Away';
   const dateLabel = formatMatchDate(match.date) ?? match.season;
+
+  const dialogRef = useRef<HTMLDialogElement>(null);
+
+  // Open as a modal dialog on mount (native focus trap + top layer).
+  useEffect(() => {
+    const dialog = dialogRef.current;
+    if (dialog && !dialog.open) dialog.showModal();
+    return () => {
+      if (dialog?.open) dialog.close();
+    };
+  }, []);
 
   // Combine both teams for stats
   const allShirts = [...targetShirts, ...opponentShirts];
@@ -110,12 +139,8 @@ export default function GameComplete({ match, targetShirts, opponentShirts, targ
                   key={shirt.token}
                   className="flex items-center gap-2 p-2 rounded-lg transition-colors"
                   style={{
-                    backgroundColor: isCorrect
-                      ? 'var(--color-correct)/10'
-                      : isFailed
-                      ? 'var(--color-failed)/10'
-                      : 'var(--color-ink/5)',
-                    border: `1px solid ${isCorrect ? 'var(--color-correct)/30' : isFailed ? 'var(--color-failed)/30' : 'var(--color-ink/10)'}`,
+                    backgroundColor: getRowBackground(isCorrect, isFailed),
+                    border: `1px solid ${getRowBorder(isCorrect, isFailed)}`,
                   }}
                 >
                   <span className="shrink-0 w-8 text-center font-display text-base text-ink/60" aria-label={`Shirt ${shirt.shirtNumber ?? '?'}`}>
@@ -127,7 +152,7 @@ export default function GameComplete({ match, targetShirts, opponentShirts, targ
                   <span
                     className="flex-1 truncate font-semibold text-sm"
                     style={{
-                      color: isCorrect ? 'var(--color-correct)' : isFailed ? 'var(--color-failed)' : 'var(--color-ink/40)',
+                      color: getNameColor(isCorrect, isFailed),
                     }}
                   >
                     {showName && shirt.name ? shirt.name : '—'}
@@ -172,7 +197,12 @@ export default function GameComplete({ match, targetShirts, opponentShirts, targ
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto p-4" role="dialog" aria-modal="true" aria-labelledby="game-complete-title">
+    <dialog
+      ref={dialogRef}
+      className="fixed inset-0 z-50 m-0 flex max-h-none max-w-none items-center justify-center bg-transparent overflow-y-auto p-4"
+      aria-labelledby="game-complete-title"
+      onCancel={(e) => e.preventDefault()}
+    >
       {/* Backdrop */}
       <div
         className="absolute inset-0 bg-ink/70 backdrop-blur-sm"
@@ -277,7 +307,10 @@ export default function GameComplete({ match, targetShirts, opponentShirts, targ
           from { opacity: 0; }
           to { opacity: 1; }
         }
+        dialog::backdrop {
+          background: transparent;
+        }
       `}</style>
-    </div>
+    </dialog>
   );
 }

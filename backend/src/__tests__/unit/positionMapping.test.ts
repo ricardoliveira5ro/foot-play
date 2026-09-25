@@ -475,4 +475,66 @@ describe('fitStartingXI', () => {
     stats.sidesFitted = 999;
     expect(getFormationMappingStats().sidesFitted).not.toBe(999);
   });
+
+  it('repair converges over multiple iterations in 4-4-2', () => {
+    // Characterization: greedy fills RW@CM2 (static), CF@RM (static), utility@CF2 (static).
+    // Iter 1 swaps RW↔CF (RW→RM tolerant, CF→CM2 static).
+    // Iter 2 swaps CF↔utility (CF→CF2 exact, utility→CM2 static).
+    // A single-iteration implementation would leave player 9 static.
+    const lineup: LineupPlayer[] = [
+      { playerId: 1, position: 'goalkeeper' },
+      { playerId: 2, position: 'centre-back' },
+      { playerId: 3, position: 'left-back' },
+      { playerId: 4, position: 'right-back' },
+      { playerId: 5, position: 'defensive midfield' },
+      { playerId: 6, position: 'central midfield' },
+      { playerId: 7, position: 'left midfield' },
+      { playerId: 8, position: 'right winger' },
+      { playerId: 9, position: 'centre-forward' },
+      { playerId: 10, position: 'second striker' },
+      { playerId: 11, position: 'utility player' },
+    ];
+    const fitted = fitStartingXI(lineup, '4-4-2');
+
+    // Player 8 (right winger) → RM, tolerant
+    expect(fitted[7].slotId).toBe('RM');
+    expect(fitted[7].fitQuality).toBe('tolerant');
+
+    // Player 9 (centre-forward) → CF2, exact (would be static with single-iteration repair)
+    expect(fitted[8].slotId).toBe('CF2');
+    expect(fitted[8].fitQuality).toBe('exact');
+
+    // Player 11 (utility player) → CM2, static
+    expect(fitted[10].slotId).toBe('CM2');
+    expect(fitted[10].fitQuality).toBe('static');
+  });
+
+  it('repair does not move players when no beneficial swap exists', () => {
+    // 4-3-3: utility player lands in CF3 static. Every other slot is filled
+    // by an exact match. Swapping utility with any exact player would trade
+    // 1 exact for 1 static — no net improvement, so repair must not move anything.
+    const lineup: LineupPlayer[] = [
+      { playerId: 1, position: 'goalkeeper' },
+      { playerId: 2, position: 'centre-back' },
+      { playerId: 3, position: 'centre-back' },
+      { playerId: 4, position: 'left-back' },
+      { playerId: 5, position: 'right-back' },
+      { playerId: 6, position: 'central midfield' },
+      { playerId: 7, position: 'central midfield' },
+      { playerId: 8, position: 'central midfield' },
+      { playerId: 9, position: 'left winger' },
+      { playerId: 10, position: 'right winger' },
+      { playerId: 11, position: 'utility player' },
+    ];
+    const fitted = fitStartingXI(lineup, '4-3-3');
+
+    // Players 1–10 all exact
+    for (let i = 0; i < 10; i++) {
+      expect(fitted[i].fitQuality).toBe('exact');
+    }
+
+    // Player 11 (utility player) → CF3, static — repair must not move it
+    expect(fitted[10].slotId).toBe('CF3');
+    expect(fitted[10].fitQuality).toBe('static');
+  });
 });

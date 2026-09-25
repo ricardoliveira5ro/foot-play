@@ -1,4 +1,5 @@
 import { prisma } from '../prisma';
+import { randomInt } from 'node:crypto';
 import { fitStartingXI, type LineupPlayer } from './positionMapping';
 import type { Prisma } from '../generated/prisma/client';
 import { normalize, getWordBoundaries } from './wordle';
@@ -21,7 +22,7 @@ export async function getRandomMatch(): Promise<GameWithRelations | null> {
   }
 
   const [game] = await prisma.game.findMany({
-    skip: Math.floor(Math.random() * count),
+    skip: randomInt(count),
     take: 1,
     include: {
       competition: true,

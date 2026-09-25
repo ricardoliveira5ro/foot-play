@@ -120,6 +120,45 @@ function getKeyStyle(state: KeyState): React.CSSProperties {
   }
 }
 
+function getTileTextColor(isRevealed: boolean, hasLetter: boolean): string {
+  if (isRevealed) return 'var(--color-chalk)';
+  if (hasLetter) return 'var(--color-ink)';
+  return 'transparent';
+}
+
+function getTileAriaLabel(letter: string | null, result: GuessResult['result'] | null): string {
+  if (!letter) return 'empty';
+  return result ? `${letter}, ${result}` : letter;
+}
+
+function getKeyLabel(key: string): string {
+  if (key === 'Backspace') return '⌫';
+  if (key === 'Enter') return '↵';
+  return key;
+}
+
+function getKeyAriaLabel(key: string): string {
+  if (key === 'Backspace') return 'Delete';
+  if (key === 'Enter') return 'Submit';
+  return key;
+}
+
+function getSubmitButtonClass(isGameOver: boolean, canSubmit: boolean): string {
+  if (isGameOver) return 'bg-ink/10 text-ink/40 cursor-not-allowed';
+  if (canSubmit) return 'bg-ink text-chalk hover:bg-flare active:scale-[0.98]';
+  return 'bg-ink/10 text-ink/40 cursor-not-allowed';
+}
+
+function getSubmitButtonLabel(
+  isGameOver: boolean,
+  isCorrect: boolean,
+  attemptNumber: number,
+  maxAttempts: number,
+): string {
+  if (isGameOver) return isCorrect ? 'Correct!' : 'Revealed';
+  return `Guess ${attemptNumber + 1} of ${maxAttempts}`;
+}
+
 // --- Main component ---
 
 export default function WordleModal({
@@ -133,8 +172,9 @@ export default function WordleModal({
   onClose,
   isGameOver = false,
   isCorrect = false,
-}: WordleModalProps) {
+}: Readonly<WordleModalProps>) {
   const gridRef = useRef<HTMLDivElement>(null);
+  const dialogRef = useRef<HTMLDialogElement>(null);
   const [inputValue, setInputValue] = useState('');
   const [inputError, setInputError] = useState<string | null>(null);
   const [shakeKey, setShakeKey] = useState(0);
@@ -145,23 +185,25 @@ export default function WordleModal({
   const canSubmit = inputValue.length === targetLength && !isGameOver;
   const keyStates = useMemo(() => getKeyStates(guesses), [guesses]);
 
+  // Open as a modal dialog on mount (native focus trap + top layer).
+  useEffect(() => {
+    const dialog = dialogRef.current;
+    if (dialog && !dialog.open) dialog.showModal();
+    return () => {
+      if (dialog?.open) dialog.close();
+    };
+  }, []);
+
   // Auto-focus grid on mount
   useEffect(() => {
     gridRef.current?.focus();
   }, []);
 
-  // Handle physical keyboard input
+  // Handle physical keyboard input. Escape is handled by the native dialog
+  // (fires `cancel` -> onClose), so only typing keys are handled here.
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent) => {
-      if (isGameOver) {
-        if (e.key === 'Escape') onClose();
-        return;
-      }
-
-      if (e.key === 'Escape') {
-        onClose();
-        return;
-      }
+      if (isGameOver) return;
 
       if (e.key === 'Enter') {
         e.preventDefault();
@@ -193,15 +235,7 @@ export default function WordleModal({
         setInputError(null);
       }
     },
-    [isGameOver, onClose, inputValue, targetLength, onGuess],
-  );
-
-  // Handle overlay click to close
-  const handleOverlayClick = useCallback(
-    (e: React.MouseEvent) => {
-      if (e.target === e.currentTarget) onClose();
-    },
-    [onClose],
+    [isGameOver, inputValue, targetLength, onGuess],
   );
 
   // Handle on-screen keyboard press
@@ -333,18 +367,25 @@ export default function WordleModal({
   }, [guesses, inputValue, attemptNumber, targetLength, maxAttempts, isGameOver, wordBoundaries]);
 
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-4"
-      onClick={handleOverlayClick}
-      role="dialog"
-      aria-modal="true"
+    <dialog
+      ref={dialogRef}
+      className="fixed inset-0 z-50 m-0 flex max-h-none max-w-none items-center justify-center bg-transparent p-4"
+      onCancel={onClose}
       aria-labelledby="wordle-modal-title"
       aria-describedby="wordle-modal-desc"
     >
-      {/* Backdrop */}
-      <div
+      {/*
+        Backdrop: an interactive full-screen button handles click-to-close.
+        tabIndex={-1} keeps it out of sequential tab order because it is a
+        redundant dismissal control — keyboard users already have Escape
+        (onCancel) and the visible close / Give Up buttons.
+      */}
+      <button
+        type="button"
+        aria-label="Close modal"
+        tabIndex={-1}
+        onClick={onClose}
         className="absolute inset-0 bg-ink/60 backdrop-blur-sm"
-        aria-hidden="true"
         style={{ animation: 'fade-in 150ms ease-out' }}
       />
 
@@ -384,12 +425,13 @@ export default function WordleModal({
           tabIndex={0}
           onKeyDown={handleKeyDown}
           className="p-4 pb-2 flex flex-col items-center gap-1.5 outline-none"
-          role="group"
+          role="grid"
           aria-label="Guessing grid"
         >
           {gridRows.map((row) => (
             <div
               key={row.key}
+              role="row"
               className="flex items-center justify-center gap-1.5"
             >
               {row.tiles.map((tile, i) => {
@@ -404,15 +446,12 @@ export default function WordleModal({
                   ? getResultBg(tile.result)
                   : 'var(--color-paper)';
                 const borderColor = tile.isCurrentRow ? 'var(--color-ink)' : 'transparent';
-                const textColor = isRevealed
-                  ? 'var(--color-chalk)'
-                  : tile.letter
-                  ? 'var(--color-ink)'
-                  : 'transparent';
+                const textColor = getTileTextColor(isRevealed, Boolean(tile.letter));
 
                 return (
                   <div
                     key={`${row.key}-${i}`}
+                    role="gridcell"
                     className="relative flex h-10 w-10 items-center justify-center font-mono font-semibold text-[18px] select-none"
                     style={{
                       backgroundColor: bg,
@@ -426,11 +465,7 @@ export default function WordleModal({
                         ? `flip-in 300ms ease-out ${i * 50}ms both`
                         : 'none',
                     }}
-                    aria-label={
-                      tile.letter
-                        ? `${tile.letter}${tile.result ? `, ${tile.result}` : ''}`
-                        : 'empty'
-                    }
+                    aria-label={getTileAriaLabel(tile.letter, tile.result)}
                   >
                     {tile.letter}
                   </div>
@@ -453,7 +488,7 @@ export default function WordleModal({
             <div key={ri} className="flex gap-1.5">
               {row.map((key) => {
                 const isWide = key === 'Enter' || key === 'Backspace';
-                const label = key === 'Backspace' ? '⌫' : key === 'Enter' ? '↵' : key;
+                const label = getKeyLabel(key);
                 const state = keyStates.get(key) ?? 'unused';
 
                 return (
@@ -469,7 +504,7 @@ export default function WordleModal({
                       minWidth: isWide ? '56px' : '34px',
                       padding: isWide ? '0 8px' : '0 4px',
                     }}
-                    aria-label={key === 'Backspace' ? 'Delete' : key === 'Enter' ? 'Submit' : key}
+                    aria-label={getKeyAriaLabel(key)}
                   >
                     {label}
                   </button>
@@ -497,15 +532,9 @@ export default function WordleModal({
                 }
               }}
               disabled={isGameOver || !canSubmit}
-              className={`flex-1 h-11 rounded-lg font-sans font-semibold text-sm transition-all focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-flare ${
-                isGameOver
-                  ? 'bg-ink/10 text-ink/40 cursor-not-allowed'
-                  : canSubmit
-                  ? 'bg-ink text-chalk hover:bg-flare active:scale-[0.98]'
-                  : 'bg-ink/10 text-ink/40 cursor-not-allowed'
-              }`}
+              className={`flex-1 h-11 rounded-lg font-sans font-semibold text-sm transition-all focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-flare ${getSubmitButtonClass(isGameOver, canSubmit)}`}
             >
-              {isGameOver ? (isCorrect ? 'Correct!' : 'Revealed') : `Guess ${attemptNumber + 1} of ${maxAttempts}`}
+              {getSubmitButtonLabel(isGameOver, isCorrect, attemptNumber, maxAttempts)}
             </button>
 
             {!isGameOver && (
@@ -540,7 +569,10 @@ export default function WordleModal({
           from { opacity: 0; transform: rotateX(90deg) scale(0.9); }
           to { opacity: 1; transform: rotateX(0) scale(1); }
         }
+        dialog::backdrop {
+          background: transparent;
+        }
       `}</style>
-    </div>
+    </dialog>
   );
 }

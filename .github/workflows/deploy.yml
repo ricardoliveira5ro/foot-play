@@ -81,7 +81,7 @@ jobs:
         run: npm run build
 
   backend-test:
-    name: Backend Tests & Coverage
+    name: Tests, Coverage & Sonar Scan
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
@@ -112,6 +112,10 @@ jobs:
         env:
           DATABASE_URL: "postgresql://dummy:dummy@localhost:5432/dummy"
           SHADOW_DATABASE_URL: "postgresql://dummy:dummy@localhost:5432/dummy_shadow"
+
+      - name: Run frontend tests with coverage
+        working-directory: frontend
+        run: npm run test:coverage
 
       - name: SonarQube Scan
         uses: SonarSource/sonarqube-scan-action@v8

@@ -10,6 +10,9 @@ import guessRouter from './routes/guess';
 
 export const app = express();
 
+// Do not disclose the Express version via the X-Powered-By header.
+app.disable('x-powered-by');
+
 // Middleware
 app.use(cors({ origin: process.env.CORS_ORIGIN ?? 'http://localhost:3000' }));
 app.use(express.json());
