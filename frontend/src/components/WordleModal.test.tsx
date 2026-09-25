@@ -76,6 +76,12 @@ describe('WordleModal', () => {
       expect(screen.getByRole('button', { name: 'Guess 1 of 6' })).toBeDisabled();
     });
 
+    it('declares explicit full-viewport dimensions on the dialog', () => {
+      renderModal();
+
+      expect(screen.getByRole('dialog')).toHaveClass('w-full', 'h-dvh');
+    });
+
     it('renders Player and Player position fallbacks when values are missing', () => {
       renderModal({ shirtNumber: null, position: null });
 

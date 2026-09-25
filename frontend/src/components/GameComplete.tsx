@@ -199,7 +199,7 @@ export default function GameComplete({ match, targetShirts, opponentShirts, targ
   return (
     <dialog
       ref={dialogRef}
-      className="fixed inset-0 z-50 m-0 flex max-h-none max-w-none items-center justify-center bg-transparent overflow-y-auto p-4"
+      className="fixed inset-0 z-50 m-0 flex h-dvh w-full max-h-none max-w-none items-center justify-center bg-transparent overflow-y-auto p-4"
       aria-labelledby="game-complete-title"
       onCancel={(e) => e.preventDefault()}
     >
