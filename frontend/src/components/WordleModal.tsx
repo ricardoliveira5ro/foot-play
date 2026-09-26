@@ -369,7 +369,7 @@ export default function WordleModal({
   return (
     <dialog
       ref={dialogRef}
-      className="fixed inset-0 z-50 m-0 flex max-h-none max-w-none items-center justify-center bg-transparent p-4"
+      className="fixed inset-0 z-50 m-0 flex h-dvh w-full max-h-none max-w-none items-center justify-center bg-transparent p-4"
       onCancel={onClose}
       aria-labelledby="wordle-modal-title"
       aria-describedby="wordle-modal-desc"

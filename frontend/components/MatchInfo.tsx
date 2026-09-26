@@ -11,42 +11,35 @@ function formatMatchDate(date: string | null): string | null {
   return parsed.toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' });
 }
 
-/**
- * Match summary: teams + score first, then date and competition.
- * Mobile: centered column with the score alone and prominent.
- * Desktop: one baseline row (name · score · name) with labels beneath.
- */
+/** Compact matchday scoreboard with the result aligned between both teams. */
 export default function MatchInfo({ match }: { match: Game }) {
   const home = match.homeClub?.name ?? 'Home';
   const away = match.awayClub?.name ?? 'Away';
   const dateLabel = formatMatchDate(match.date) ?? match.season;
 
   return (
-    <div>
-      <div className="flex flex-col items-center gap-1 text-center md:flex-row md:flex-wrap md:items-baseline md:gap-x-3 md:gap-y-1 md:text-left">
-        {/* Score — never smaller than 40px */}
-        <p className="order-4 font-display text-[40px] leading-none text-ink md:order-2 md:text-[44px]">
-          {match.homeScore} – {match.awayScore}
-        </p>
-        <p className="order-1 text-base font-semibold leading-snug text-ink md:order-1 md:text-xl">
-          {home}
-        </p>
-        <p aria-hidden="true" className="order-2 text-base font-medium text-ink/55 md:hidden">
-          v
-        </p>
-        <p className="order-3 text-base font-semibold leading-snug text-ink md:order-3 md:text-xl">
-          {away}
-        </p>
+    <div className="w-full">
+      <div
+        role="group"
+        className="grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-3 text-center"
+        aria-label={`${home} ${match.homeScore}, ${away} ${match.awayScore}`}
+      >
+        <div className="min-w-0">
+          <p className="font-display text-[48px] leading-[0.9] text-ink">{match.homeScore}</p>
+          <p className="mt-2 text-lg font-semibold leading-tight text-ink">{home}</p>
+        </div>
+        <span aria-hidden="true" className="-mt-5 font-display text-3xl leading-none text-flare">–</span>
+        <div className="min-w-0">
+          <p className="font-display text-[48px] leading-[0.9] text-ink">{match.awayScore}</p>
+          <p className="mt-2 text-lg font-semibold leading-tight text-ink">{away}</p>
+        </div>
       </div>
 
       {(dateLabel || match.competition) && (
-        <div className="mt-2 flex flex-col items-center gap-0.5 md:items-start">
-          {dateLabel && (
-            <p className="text-xs uppercase tracking-[0.08em] text-ink/55">{dateLabel}</p>
-          )}
-          {match.competition && (
-            <p className="text-xs uppercase tracking-[0.08em] text-ink/55">{match.competition}</p>
-          )}
+        <div className="mt-3 flex flex-wrap items-center justify-center gap-x-2 text-[12px] uppercase tracking-[0.12em] text-ink/50">
+          {dateLabel && <p>{dateLabel}</p>}
+          {dateLabel && match.competition && <span aria-hidden="true">·</span>}
+          {match.competition && <p>{match.competition}</p>}
         </div>
       )}
     </div>

@@ -4,7 +4,8 @@ import { describe, it, expect, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import GameComplete from './GameComplete';
-import type { Game, ShirtData, RevealPlayer } from '@/types';
+import type { Game, ShirtData } from '@/types';
+import type { ShirtGameData } from '@/lib/gameState';
 
 // --- Fixtures ---
 
@@ -24,7 +25,7 @@ function makeMatch(overrides: Partial<Game> = {}): Game {
   };
 }
 
-function makeShirt(overrides: Partial<ShirtData> = {}): ShirtData {
+function makeShirt(overrides: Partial<ShirtGameData> = {}): ShirtGameData {
   return {
     token: 'shirt-1',
     nameLength: 5,
@@ -33,17 +34,19 @@ function makeShirt(overrides: Partial<ShirtData> = {}): ShirtData {
     position: 'ST',
     coords: { x: 50, y: 50 },
     state: 'default',
+    attempts: 0,
+    guessHistory: [],
+    correctLetters: [],
     ...overrides,
   };
 }
 
 interface RenderOptions {
   match?: Game;
-  targetShirts?: ShirtData[];
-  opponentShirts?: ShirtData[];
+  targetShirts?: ShirtGameData[];
+  opponentShirts?: ShirtGameData[];
   targetTeamName?: string;
   opponentTeamName?: string;
-  revealedPlayers?: RevealPlayer[];
   onPlayAgain?: () => void;
 }
 
@@ -56,7 +59,6 @@ function renderGameComplete(options: RenderOptions = {}) {
       opponentShirts={options.opponentShirts ?? []}
       targetTeamName={options.targetTeamName ?? 'Target FC'}
       opponentTeamName={options.opponentTeamName ?? 'Opponent FC'}
-      revealedPlayers={options.revealedPlayers ?? []}
       onPlayAgain={onPlayAgain}
     />
   );
@@ -86,7 +88,6 @@ describe('GameComplete', () => {
       opponentShirts: [makeShirt({ token: 'o1', state: 'correct' })],
     });
     expect(screen.getByRole('heading', { name: 'Perfect Score!' })).toBeInTheDocument();
-    expect(screen.getByText('You identified all 2 players across both teams.')).toBeInTheDocument();
   });
 
   it('renders "Game Over" with the correct/failed counts', () => {
@@ -98,7 +99,7 @@ describe('GameComplete', () => {
       ],
     });
     expect(screen.getByRole('heading', { name: 'Game Over' })).toBeInTheDocument();
-    expect(screen.getByText('You identified 1 of 3 players across both teams.')).toBeInTheDocument();
+    expect(screen.getByLabelText('Correct')).toBeInTheDocument();
   });
 
   it('renders the score, team names, competition, and formatted date', () => {
@@ -180,16 +181,12 @@ describe('GameComplete', () => {
     expect(screen.getByLabelText('Shirt ?')).toBeInTheDocument();
   });
 
-  it('shows revealed names for correct/failed shirts and — for unresolved ones', () => {
+  it('shows names for resolved shirts and — for unresolved ones', () => {
     renderGameComplete({
       targetShirts: [
-        makeShirt({ token: 't1', state: 'correct', shirtNumber: 10 }),
-        makeShirt({ token: 't2', state: 'failed', shirtNumber: 11 }),
+        makeShirt({ token: 't1', state: 'correct', shirtNumber: 10, name: 'Lionel Messi' }),
+        makeShirt({ token: 't2', state: 'failed', shirtNumber: 11, name: 'Cristiano Ronaldo' }),
         makeShirt({ token: 't3', state: 'default', shirtNumber: 12 }),
-      ],
-      revealedPlayers: [
-        { playerId: 1, name: 'Lionel Messi', shirtNumber: 10 },
-        { playerId: 2, name: 'Cristiano Ronaldo', shirtNumber: 11 },
       ],
     });
     expect(screen.getByText('Lionel Messi')).toBeInTheDocument();
@@ -197,7 +194,7 @@ describe('GameComplete', () => {
     expect(screen.getAllByText('—')).toHaveLength(1);
   });
 
-  it('shows — when a correct/failed shirt has no revealed name', () => {
+  it('shows — when a resolved shirt has no name', () => {
     renderGameComplete({
       targetShirts: [
         makeShirt({ token: 't1', state: 'correct', shirtNumber: 10 }),

@@ -7,7 +7,10 @@ import MatchInfo from '@/components/MatchInfo';
 import TacticBoard from '@/components/TacticBoard';
 import WordleModal from '@/components/WordleModal';
 import GameComplete from '@/components/GameComplete';
+import ScoreCounter from '@/components/ScoreCounter';
+import { computeTotalScore } from '@/lib/scoring';
 import type { ShirtData, RevealPlayer } from '@/types';
+import type { ShirtGameData } from '@/lib/gameState';
 
 function describeError(cause: unknown): string {
   return cause instanceof Error ? cause.message : 'Something went wrong.';
@@ -28,9 +31,21 @@ export default function MissingElevenPage() {
     toggleBoard,
   } = useGameState();
 
-  const [revealedPlayers, setRevealedPlayers] = useState<RevealPlayer[]>([]);
   const [confirmingSurrender, setConfirmingSurrender] = useState(false);
   const confirmTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const shirtsRef = useRef({ target: state.targetShirts, opponent: state.opponentShirts });
+
+  // Keep the ref in sync with the latest shirts without triggering re-renders.
+  useEffect(() => {
+    shirtsRef.current = { target: state.targetShirts, opponent: state.opponentShirts };
+  });
+
+  const revealTeam = useCallback((players: RevealPlayer[], shirts: ShirtGameData[]) => {
+    for (const player of players) {
+      const shirt = shirts.find(s => s.shirtNumber === player.shirtNumber && s.state !== 'correct');
+      if (shirt) revealName(shirt.token, player.name);
+    }
+  }, [revealName]);
 
   const handleSurrender = useCallback(async () => {
     if (confirmingSurrender) {
@@ -49,17 +64,11 @@ export default function MissingElevenPage() {
           fetchReveal(state.match.game.gameId, pickedSide),
           fetchReveal(state.match.game.gameId, oppositeSide),
         ]);
-        setRevealedPlayers([...picked.players, ...opposite.players]);
 
-        // Reveal names on all unresolved shirts
-        const allRevealed = [...picked.players, ...opposite.players];
-        const allShirts = [...state.targetShirts, ...state.opponentShirts];
-        for (const player of allRevealed) {
-          const shirt = allShirts.find(s => s.shirtNumber === player.shirtNumber && s.state !== 'correct');
-          if (shirt) {
-            revealName(shirt.token, player.name);
-          }
-        }
+        // Reveal names on unresolved shirts, matched per team to avoid
+        // shirt-number collisions between the two lineups.
+        revealTeam(picked.players, state.targetShirts);
+        revealTeam(opposite.players, state.opponentShirts);
 
         // Mark game as complete
         surrender();
@@ -73,7 +82,7 @@ export default function MissingElevenPage() {
         setConfirmingSurrender(false);
       }, 4000);
     }
-  }, [confirmingSurrender, state.match, state.teamSide, state.targetShirts, state.opponentShirts, revealName, surrender, setError]);
+  }, [confirmingSurrender, state.match, state.teamSide, state.targetShirts, state.opponentShirts, revealTeam, surrender, setError]);
 
   // Initialize game on mount (no localStorage restore — fixes hydration mismatch)
   useEffect(() => {
@@ -104,13 +113,17 @@ export default function MissingElevenPage() {
         fetchReveal(state.match.game.gameId, oppositeSide),
       ])
         .then(([picked, opposite]) => {
-          setRevealedPlayers([...picked.players, ...opposite.players]);
+          // Populate names on unresolved shirts so the board and GameComplete
+          // read shirt.name directly. Read from shirtsRef to avoid re-running
+          // this effect when revealName updates the shirts.
+          revealTeam(picked.players, shirtsRef.current.target);
+          revealTeam(opposite.players, shirtsRef.current.opponent);
         })
         .catch((cause: unknown) => {
           setError(describeError(cause));
         });
     }
-  }, [state.gameStatus, state.match, state.teamSide, setError]);
+  }, [state.gameStatus, state.match, state.teamSide, setError, revealTeam]);
 
   // Cleanup confirm timer on unmount
   useEffect(() => {
@@ -164,7 +177,6 @@ export default function MissingElevenPage() {
   }, [activeShirt, state.match, submitGuess, revealName, setError]);
 
   const handlePlayAgain = useCallback(() => {
-    setRevealedPlayers([]);
     newGame();
     // Fetch new match
     setLoading(true);
@@ -250,21 +262,58 @@ export default function MissingElevenPage() {
   const targetSolved = state.targetShirts.filter(s => s.state === 'correct').length;
   const opponentSolved = state.opponentShirts.filter(s => s.state === 'correct').length;
 
+  // Live score — recomputed after each guess from the current state
+  const scoreBreakdown =
+    (state.gameStatus === 'playing' || state.gameStatus === 'complete') && state.match
+      ? computeTotalScore(state.targetShirts, state.opponentShirts, targetTeamName, opponentTeamName)
+      : null;
+  const liveScore = scoreBreakdown?.grandTotal ?? 0;
+
   return (
-    <div className="mx-auto w-full max-w-6xl px-4 py-10 md:px-6 md:py-14">
-      <div className="grid gap-6 lg:grid-cols-[340px_minmax(0,620px)] lg:items-start lg:gap-x-12 lg:gap-y-8">
-        <header className="lg:col-start-1 lg:row-start-1">
-          <h1 className="font-display text-[clamp(40px,6vw,64px)] uppercase leading-[0.95] text-ink">
-            Missing Eleven
-          </h1>
-        </header>
+    <div className="mx-auto w-full max-w-6xl px-4 py-6 md:px-6 md:py-8">
+      <div className="grid gap-6 lg:grid-cols-[340px_minmax(0,620px)] lg:items-start lg:gap-x-10">
+        <aside className="flex flex-col gap-8 text-center lg:sticky lg:top-6 lg:items-start lg:text-left">
+          <header className="w-full pb-4">
+            <h1 className="w-full text-center font-display text-[clamp(40px,4.6vw,50px)] uppercase leading-[0.92] tracking-[-0.02em] text-ink">
+              Missing Eleven
+            </h1>
+          </header>
 
-        <div className="lg:col-start-1 lg:row-start-2">
           <MatchInfo match={state.match.game} />
-        </div>
 
-        {/* Tactic Board section */}
-        <section className="lg:col-start-2 lg:row-start-1 lg:row-span-3" aria-label="Tactic board">
+          {state.gameStatus === 'playing' && (
+            <ScoreCounter score={liveScore} />
+          )}
+
+          <div className="flex w-full flex-col gap-3">
+            <div className="flex items-center justify-between gap-2">
+              <p className="text-xs text-ink/65">Tap a shirt. Six tries per player.</p>
+              {state.gameStatus === 'playing' && (
+                <button
+                  type="button"
+                  onClick={handleSurrender}
+                  className={`shrink-0 rounded-md px-2 py-2.5 text-xs underline font-medium transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-flare ${
+                    confirmingSurrender
+                      ? 'text-failed hover:bg-failed/10'
+                      : 'text-ink/45 hover:text-ink'
+                  }`}
+                >
+                  {confirmingSurrender ? 'Are you sure?' : 'Give up?'}
+                </button>
+              )}
+            </div>
+            <button
+              type="button"
+              onClick={handlePlayAgain}
+              className="w-full rounded-lg bg-ink px-5 py-3 font-semibold text-chalk transition-colors hover:bg-flare focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-flare"
+            >
+              New puzzle
+            </button>
+          </div>
+        </aside>
+
+        {/* Tactic board */}
+        <section className="min-w-0" aria-label="Tactic board">
           <TacticBoard
             teamName={teamName}
             formation={formation}
@@ -279,30 +328,6 @@ export default function MissingElevenPage() {
             onToggleBoard={toggleBoard}
           />
         </section>
-
-        <aside className="flex flex-col items-center gap-4 text-center lg:col-start-1 lg:row-start-3 lg:items-start lg:text-left">
-          <p className="text-sm text-ink/70">Tap a shirt. Six tries per player.</p>
-          <button
-            type="button"
-            onClick={handlePlayAgain}
-            className="rounded-lg bg-ink px-6 py-3 font-semibold text-chalk transition-colors hover:bg-flare focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-flare"
-          >
-            New Puzzle
-          </button>
-          {state.gameStatus === 'playing' && (
-            <button
-              type="button"
-              onClick={handleSurrender}
-              className={`rounded-lg border px-6 py-3 font-semibold text-sm transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-flare ${
-                confirmingSurrender
-                  ? 'border-failed/40 text-failed hover:bg-failed/10'
-                  : 'border-ink/20 text-ink/50 hover:border-ink/40 hover:text-ink/70'
-              }`}
-            >
-              {confirmingSurrender ? 'Are you sure?' : 'Give up?'}
-            </button>
-          )}
-        </aside>
       </div>
 
       {/* Wordle Modal */}
@@ -329,7 +354,6 @@ export default function MissingElevenPage() {
           opponentShirts={state.opponentShirts}
           targetTeamName={targetTeamName}
           opponentTeamName={opponentTeamName}
-          revealedPlayers={revealedPlayers}
           onPlayAgain={handlePlayAgain}
         />
       )}
