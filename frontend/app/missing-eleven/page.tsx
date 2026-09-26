@@ -270,26 +270,50 @@ export default function MissingElevenPage() {
   const liveScore = scoreBreakdown?.grandTotal ?? 0;
 
   return (
-    <div className="mx-auto w-full max-w-6xl px-4 py-10 md:px-6 md:py-14">
-      <div className="grid gap-6 lg:grid-cols-[340px_minmax(0,620px)] lg:items-start lg:gap-x-12 lg:gap-y-8">
-        <header className="lg:col-start-1 lg:row-start-1">
-          <h1 className="font-display text-[clamp(40px,6vw,64px)] uppercase leading-[0.95] text-ink">
-            Missing Eleven
-          </h1>
-        </header>
+    <div className="mx-auto w-full max-w-6xl px-4 py-6 md:px-6 md:py-8">
+      <div className="grid gap-6 lg:grid-cols-[340px_minmax(0,620px)] lg:items-start lg:gap-x-10">
+        <aside className="flex flex-col gap-8 text-center lg:sticky lg:top-6 lg:items-start lg:text-left">
+          <header className="w-full pb-4">
+            <h1 className="w-full text-center font-display text-[clamp(40px,4.6vw,50px)] uppercase leading-[0.92] tracking-[-0.02em] text-ink">
+              Missing Eleven
+            </h1>
+          </header>
 
-        <div className="lg:col-start-1 lg:row-start-2">
           <MatchInfo match={state.match.game} />
-        </div>
 
-        {state.gameStatus === 'playing' && (
-          <div className="lg:col-start-1 lg:row-start-3">
+          {state.gameStatus === 'playing' && (
             <ScoreCounter score={liveScore} />
-          </div>
-        )}
+          )}
 
-        {/* Tactic Board section */}
-        <section className="lg:col-start-2 lg:row-start-1 lg:row-span-4" aria-label="Tactic board">
+          <div className="flex w-full flex-col gap-3">
+            <div className="flex items-center justify-between gap-2">
+              <p className="text-xs text-ink/65">Tap a shirt. Six tries per player.</p>
+              {state.gameStatus === 'playing' && (
+                <button
+                  type="button"
+                  onClick={handleSurrender}
+                  className={`shrink-0 rounded-md px-2 py-2.5 text-xs underline font-medium transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-flare ${
+                    confirmingSurrender
+                      ? 'text-failed hover:bg-failed/10'
+                      : 'text-ink/45 hover:text-ink'
+                  }`}
+                >
+                  {confirmingSurrender ? 'Are you sure?' : 'Give up?'}
+                </button>
+              )}
+            </div>
+            <button
+              type="button"
+              onClick={handlePlayAgain}
+              className="w-full rounded-lg bg-ink px-5 py-3 font-semibold text-chalk transition-colors hover:bg-flare focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-flare"
+            >
+              New puzzle
+            </button>
+          </div>
+        </aside>
+
+        {/* Tactic board */}
+        <section className="min-w-0" aria-label="Tactic board">
           <TacticBoard
             teamName={teamName}
             formation={formation}
@@ -304,30 +328,6 @@ export default function MissingElevenPage() {
             onToggleBoard={toggleBoard}
           />
         </section>
-
-        <aside className="flex flex-col items-center gap-4 text-center lg:col-start-1 lg:row-start-4 lg:items-start lg:text-left">
-          <p className="text-sm text-ink/70">Tap a shirt. Six tries per player.</p>
-          <button
-            type="button"
-            onClick={handlePlayAgain}
-            className="rounded-lg bg-ink px-6 py-3 font-semibold text-chalk transition-colors hover:bg-flare focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-flare"
-          >
-            New Puzzle
-          </button>
-          {state.gameStatus === 'playing' && (
-            <button
-              type="button"
-              onClick={handleSurrender}
-              className={`rounded-lg border px-6 py-3 font-semibold text-sm transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-flare ${
-                confirmingSurrender
-                  ? 'border-failed/40 text-failed hover:bg-failed/10'
-                  : 'border-ink/20 text-ink/50 hover:border-ink/40 hover:text-ink/70'
-              }`}
-            >
-              {confirmingSurrender ? 'Are you sure?' : 'Give up?'}
-            </button>
-          )}
-        </aside>
       </div>
 
       {/* Wordle Modal */}

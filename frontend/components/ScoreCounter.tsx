@@ -10,8 +10,8 @@ interface ScoreCounterProps {
 const numberFormatter = new Intl.NumberFormat('en-US');
 
 /**
- * Live score readout shown in the page header during gameplay.
- * A bordered pill with a mono "SCORE" label and an Anton display value.
+ * Live score readout shown beside the match summary during gameplay.
+ * A quiet full-width line with a mono "SCORE" label and an Anton display value.
  * The value pulses (scale 1 → 1.15 → 1 over 300ms) whenever the score changes.
  */
 export default function ScoreCounter({ score }: ScoreCounterProps) {
@@ -35,12 +35,12 @@ export default function ScoreCounter({ score }: ScoreCounterProps) {
   }, []);
 
   return (
-    <div className="inline-flex items-center gap-3 border border-ink/10 rounded-lg px-4 py-2.5">
+    <div className="flex w-full items-center justify-between border-y border-ink/10 py-2">
       <span className="font-mono text-xs uppercase tracking-[0.08em] text-ink/55">Score</span>
       <span
         aria-live="polite"
         key={score}
-        className={`font-display text-[28px] leading-none text-ink ${pulsing ? 'animate-score-pulse' : ''}`}
+        className={`font-display text-[30px] leading-none text-ink ${pulsing ? 'animate-score-pulse' : ''}`}
       >
         {numberFormatter.format(score)}
       </span>
