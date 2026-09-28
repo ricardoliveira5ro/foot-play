@@ -1,6 +1,6 @@
 {
   "name": "footplay",
-  "version": "0.2.3",
+  "version": "0.2.5",
   "private": true,
   "description": "FootPlay — Football data platform",
   "workspaces": [

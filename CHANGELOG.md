@@ -8,6 +8,25 @@ from, and release notes are taken from the entry itself.
 
 ---
 
+## v0.2.5 — Deploy Fix: npm Upgrade & Git Force Sync
+
+_2026-09-28_
+
+### Fixed
+
+- **npm 10.8.2 bug** in Node 20-alpine Docker images — `npm install` failed with
+  `Cannot read properties of null (reading 'edgesOut')`. Upgraded npm to latest
+  in both frontend and backend Dockerfiles (`RUN npm install -g npm@latest`).
+- **Git divergent branches** on Oracle Cloud deploy — `git pull` failed silently
+  with "Need to specify how to reconcile divergent branches", leaving repo at
+  old commit. Changed deploy script to `git fetch origin && git reset --hard origin/main`
+  for force-sync behavior.
+- **Deploy script fail-fast** — added `set -e` to SSH scripts so failures
+  (git, docker build, health check) actually fail the CI job instead of
+  reporting success.
+
+---
+
 ## v0.2.4 — CI/CD Deployment Pipeline & Automated Releases
 
 _2026-09-28_
