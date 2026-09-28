@@ -203,7 +203,11 @@ async function runRelease(): Promise<void> {
         `Recover with: git push origin refs/tags/${version}`,
     );
   }
-  console.log('[release] Pushed tag. The release workflow will publish the GitHub Release.');
+  console.log(
+    '[release] Pushed tag. Releases are published automatically when a PR merges into main.\n' +
+      '  A manually pushed tag does not auto-publish; create the release with:\n' +
+      `  gh release create ${version} --target <sha> --title "${title}" --notes-file <notes.md>`,
+  );
 }
 
 async function main(): Promise<void> {
@@ -215,6 +219,17 @@ async function main(): Promise<void> {
   const titleVersion = flagValue('--title');
   if (titleVersion) {
     process.stdout.write(`${releaseTitle(findSection(titleVersion))}\n`);
+    return;
+  }
+  const nextVersion = process.argv.includes('--next');
+  if (nextVersion) {
+    const sections = parseChangelog();
+    for (const section of sections) {
+      if (!findExistingTag(section.version)) {
+        process.stdout.write(`${section.version}\n`);
+        return;
+      }
+    }
     return;
   }
   await runRelease();

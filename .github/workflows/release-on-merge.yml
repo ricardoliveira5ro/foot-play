@@ -1,0 +1,66 @@
+name: Release on Merge
+
+on:
+  pull_request:
+    types: [closed]
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    name: Publish GitHub Release
+    runs-on: ubuntu-latest
+    if: github.event.pull_request.merged == true && github.event.pull_request.base.ref == 'main'
+    steps:
+      - name: Checkout merge commit
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.merge_commit_sha }}
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: package-lock.json
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Resolve candidate version from CHANGELOG
+        id: version
+        run: |
+          VERSION="$(npm run release -- --next)"
+          if [ -z "$VERSION" ]; then
+            echo "version=" >> "$GITHUB_OUTPUT"
+            echo "No pending release: the top CHANGELOG entry is already tagged."
+          else
+            echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+            echo "Will release $VERSION"
+          fi
+
+      - name: Read release title and notes
+        if: steps.version.outputs.version != ''
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          npm run release -- --title "$VERSION" > release-title.txt
+          npm run release -- --notes "$VERSION" > release-notes.md
+
+      - name: Create GitHub Release
+        if: steps.version.outputs.version != ''
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          VERSION: ${{ steps.version.outputs.version }}
+          SHA: ${{ github.event.pull_request.merge_commit_sha }}
+        run: |
+          gh release create "$VERSION" \
+            --target "$SHA" \
+            --title "$(cat release-title.txt)" \
+            --notes-file release-notes.md
