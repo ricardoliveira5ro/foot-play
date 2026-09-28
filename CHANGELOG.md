@@ -8,6 +8,30 @@ from, and release notes are taken from the entry itself.
 
 ---
 
+## v0.2.4 — CI/CD Deployment Pipeline & Automated Releases
+
+_2026-09-28_
+
+### Added
+
+- Manual deployment control panel — pushes and PRs no longer run builds, deploys,
+  or DB seeding; a push is just a push
+- `Run workflow` dialog with per-job checkboxes: frontend/backend lint, backend
+  build, tests + coverage + Sonar scan, deploy, and optional DB seed
+- Deploy and seed are `main`-only: ticking them on another branch fails the run
+  with a clear message instead of silently skipping
+- Automated releases on merge — when a pull request merges into `main`, the top
+  unreleased CHANGELOG entry is tagged and published as a GitHub Release at the
+  merged commit
+
+### Fixed
+
+- Manual workflow runs reported every job as skipped: boolean dispatch inputs
+  were compared with `== 'true'`, which GitHub's expression engine coerces to a
+  number comparison (`true → 1`, `'true' → NaN`), so every gate evaluated false
+
+---
+
 ## v0.2.3 — Precision XI Scoring System
 
 _Spec: `docs/v0.2/dev-3-scoring-system.md` · 2026-09-11_
