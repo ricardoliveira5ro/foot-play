@@ -42,7 +42,7 @@ jobs:
   frontend-lint:
     name: Frontend Lint
     runs-on: ubuntu-latest
-    if: ${{ inputs.run_frontend_lint == 'true' }}
+    if: ${{ inputs.run_frontend_lint }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -64,7 +64,7 @@ jobs:
   backend-lint:
     name: Backend Lint
     runs-on: ubuntu-latest
-    if: ${{ inputs.run_backend_lint == 'true' }}
+    if: ${{ inputs.run_backend_lint }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -85,7 +85,7 @@ jobs:
   backend-build:
     name: Backend Build (Type Check)
     runs-on: ubuntu-latest
-    if: ${{ inputs.run_backend_build == 'true' }}
+    if: ${{ inputs.run_backend_build }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -114,7 +114,7 @@ jobs:
   backend-test:
     name: Tests, Coverage & Sonar Scan
     runs-on: ubuntu-latest
-    if: ${{ inputs.run_tests_sonar == 'true' }}
+    if: ${{ inputs.run_tests_sonar }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -167,7 +167,7 @@ jobs:
   validate-deploy-ref:
     name: Validate Deploy Branch
     runs-on: ubuntu-latest
-    if: ${{ inputs.run_deploy == 'true' && github.ref != 'refs/heads/main' }}
+    if: ${{ inputs.run_deploy && github.ref != 'refs/heads/main' }}
     steps:
       - name: Fail with clear message
         run: |
@@ -181,7 +181,7 @@ jobs:
     if: >
       always() &&
       github.ref == 'refs/heads/main' &&
-      inputs.run_deploy == 'true' &&
+      inputs.run_deploy &&
       needs.frontend-lint.result != 'failure' &&
       needs.backend-lint.result != 'failure' &&
       needs.backend-build.result != 'failure' &&
@@ -206,7 +206,7 @@ jobs:
             curl -f http://localhost/api/health || exit 1
 
       - name: Seed database
-        if: ${{ inputs.run_seed == 'true' }}
+        if: ${{ inputs.run_seed }}
         uses: appleboy/ssh-action@v1
         with:
           host: ${{ secrets.DEPLOY_HOST }}
