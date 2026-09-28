@@ -5,6 +5,38 @@ on:
     branches: [main]
   pull_request:
     branches: [main]
+  workflow_dispatch:
+    inputs:
+      run_frontend_lint:
+        description: 'Run frontend lint'
+        required: false
+        default: true
+        type: boolean
+      run_backend_lint:
+        description: 'Run backend lint'
+        required: false
+        default: true
+        type: boolean
+      run_backend_build:
+        description: 'Backend build (type check)'
+        required: false
+        default: true
+        type: boolean
+      run_tests_sonar:
+        description: 'Run tests with coverage and the Sonar scan'
+        required: false
+        default: true
+        type: boolean
+      run_deploy:
+        description: 'Deploy to Oracle Cloud'
+        required: false
+        default: true
+        type: boolean
+      run_seed:
+        description: 'Seed the database after deploying'
+        required: false
+        default: false
+        type: boolean
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -14,6 +46,7 @@ jobs:
   frontend-lint:
     name: Frontend Lint
     runs-on: ubuntu-latest
+    if: ${{ github.event_name != 'workflow_dispatch' || inputs.run_frontend_lint == 'true' }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -35,6 +68,7 @@ jobs:
   backend-lint:
     name: Backend Lint
     runs-on: ubuntu-latest
+    if: ${{ github.event_name != 'workflow_dispatch' || inputs.run_backend_lint == 'true' }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -55,6 +89,7 @@ jobs:
   backend-build:
     name: Backend Build (Type Check)
     runs-on: ubuntu-latest
+    if: ${{ github.event_name != 'workflow_dispatch' || inputs.run_backend_build == 'true' }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -83,6 +118,7 @@ jobs:
   backend-test:
     name: Tests, Coverage & Sonar Scan
     runs-on: ubuntu-latest
+    if: ${{ github.event_name != 'workflow_dispatch' || inputs.run_tests_sonar == 'true' }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -136,7 +172,15 @@ jobs:
     name: Deploy to Oracle Cloud
     runs-on: ubuntu-latest
     needs: [frontend-lint, backend-lint, backend-build, backend-test]
-    if: github.ref == 'refs/heads/main'
+    if: >
+      always() &&
+      github.event_name == 'workflow_dispatch' &&
+      github.ref == 'refs/heads/main' &&
+      inputs.run_deploy == 'true' &&
+      needs.frontend-lint.result != 'failure' &&
+      needs.backend-lint.result != 'failure' &&
+      needs.backend-build.result != 'failure' &&
+      needs.backend-test.result != 'failure'
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -153,8 +197,18 @@ jobs:
             git pull origin main
             sudo docker compose -f docker-compose.prod.yml --env-file .env.production up -d --build
             sudo docker compose -f docker-compose.prod.yml --env-file .env.production exec -T backend npx prisma migrate deploy
-            # Seed database
-            sudo docker run --rm -v ~/foot-play/scripts:/app -v ~/foot-play/tsconfig.base.json:/tsconfig.base.json:ro -w /app node:20-alpine sh -c "npm install && npx ts-node --transpile-only src/download-data.ts"
-            sudo docker compose -f docker-compose.prod.yml --env-file .env.production exec -T backend npx ts-node --transpile-only --project prisma/tsconfig.json prisma/seed.ts
             sleep 10
             curl -f http://localhost/api/health || exit 1
+
+      - name: Seed database
+        if: ${{ inputs.run_seed == 'true' }}
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.DEPLOY_HOST }}
+          username: ${{ secrets.DEPLOY_USER }}
+          key: ${{ secrets.DEPLOY_KEY }}
+          timeout: "30m"
+          script: |
+            cd ~/foot-play
+            sudo docker run --rm -v ~/foot-play/scripts:/app -v ~/foot-play/tsconfig.base.json:/tsconfig.base.json:ro -w /app node:20-alpine sh -c "npm install && npx ts-node --transpile-only src/download-data.ts"
+            sudo docker compose -f docker-compose.prod.yml --env-file .env.production exec -T backend npx ts-node --transpile-only --project prisma/tsconfig.json prisma/seed.ts
