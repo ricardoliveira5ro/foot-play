@@ -1,0 +1,94 @@
+name: Bug report
+description: Something in FootPlay behaves differently from what it should
+title: "[bug] "
+labels:
+  - bug
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for the report. Please fill in what you can — a partial
+        report with steps to reproduce is far more useful than a complete
+        description of a symptom you cannot pin down.
+
+  - type: input
+    id: version
+    attributes:
+      label: FootPlay version
+      description: What is deployed, or the commit/branch you are running.
+      placeholder: v0.2.3, or `main` at <sha>
+    validations:
+      required: true
+
+  - type: dropdown
+    id: environment
+    attributes:
+      label: Where did you see this?
+      options:
+        - Production (deployed site)
+        - Local dev (npm run dev)
+        - Docker Compose (docker-compose.prod.yml)
+        - CI pipeline
+        - Not sure
+    validations:
+      required: true
+
+  - type: input
+    id: os-browser
+    attributes:
+      label: OS and browser
+      description: Browser matters for the Wordle grid and the native dialog.
+      placeholder: Ubuntu 24.04 / Firefox 141, or macOS 15 / Safari 18
+    validations:
+      required: false
+
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      description: What you saw, including anything that looked wrong or broke.
+      placeholder: The board switched to the away team but the score counter kept showing the home total.
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: What did you expect to happen?
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      description: |
+        1. Play a game at /missing-eleven
+        2. Click the shirt numbered 9
+        3. Type a guess
+        4. Observe ...
+      render: text
+    validations:
+      required: true
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs, screenshots, or relevant request/response
+      description: |
+        Browser console output, the backend's Morgan request log, or the
+        JSON body from the failing /api call. Redact anything sensitive —
+        player tokens should not be pasted publicly.
+      render: shell
+    validations:
+      required: false
+
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Checks
+      options:
+        - label: I searched the existing issues and this is not a duplicate
+          required: true
+        - label: I can reproduce this on a fresh game (Play Again)
+          required: false

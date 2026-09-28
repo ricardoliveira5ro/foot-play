@@ -1,6 +1,6 @@
 # Development 3: Core REST API
 
-**Status**: `ready for implementation`
+**Status**: `shipped in v0.1.3`
 **Source**: `docs/v0.1/plan-v1.0-decomposition.md` (Development 3)
 **Estimated Effort**: M (2-4 days)
 

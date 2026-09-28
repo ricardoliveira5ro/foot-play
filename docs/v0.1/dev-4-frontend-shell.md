@@ -1,6 +1,6 @@
 # Development 4: Frontend Shell & Layout
 
-**Status**: `ready for implementation`
+**Status**: `shipped in v0.1.4`
 **Source**: `docs/v0.1/plan-v1.0-decomposition.md` (Development 4)
 **Estimated Effort**: S (2-3 days)
 

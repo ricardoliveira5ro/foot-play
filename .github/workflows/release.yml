@@ -1,0 +1,332 @@
+name: Release
+
+# Cuts a GitHub Release from a git tag that a human already pushed. It never
+# creates a tag: `gh release create --verify-tag` makes the CLI refuse a tag that
+# is not already on the remote, so tagging stays a deliberate, separate step.
+#
+# The philosophy is cd.yml's: every check below is a gate that fails the job.
+# A release is the one artefact that cannot be quietly retracted, so a
+# mismatched tag, a missing changelog section or an unreachable commit must stop
+# the run rather than publish something plausible and wrong.
+on:
+  push:
+    tags: ['v*']
+  # Rehearsal path: run every guard and print the would-be body against a tag
+  # that already exists, without creating anything.
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Existing tag to cut a release from (e.g. v0.2.3)'
+        required: true
+        type: string
+      dry_run:
+        description: 'Run all guards and print the release body, but create nothing'
+        required: false
+        default: false
+        type: boolean
+
+# Two runs for one tag must queue, never race: the loser would find a
+# half-created release and fail confusingly.
+concurrency:
+  group: release-${{ github.event.inputs.tag || github.ref_name }}
+  cancel-in-progress: false
+
+# contents: write is the minimum needed to create a release. Deliberately not
+# `checks: read` — that omission is the reason this workflow cannot assert that
+# CI passed for the tagged commit; see the reachability guard for what it does
+# instead.
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: Cut release
+    runs-on: ubuntu-latest
+
+    steps:
+      # On a tag push the tag is the ref name. On a manual run it arrives as an
+      # input, because the dispatch ref is a branch. Resolved once, here, so
+      # every later step reads the same value from an output rather than
+      # re-deriving it from two different contexts.
+      - name: Resolve release tag
+        id: tag
+        env:
+          EVENT: ${{ github.event_name }}
+          DISPATCH_TAG: ${{ github.event.inputs.tag }}
+          PUSH_TAG: ${{ github.ref_name }}
+          DISPATCH_DRY_RUN: ${{ github.event.inputs.dry_run }}
+        run: |
+          set -euo pipefail
+          if [[ "${EVENT}" == "workflow_dispatch" ]]; then
+            tag="${DISPATCH_TAG}"
+            dry_run="${DISPATCH_DRY_RUN:-false}"
+          else
+            tag="${PUSH_TAG}"
+            # A tag push is always a real release; there is no dry-run tag.
+            dry_run="false"
+          fi
+
+          if [[ -z "${tag}" ]]; then
+            echo "::error::no tag to release. On a manual run, pass the tag input."
+            exit 1
+          fi
+
+          # Reject control characters before the tag reaches $GITHUB_OUTPUT.
+          # Git ref names cannot contain them, so this can only ever fire on a
+          # hand-typed dispatch input, but a newline there would split into a
+          # second fake output line. Guard 1 would still validate and release
+          # only the first line, so this is tidiness, not a safety hole.
+          if [[ "${tag}" == *[$'\n\r\t']* ]]; then
+            echo "::error::the tag contains a control character; refusing to release it"
+            exit 1
+          fi
+
+          # Normalise rather than trust the checkbox's spelling.
+          case "${dry_run}" in
+            true | True | TRUE) dry_run="true" ;;
+            *) dry_run="false" ;;
+          esac
+
+          echo "tag=${tag}" >> "${GITHUB_OUTPUT}"
+          echo "dry_run=${dry_run}" >> "${GITHUB_OUTPUT}"
+          echo "Tag: ${tag} (event: ${EVENT}, dry run: ${dry_run}, actor: ${GITHUB_ACTOR})"
+
+      # ------------------------------------------------------------------
+      # GUARD 1 of 4 — the tag is well-formed.
+      #
+      # Blocks: any tag that is not exactly v<MAJOR.MINOR.PATCH>, including
+      # v0.2.3.4, vabc, v01.2.3, v0.2.3-rc.1 and v0.2.3+build.
+      #
+      # Prereleases are rejected on purpose. This project has never cut one, and
+      # a prerelease GitHub Release is a different product decision: it needs
+      # `--prerelease` (which this workflow does not pass, because the task is a
+      # normal version) and it changes what "latest" means. Shipping v0.3.0-rc.1
+      # later is a conscious edit to this line, to RELEASABLE in
+      # scripts/release-notes.mjs and to the regex in cd.yml — not an accident.
+      #
+      # This regex is deliberately a second, independent implementation of the
+      # same rule rather than a call into release-notes.mjs: a single shared
+      # parser that is wrong would otherwise let a malformed tag through the
+      # guard that is supposed to catch it.
+      # ------------------------------------------------------------------
+      - name: 'Guard: tag is a well-formed v<semver>'
+        env:
+          TAG: ${{ steps.tag.outputs.tag }}
+        run: |
+          set -euo pipefail
+          if [[ ! "${TAG}" =~ ^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$ ]]; then
+            echo "::error::refusing to release: tag '${TAG}' is not v<MAJOR.MINOR.PATCH>"
+            exit 1
+          fi
+          echo "Tag '${TAG}' is well-formed; version ${TAG#v}"
+
+      # `ref:` resolves the tag on the manual path too, where the dispatch ref
+      # is a branch. A tag that does not exist fails this step. Full history
+      # because the reachability guard needs the commit graph.
+      - name: Checkout the tagged commit
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ steps.tag.outputs.tag }}
+          fetch-depth: 0
+          # The token is handed to `gh` per step via GH_TOKEN instead of being
+          # left in .git/config. Same choice as cd.yml.
+          persist-credentials: false
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+
+      # ------------------------------------------------------------------
+      # GUARD 2 of 4 — the tag matches the code at the tagged commit.
+      #
+      # Blocks: tagging a commit whose package.json version is not the tag
+      # (a forgotten `npm run version:set`), which would publish a release
+      # labelled v0.2.4 from code that says 0.2.3.
+      #
+      # `version:check` runs first and independently: it also catches a
+      # frontend/backend/scripts workspace that drifted from the root. No
+      # `npm install` is needed because set-version.mjs is dependency-free
+      # (node:fs only), the same trick ci.yml's version-check job uses.
+      # ------------------------------------------------------------------
+      - name: 'Guard: tag matches the version in the code'
+        env:
+          TAG: ${{ steps.tag.outputs.tag }}
+        run: |
+          set -euo pipefail
+          npm run version:check
+
+          code_version="$(node -p "require('./package.json').version")"
+          if [[ "${code_version}" != "${TAG#v}" ]]; then
+            echo "::error::refusing to release: tag ${TAG} does not match package.json version ${code_version} at the tagged commit"
+            exit 1
+          fi
+          echo "package.json version ${code_version} matches tag ${TAG}"
+
+      # ------------------------------------------------------------------
+      # GUARD 3 of 4 — the changelog has a section for this version, and the
+      # release body is built from it.
+      #
+      # Blocks: a tag with no changelog entry. release-notes.mjs exits non-zero
+      # and `set -e` turns that into a failed job; there is no "continue with an
+      # empty body" path, because a release with a truncated or missing body is
+      # the exact failure this workflow exists to prevent.
+      #
+      # The body goes to a file under RUNNER_TEMP rather than $GITHUB_ENV on
+      # purpose: a multi-line $GITHUB_ENV value needs a heredoc with a
+      # collision-proof delimiter, and a changelog section may legitimately
+      # contain a line that looks like one. `gh release create --notes-file`
+      # then reads it as data, so no shell quoting can mangle it.
+      #
+      # The `-s` check is a second, independent guard: the workflow does not
+      # take the script's word for it.
+      # ------------------------------------------------------------------
+      - name: 'Guard: changelog has a section, and build the release body'
+        id: notes
+        env:
+          TAG: ${{ steps.tag.outputs.tag }}
+        run: |
+          set -euo pipefail
+          body_file="${RUNNER_TEMP}/release-notes.md"
+
+          node scripts/release-notes.mjs "${TAG}" > "${body_file}"
+
+          if [[ ! -s "${body_file}" ]]; then
+            echo "::error::refusing to release: the ${TAG} release body extracted from CHANGELOG.md is empty"
+            exit 1
+          fi
+
+          # Reuse the changelog's own wording for the release title, so the
+          # title and the body cannot disagree. Falls back to the bare tag if a
+          # heading ever carries no title.
+          heading_title="$(node scripts/release-notes.mjs "${TAG}" --print-title)"
+          if [[ -z "${heading_title}" ]]; then
+            echo "::warning::the ${TAG} changelog heading has no title; using the tag alone"
+            title="${TAG}"
+          else
+            title="${TAG} — ${heading_title}"
+          fi
+
+          echo "Release title: ${title}"
+          echo "Release body: $(wc -l < "${body_file}") line(s), $(wc -c < "${body_file}") byte(s)"
+          echo "body_file=${body_file}" >> "${GITHUB_OUTPUT}"
+          echo "title=${title}" >> "${GITHUB_OUTPUT}"
+
+      # ------------------------------------------------------------------
+      # GUARD 4 of 4 — the tagged commit is on main.
+      #
+      # Blocks: releasing a commit that only ever existed on a side branch, so
+      # a release cannot ship code that was never merged or reviewed.
+      #
+      # What this deliberately does NOT do: assert that CI passed for the
+      # commit, the way cd.yml does. That check reads the check-runs API, which
+      # needs the `checks: read` scope, and this workflow is restricted to
+      # `contents: write`. The residual gap — a commit merged to main whose CI
+      # failed or was skipped — is a merge-process question, not a workflow one.
+      # Widening the permissions and copying cd.yml's second gate is the fix if
+      # you want it closed.
+      # ------------------------------------------------------------------
+      - name: 'Guard: the tagged commit is reachable from main'
+        env:
+          TAG: ${{ steps.tag.outputs.tag }}
+        run: |
+          set -euo pipefail
+          # Fetched explicitly instead of trusting actions/checkout to have
+          # created these refs, so the assertions below hold regardless of the
+          # checkout refspec. --no-tags keeps this to two refs.
+          git fetch --quiet --force origin "+refs/heads/main:refs/remotes/origin/main"
+          git fetch --quiet --force origin "+refs/tags/${TAG}:refs/tags/${TAG}"
+
+          head_sha="$(git rev-parse HEAD)"
+          tag_sha="$(git rev-parse "refs/tags/${TAG}^{commit}")"
+
+          # Assert, do not assume: the release must attach to the commit the
+          # tag names. `^{commit}` peels an annotated tag to its commit.
+          if [[ "${head_sha}" != "${tag_sha}" ]]; then
+            echo "::error::checkout is at ${head_sha} but ${TAG} points at ${tag_sha}"
+            exit 1
+          fi
+
+          if ! git merge-base --is-ancestor "${head_sha}" refs/remotes/origin/main; then
+            echo "::error::refusing to release: ${TAG} (${head_sha}) is not reachable from origin/main"
+            exit 1
+          fi
+          echo "${TAG} -> ${head_sha} is reachable from origin/main"
+
+      # Runs after all four guards, so a green dry run means the real run would
+      # have published exactly this.
+      - name: 'Dry run: report what would be published'
+        if: steps.tag.outputs.dry_run == 'true'
+        env:
+          TAG: ${{ steps.tag.outputs.tag }}
+          TITLE: ${{ steps.notes.outputs.title }}
+          BODY_FILE: ${{ steps.notes.outputs.body_file }}
+        run: |
+          set -euo pipefail
+          echo "Dry run: all four guards passed for ${TAG}. Nothing was published."
+          echo "--- release title ---"
+          echo "${TITLE}"
+          echo "--- release body ---"
+          cat "${BODY_FILE}"
+          echo "--- end ---"
+
+      # ------------------------------------------------------------------
+      # Create the release.
+      #
+      # Method: `gh release create`, not softprops/action-gh-release and not a
+      # raw `gh api` call. The GitHub CLI is preinstalled on ubuntu-latest, so
+      # it adds no dependency to install and no third-party action to pin,
+      # audit or trust. It has first-class flags for exactly what is needed
+      # (--verify-tag, --notes-file, --title), so there is no hand-built JSON
+      # body in which a quoting mistake could corrupt the notes.
+      #
+      # Flags deliberately absent:
+      #   --generate-notes  The changelog section IS the curated release note.
+      #                     Generated notes are derived from the commit log and
+      #                     would duplicate it; worse, they can contradict it,
+      #                     because the changelog records decisions ("cut the
+      #                     match-level bonuses") that read as changes in the log
+      #                     but shipped as non-changes. Not passing the flag is
+      #                     how you turn it off: gh only calls the Release Notes
+      #                     API when it is given. --notes-from-tag is unused for
+      #                     the same reason, since tags here carry no annotation.
+      #   --prerelease      This is a normal version, not a prerelease.
+      #   --draft           Publish now; a draft is not a release.
+      #   --latest          Left unset on purpose. gh's default is already
+      #                     "automatic based on date and version", which is the
+      #                     behaviour we want; forcing the flag would freeze that
+      #                     decision at the wrong moment.
+      #   --target          Also left unset. Its default is the main branch, and
+      #                     it would only ever be used to *create* a tag — which
+      #                     --verify-tag below makes impossible. With the tag
+      #                     already on the remote, gh attaches the release to
+      #                     that tag and --target is never consulted.
+      # ------------------------------------------------------------------
+      - name: Create the GitHub Release
+        if: steps.tag.outputs.dry_run != 'true'
+        env:
+          TAG: ${{ steps.tag.outputs.tag }}
+          TITLE: ${{ steps.notes.outputs.title }}
+          BODY_FILE: ${{ steps.notes.outputs.body_file }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # Set explicitly so gh never has to infer the repo from git config.
+          GH_REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          # A re-run after a partial failure must not silently overwrite or
+          # duplicate a published release.
+          if gh release view "${TAG}" > /dev/null 2>&1; then
+            echo "::error::a release already exists for ${TAG}; delete it deliberately if you mean to re-cut it"
+            exit 1
+          fi
+
+          # --verify-tag is the point: it makes gh fail rather than create the
+          # tag, so this workflow can only ever publish a release for a tag a
+          # human pushed. GH_REPO/GH_TOKEN are what authorise it; the release
+          # needs none of the repository secrets.
+          gh release create "${TAG}" \
+            --verify-tag \
+            --title "${TITLE}" \
+            --notes-file "${BODY_FILE}"
+
+          echo "Published ${TAG}"

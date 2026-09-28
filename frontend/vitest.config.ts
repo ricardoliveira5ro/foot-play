@@ -25,6 +25,35 @@ export default defineConfig({
       reporter: ['text', 'json-summary', 'lcov'],
       include: ['src/**/*.{ts,tsx}'],
       exclude: ['src/**/*.test.{ts,tsx}'],
+      // Global floors, enforced on `npm run test:coverage` (the step
+      // "Run frontend tests with coverage" in .github/workflows/ci.yml).
+      //
+      // SCOPE: these floors measure `frontend/src/` and nothing else. The
+      // `include` glob above deliberately excludes `app/`, `components/`,
+      // `lib/`, `types/` and `vitest.setup.ts`, so a change to any of those
+      // cannot move these numbers and cannot fail this gate. Widening the glob
+      // is not a neutral edit: the excluded directories are far less covered
+      // than src/, so adding them drops the percentages below the floors and
+      // fails CI immediately. Widen it only in the same change that brings
+      // tests for the newly included files.
+      //
+      // No glob keys, so these are whole-scope numbers (all of `src/`), not
+      // per-file.
+      //
+      // Baseline measured at 2026-09-27: statements 98.71, branches 95.42,
+      // functions 99.12, lines 99.23. These sit below it on purpose — a floor
+      // that is at or above today's number would fail CI on unrelated work.
+      // With 466 statements (460 covered) and 350 branches (334 covered) in the
+      // report, the 95/90 floors leave room for 17 further uncovered statements
+      // or 19 further uncovered branches before the gate trips, which is enough
+      // headroom for a new (not yet unit-tested) file while still catching real
+      // erosion. Ratchet up as tests are added.
+      thresholds: {
+        statements: 95,
+        branches: 90,
+        functions: 95,
+        lines: 95,
+      },
     },
   },
 });

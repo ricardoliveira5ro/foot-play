@@ -1,6 +1,6 @@
 # Development 2: Opponent Lineup Toggle
 
-**Status**: `planned`
+**Status**: `shipped in v0.2.2`
 **Source**: `docs/v0.2/plan-v0.2-overview.md` (Feature 2)
 **Estimated Effort**: M (3-4 days)
 

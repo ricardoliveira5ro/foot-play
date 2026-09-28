@@ -26,6 +26,13 @@ services:
       - PLAYER_TOKEN_SECRET=${PLAYER_TOKEN_SECRET}
       - CORS_ORIGIN=http://localhost
       - BACKEND_PORT=4000
+      # Deploy provenance, injected by cd.yml through the shell environment.
+      # backend/src/app.ts reports these on /api/health and frontend/components/
+      # Footer.tsx renders the version, and both treat the literal 'unknown' as a
+      # sentinel meaning "not injected" — so the default must stay that literal
+      # rather than becoming an empty string, which would read as a version.
+      - APP_VERSION=${APP_VERSION:-unknown}
+      - GIT_SHA=${GIT_SHA:-unknown}
     volumes:
       - ./scripts:/scripts:ro
     ports:
@@ -39,6 +46,12 @@ services:
     build:
       context: frontend
       dockerfile: Dockerfile
+      # NEXT_PUBLIC_* is inlined by `next build`, so it has to be a build arg,
+      # not a runtime environment entry: setting it under `environment:` would
+      # change nothing about the already-baked bundle. Defaults to the same
+      # 'unknown' sentinel the backend uses, which the Footer renders unprefixed.
+      args:
+        NEXT_PUBLIC_APP_VERSION: ${APP_VERSION:-unknown}
     ports:
       - '3000:3000'
     environment:

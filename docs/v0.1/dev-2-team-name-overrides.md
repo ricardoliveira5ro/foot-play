@@ -1,5 +1,16 @@
 # Dev 2.x — Team Name Override Mechanism (Tier 1)
 
+**Status**: `shipped in v0.1.2` — a Dev 2.x increment, shipped inside its parent
+version rather than as a third version component
+**Source**: `docs/v0.1/plan-v1.0-decomposition.md` (Development 2, as an increment)
+
+> **Deviation from spec**: this spec fixes scope at **38** Tier 1 names and
+> requires a 38-key assertion. The shipped `scripts/src/team-names.ts` has **45**
+> entries and no such assertion; the extra seven were added during implementation
+> and this spec was never updated. See
+> [`docs/roadmap.md` §2](../roadmap.md#2-v01--missing-eleven-mvp-delivered) and the
+> `v0.1.2` section of `CHANGELOG.md`.
+
 ## Problem statement
 
 The database contains "strange" / overly verbose team names (e.g. `Associazione

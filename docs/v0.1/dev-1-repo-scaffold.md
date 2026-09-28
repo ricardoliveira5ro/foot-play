@@ -1,6 +1,6 @@
 # Development 1: Repo Scaffold & Prisma Schema
 
-**Status**: `ready for implementation`
+**Status**: `shipped in v0.1.1`
 **Source**: `docs/v0.1/plan-v1.0-decomposition.md` (Development 1)
 **Estimated Effort**: S (2-3 days)
 

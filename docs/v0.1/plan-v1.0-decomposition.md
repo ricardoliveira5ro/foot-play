@@ -1,6 +1,6 @@
 # FootPlay v1.0 — Missing Eleven MVP Decomposition Plan
 
-**Status**: `ready for implementation`
+**Status**: `delivered` — all 6 planned developments shipped as v0.1.1 through v0.1.6
 **Author**: specifier
 **Date**: 2026-07-21
 **Source documents**: `Project.md`, `docs/roadmap.md`, `research-roadmap.md`

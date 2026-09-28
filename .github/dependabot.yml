@@ -1,0 +1,117 @@
+# Dependabot configuration for the FootPlay monorepo.
+#
+# Note on npm workspaces: this repo has ONE root package-lock.json and the
+# workspaces (frontend/, backend/, scripts/) have no lockfiles of their own.
+# Listing each workspace as its own npm entry is wrong here — it makes
+# Dependabot update the workspace package.json without fixing the root
+# lockfile. A single entry at the root, plus `versioning-strategy: increase`,
+# updates both correctly.
+# See dependabot-core#5226.
+#
+# Note on secrets: every PR below is opened by the `dependabot` actor, whose
+# runs get a read-only GITHUB_TOKEN and no repository secrets. `SONAR_TOKEN` is
+# therefore unavailable, so ci.yml guards the SonarQube scan and quality-gate
+# steps with `if: github.actor != 'dependabot'` and logs a warning in their
+# place. Without that guard every Dependabot PR would go red at the Sonar step,
+# which would quietly turn the quality gate into a no-op. The test and coverage
+# gates still run and still block.
+
+version: 2
+
+updates:
+  # ---------------------------------------------------------------- npm ----
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    # Bump the range in package.json and reconcile the root lockfile, rather
+    # than pinning the lockfile to the old version.
+    versioning-strategy: increase
+    # Never open a major-bump PR on its own. `update-types` only affects
+    # version updates, not security updates, so vulnerability fixes still
+    # arrive — including major bumps when a fix requires one.
+    allow:
+      - dependency-type: production
+        update-types:
+          - version-update:semver-patch
+          - version-update:semver-minor
+      - dependency-type: development
+        update-types:
+          - version-update:semver-patch
+          - version-update:semver-minor
+    # Two PRs per run instead of one per package: a deps PR and a dev-deps PR.
+    groups:
+      npm-production:
+        dependency-type: production
+      npm-development:
+        dependency-type: development
+    open-pull-requests-limit: 5
+    labels:
+      - dependencies
+      - npm
+    commit-message:
+      prefix: deps
+      include: scope
+
+  # ------------------------------------------------------ GitHub Actions ----
+  # `directory: "/"` makes Dependabot scan /.github/workflows automatically.
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    groups:
+      github-actions:
+        patterns:
+          - "*"
+    open-pull-requests-limit: 3
+    labels:
+      - dependencies
+      - ci
+    commit-message:
+      prefix: ci(deps)
+
+  # ------------------------------------------------------------- Docker ----
+  # One Dockerfile per workspace, both reached from a single multi-directory
+  # entry. These images are built on the ARM64 host, so a base-image major
+  # bump is effectively a platform change — keep majors manual.
+  - package-ecosystem: docker
+    directories:
+      - /frontend
+      - /backend
+    schedule:
+      interval: weekly
+      day: monday
+    allow:
+      - update-types:
+          - version-update:semver-patch
+          - version-update:semver-minor
+    groups:
+      docker-base-images:
+        patterns:
+          - "*"
+    open-pull-requests-limit: 2
+    labels:
+      - dependencies
+      - docker
+    commit-message:
+      prefix: docker(deps)
+
+  # ------------------------------------------------------- Docker Compose ----
+  # docker-compose.dev.yml and docker-compose.prod.yml live at the root.
+  - package-ecosystem: docker-compose
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    groups:
+      docker-compose:
+        patterns:
+          - "*"
+    open-pull-requests-limit: 2
+    labels:
+      - dependencies
+      - docker
+    commit-message:
+      prefix: docker(deps)

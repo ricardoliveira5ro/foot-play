@@ -1,6 +1,6 @@
 # Development 5: Wordle Algorithm & Game Loop
 
-**Status**: `ready for implementation`
+**Status**: `shipped in v0.1.5`
 **Source**: `docs/v0.1/plan-v1.0-decomposition.md` (Development 5)
 **Estimated Effort**: M (3-5 days)
 

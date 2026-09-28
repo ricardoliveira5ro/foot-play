@@ -1,0 +1,84 @@
+name: Feature request
+description: Propose a new game, a gameplay change, or an improvement to Missing Eleven
+title: "[feature] "
+labels:
+  - enhancement
+body:
+  - type: markdown
+    attributes:
+      value: |
+        FootPlay ships one game at a time, as spec'd developments inside a
+        milestone. Before writing code, check `docs/roadmap.md` — work that
+        was deferred lives in its Appendix A, and reusing an existing plan is
+        much cheaper than starting fresh.
+
+  - type: dropdown
+    id: area
+    attributes:
+      label: Which game / area is this for?
+      options:
+        - Missing Eleven — gameplay
+        - Missing Eleven — scoring
+        - Missing Eleven — UI / UX
+        - Missing Eleven — data or content
+        - A new game
+        - Infrastructure, CI, or deployment
+        - Docs
+        - Other
+    validations:
+      required: true
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: What problem does this solve?
+      description: |
+        Describe the situation a player is in today and what they cannot do.
+        The problem matters more than the solution — it is what decides
+        whether this is worth building.
+      placeholder: >
+        There is no way to narrow down to a competition or era, so someone
+        who only knows Premier League football gets handed obscure
+        lower-division or pre-2000 lineups.
+    validations:
+      required: true
+
+  - type: textarea
+    id: solution
+    attributes:
+      label: Proposed solution
+      description: What you would like to happen instead.
+    validations:
+      required: true
+
+  - type: dropdown
+    id: data
+    attributes:
+      label: Does this need data the project does not have?
+      description: |
+        The seed is filter-first over 17 clubs and 8 national teams, and
+        only keeps matches with a complete starting XI.
+      options:
+        - "No — playable with the data already seeded"
+        - "Maybe — depends on what the source CSVs turn out to contain"
+        - "Yes — needs a new source or a wider curated set"
+        - "Not sure"
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives you considered
+    validations:
+      required: false
+
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Checks
+      options:
+        - label: I checked `docs/roadmap.md` and this is not already planned or explicitly removed
+          required: true
+        - label: This is a single increment I could scope in a spec doc under `docs/v0.X/`
+          required: false

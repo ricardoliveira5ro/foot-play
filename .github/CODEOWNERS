@@ -1,0 +1,21 @@
+# Code owners
+
+# Single maintainer. Every change gets reviewed by the repo owner.
+*                       @ricardoliveira5ro
+
+# Documentation accuracy is treated as part of the deliverable, not an
+# afterthought — spec docs, the roadmap and the changelog are load-bearing
+# here, so changes to them get explicit review.
+docs/                   @ricardoliveira5ro
+*.md                    @ricardoliveira5ro
+
+# Deviation records are the highest-value thing in docs/roadmap.md. Protect
+# them specifically.
+docs/roadmap.md         @ricardoliveira5ro
+CHANGELOG.md            @ricardoliveira5ro
+
+# Infrastructure and quality gates.
+.github/workflows/     @ricardoliveira5ro
+sonar-project.properties @ricardoliveira5ro
+docker-compose*.yml    @ricardoliveira5ro
+nginx/                 @ricardoliveira5ro

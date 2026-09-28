@@ -1,8 +1,12 @@
 # Development 6: Docker, CI/CD & Deploy
 
-**Status**: `ready for implementation`
+**Status**: `shipped in v0.1.6`
 **Source**: `docs/v0.1/plan-v1.0-decomposition.md` (Development 6)
 **Estimated Effort**: M (3-5 days)
+
+> **Later deviation**: the shipped images use `node:24-alpine`, not the
+> `node:20-alpine` specified below. See the recorded deviation in
+> `docs/roadmap.md` §2 (v0.1.6); the rest of this document is accurate as written.
 
 ---
 

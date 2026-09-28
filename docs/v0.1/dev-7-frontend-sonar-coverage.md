@@ -1,6 +1,6 @@
 # Dev 7 — Frontend Test Coverage in SonarCloud
 
-**Status**: `spec` — ready for implementation
+**Status**: `shipped in v0.1.7`
 **Branch**: `quality-gate`
 **Scope**: full (infrastructure + all coverage-raising items), phased
 **Estimated scope**: `large` (phased: Phase 1 small, Phase 2 small, Phase 3 large)

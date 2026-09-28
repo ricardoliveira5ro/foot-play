@@ -1,0 +1,313 @@
+name: CD
+
+# Continuous delivery only. All checks live in ci.yml; this workflow refuses to
+# run unless CI passed for the exact commit it is about to deploy.
+on:
+  workflow_run:
+    workflows: ['CI']
+    types: [completed]
+  workflow_dispatch:
+    inputs:
+      reason:
+        description: 'Why this manual deploy is needed (echoed into the deploy log)'
+        required: false
+        type: string
+
+# Deploys must queue, never interleave: two concurrent `up -d --build` runs on
+# the same host would race on the same containers and the same database.
+concurrency:
+  group: production-deploy
+  cancel-in-progress: false
+
+# contents: read to read the commit; checks: read to read the CI result.
+permissions:
+  contents: read
+  checks: read
+
+jobs:
+  deploy:
+    name: Deploy to Oracle Cloud
+    runs-on: ubuntu-latest
+
+    # Creates a Deployments history entry, enables required reviewers and
+    # branch/tag protection rules later, and scopes the deploy secrets.
+    environment: production
+
+    # Automatic path: a CI run of this repo, on main, from a push, that
+    # succeeded. The head_repository check is what stops a fork's identically
+    # named workflow from triggering a production deploy.
+    # Manual path: an operator dispatched this run.
+    if: >-
+      (github.event_name == 'workflow_run'
+      && github.event.workflow_run.conclusion == 'success'
+      && github.event.workflow_run.event == 'push'
+      && github.event.workflow_run.head_branch == 'main'
+      && github.event.workflow_run.head_repository.full_name == github.repository)
+      || github.event_name == 'workflow_dispatch'
+
+    steps:
+      # A workflow_run run's own github.sha is the default branch tip as of this
+      # run, which may already be *newer* than the commit that passed CI. The
+      # triggering run's head_sha is the commit that was actually tested, so
+      # that is what gets deployed. For workflow_dispatch, github.sha is the
+      # ref the operator dispatched.
+      - name: Resolve commit to deploy
+        id: resolve
+        env:
+          TRIGGER_SHA: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || github.sha }}
+          REASON: ${{ github.event.inputs.reason }}
+        run: |
+          set -euo pipefail
+          sha="${TRIGGER_SHA}"
+          if [[ ! "${sha}" =~ ^[0-9a-f]{40}$ ]]; then
+            echo "::error::refusing to deploy: '${sha}' is not a 40-character commit SHA"
+            exit 1
+          fi
+          if [[ -n "${REASON:-}" ]]; then
+            echo "Manual deploy requested by ${GITHUB_ACTOR}: ${REASON}"
+          fi
+          echo "Deploying commit ${sha} (trigger: ${GITHUB_EVENT_NAME}, run: ${GITHUB_RUN_ID})"
+          echo "sha=${sha}" >> "${GITHUB_OUTPUT}"
+
+      # Ref is pinned to the resolved SHA so that the version below is read from
+      # the same tree the server will get, not from whatever main points at.
+      - name: Checkout deployed commit
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ steps.resolve.outputs.sha }}
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+
+      - name: Read release version from the deployed commit
+        id: meta
+        run: |
+          set -euo pipefail
+          # Cheap pre-flight: a commit whose workspace versions have drifted is
+          # not worth putting on a server.
+          npm run version:check
+          version="$(node -p "require('./package.json').version")"
+          # This value is interpolated into the remote environment below, so
+          # constrain it to SemVer here rather than trusting the file.
+          if [[ ! "${version}" =~ ^[0-9]+\.[0-9]+\.[0-9]+([-+][0-9A-Za-z.-]+)?$ ]]; then
+            echo "::error::refusing to deploy: '${version}' from package.json is not a SemVer version"
+            exit 1
+          fi
+          echo "version=${version}" >> "${GITHUB_OUTPUT}"
+
+      # Second, independent gate: ask GitHub what actually ran against this
+      # commit. On the automatic path this re-confirms the run that triggered
+      # this workflow. On the manual path it is the only gate, so it is what
+      # stops an operator from shipping a commit that never passed CI.
+      #
+      # The assertion is "the checks CI is expected to produce are green", not
+      # "every check run on this SHA is green". Those are not the same test, and
+      # the second one can never pass: GitHub creates a check run for a job when
+      # it *starts*, so this deploy job's own in-progress check run is already
+      # attached to the SHA while this step is executing. Asserting over
+      # everything would make every deploy fail forever.
+      #
+      # Fails closed, which is the property that matters: a missing expected
+      # check and a non-green expected check are both failures, and an empty
+      # response makes all five absent. Unrelated runs (this job's own check
+      # run, anything from another workflow) are reported and ignored.
+      - name: Verify CI passed for this exact commit
+        env:
+          SHA: ${{ steps.resolve.outputs.sha }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+
+          # These must match the `name:` of every job in ci.yml, verbatim. A
+          # rename there has to be renamed here or the deploy starts failing
+          # closed, which is the intended direction for a stale list.
+          expected=("Version Check" "Frontend Lint" "Backend Lint" \
+                    "Backend Build (Type Check)" "Tests, Coverage & Sonar Scan")
+
+          # Capture every page before parsing. Reading gh api through a process
+          # substitution (`done < <(gh api ...)`) discards its exit status, so a
+          # failure after the first page would leave a partial list that could
+          # still satisfy the loop. A command substitution keeps the status, and
+          # `set -e` turns a failed fetch into a failed step.
+          payload="$(gh api --paginate --slurp \
+            "repos/${GITHUB_REPOSITORY}/commits/${SHA}/check-runs")"
+
+          # Parsed with jq, not `while IFS=$'\t'`: a check name containing a tab
+          # would split into extra fields and silently compare the wrong name.
+          # `--slurp` makes the payload an array of pages, so flatten them all.
+          total="$(jq '[.[] | .check_runs[]] | length' <<<"${payload}")"
+          if [[ "${total}" -eq 0 ]]; then
+            echo "::error::no CI check runs found for ${SHA}; refusing to deploy an unverified commit"
+            exit 1
+          fi
+
+          failed=0
+          for want in "${expected[@]}"; do
+            # sort_by(.started_at) | last: a push run and a pull_request run can
+            # both cover one SHA, and only the most recent attempt of a job says
+            # anything about it.
+            observed="$(jq -r --arg name "${want}" '
+              [ .[] | .check_runs[] | select(.name == $name) ]
+              | sort_by(.started_at) | last
+              | if . == null then "absent"
+                else "\(.status)/\(.conclusion // "null")"
+                end
+            ' <<<"${payload}")"
+            if [[ "${observed}" != "completed/success" ]]; then
+              echo "::error::check '${want}' is ${observed} for ${SHA}"
+              failed=1
+            fi
+          done
+
+          if [[ "${failed}" -ne 0 ]]; then
+            echo "Expected: ${expected[*]}"
+            echo "Observed on ${SHA}:"
+            jq -r '.[] | .check_runs[] | "  \(.name) — \(.status)/\(.conclusion // "null")"' \
+              <<<"${payload}" | sort -u
+            exit 1
+          fi
+
+          # Anything not in the expected list is reported but ignored. This
+          # run's own in-progress check run always appears here.
+          unexpected="$(jq -r --argjson want "$(printf '%s\n' "${expected[@]}" | jq -R . | jq -s .)" '
+            [ .[] | .check_runs[] | select((.name as $n | $want | index($n)) == null) | .name ]
+            | unique | join(", ")
+          ' <<<"${payload}")"
+          if [[ -n "${unexpected}" ]]; then
+            echo "Ignoring non-CI check run(s) not gated on: ${unexpected}"
+          fi
+          echo "All ${#expected[@]} CI checks green for ${SHA} (${total} check run(s) on the commit)"
+
+      - name: Deploy via SSH
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.DEPLOY_HOST }}
+          username: ${{ secrets.DEPLOY_USER }}
+          key: ${{ secrets.DEPLOY_KEY }}
+          timeout: "30m"
+          script_stop: true
+          # Transported as remote environment variables rather than
+          # interpolated into the script text: the script then reads them as
+          # data, so nothing from package.json can be parsed as shell code.
+          envs: APP_VERSION=${{ steps.meta.outputs.version }},GIT_SHA=${{ steps.resolve.outputs.sha }}
+          script: |
+            set -eu
+
+            cd ~/foot-play
+
+            compose() {
+              sudo docker compose -f docker-compose.prod.yml --env-file .env.production "$@"
+            }
+
+            echo "Deploying ${GIT_SHA} (version ${APP_VERSION}) to Oracle Cloud"
+
+            # Fetch and check out the exact tested commit instead of
+            # `git pull origin main`, which can hand the server a commit newer
+            # than the one CI passed. Detached HEAD is fine: the deploy creates
+            # no commits.
+            git fetch --prune --tags origin
+            git checkout --force "${GIT_SHA}"
+
+            checked_out="$(git rev-parse HEAD)"
+            if [ "${checked_out}" != "${GIT_SHA}" ]; then
+              echo "Refusing to continue: HEAD is ${checked_out}, expected ${GIT_SHA}" >&2
+              exit 1
+            fi
+            echo "Checked out ${checked_out}"
+
+            # APP_VERSION and GIT_SHA reach compose through this shell's
+            # environment; docker compose gives the shell environment precedence
+            # over --env-file. The server's .env.production defines neither.
+            compose up -d --build
+
+            # Migrations are never gated: every deploy needs them.
+            compose exec -T backend npx prisma migrate deploy
+
+            # ------------------------------------------------------------------
+            # Destructive-seed guard
+            #
+            # backend/prisma/seed.ts deleteMany()s all five tables before
+            # reinserting, so running it against a populated database discards
+            # live data for nothing. It is only safe on a first, empty deploy.
+            # The decision comes from the database itself, not from a flag.
+            #
+            #   - the count runs inside the postgres container, which already
+            #     has POSTGRES_USER / POSTGRES_DB as container environment, so
+            #     no host-side credential is needed;
+            #   - the assignment keeps psql's exit status (no pipe is involved),
+            #     so a psql failure aborts the deploy instead of being read as
+            #     "zero games" -> seed -> wipe;
+            #   - anything that is not a plain integer aborts for the same
+            #     reason. A guard that guesses is worse than no guard.
+            # ------------------------------------------------------------------
+            # shellcheck disable=SC2016  # the single quotes are the point: the
+            # outer shell must NOT expand these, the container's shell must.
+            if ! game_count_raw="$(compose exec -T postgres sh -c 'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -tAc "SELECT COUNT(*) FROM \"Game\";"')"; then
+              echo "Refusing to continue: could not count rows in the Game table." >&2
+              echo "Is the database up and migrated? A failed query is never treated as an empty table." >&2
+              exit 1
+            fi
+            game_count="$(printf '%s' "${game_count_raw}" | tr -d '[:space:]')"
+
+            case "${game_count}" in
+              ''|*[!0-9]*)
+                echo "Refusing to continue: Game count is '${game_count_raw}', which is not a row count." >&2
+                echo "Not guessing whether the database is empty." >&2
+                exit 1
+                ;;
+            esac
+
+            if [ "${game_count}" -eq 0 ]; then
+              echo "Game table is empty (first deploy): downloading Transfermarkt data and seeding."
+              sudo docker run --rm -v ~/foot-play/scripts:/app -v ~/foot-play/tsconfig.base.json:/tsconfig.base.json:ro -w /app node:24-alpine sh -c "npm install && npx ts-node --transpile-only src/download-data.ts"
+              compose exec -T backend npx ts-node --transpile-only --project prisma/tsconfig.json prisma/seed.ts
+            else
+              echo "Seed skipped: the Game table already holds ${game_count} row(s)."
+              echo "The seed is destructive and runs only when the database is empty."
+            fi
+
+            # ------------------------------------------------------------------
+            # Post-deploy verification
+            #
+            # Containers accept connections before the app can answer, so poll
+            # instead of sleeping a fixed amount. Both the commit and the
+            # version are asserted, not assumed: they are two independent
+            # injection paths (APP_VERSION/GIT_SHA into the backend env,
+            # NEXT_PUBLIC_APP_VERSION into the frontend bundle), and a health
+            # endpoint reporting "unknown" means one of them broke, which is
+            # exactly the failure worth catching. Asserting only the commit
+            # would let a total version-injection regression ship silently.
+            # ------------------------------------------------------------------
+            attempt=1
+            health=''
+            while [ "${attempt}" -le 30 ]; do
+              health="$(curl -fsS --max-time 10 http://localhost/api/health 2>/dev/null || true)"
+              # Each field is matched independently, so the assertion does not
+              # depend on the order the two keys happen to be serialised in.
+              commit_ok=0
+              version_ok=0
+              case "${health}" in
+                *"\"commit\":\"${GIT_SHA}\""*) commit_ok=1 ;;
+              esac
+              case "${health}" in
+                *"\"version\":\"${APP_VERSION}\""*) version_ok=1 ;;
+              esac
+              if [ "${commit_ok}" -eq 1 ] && [ "${version_ok}" -eq 1 ]; then
+                echo "Health OK: ${health}"
+                break
+              fi
+              if [ "${attempt}" -eq 30 ]; then
+                echo "Refusing to report success: /api/health did not report commit ${GIT_SHA} and version ${APP_VERSION} after 30 attempts." >&2
+                echo "A 'unknown' value means version injection broke; a mismatch means the wrong build answered." >&2
+                echo "Last response: '${health}'" >&2
+                exit 1
+              fi
+              attempt=$((attempt + 1))
+              sleep 5
+            done
+
+            echo "Deployed ${GIT_SHA} (version ${APP_VERSION}) successfully."

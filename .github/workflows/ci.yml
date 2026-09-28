@@ -1,16 +1,45 @@
-name: CI/CD Pipeline
+name: CI
 
+# Continuous integration only. Deployment lives in cd.yml, which is gated on
+# this workflow completing successfully.
+#
+# Triggers are unchanged from the old deploy.yml: pull_request so PRs are
+# checked, and push to main so that a push to main has a CI run for cd.yml to
+# gate on.
 on:
   push:
     branches: [main]
   pull_request:
     branches: [main]
 
+# Superseded PR runs are dead work, so cancelling them is correct for CI.
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
+# Read-only by default: nothing in this workflow needs to write to the repo.
+permissions:
+  contents: read
+
 jobs:
+  version-check:
+    name: Version Check
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+
+      # No `npm install`: scripts/set-version.mjs is dependency-free (node:fs
+      # only) and version:check is just `node scripts/set-version.mjs --check`,
+      # so this job needs nothing from node_modules and stays fast.
+      - name: Check workspace versions agree with root package.json
+        run: npm run version:check
+
   frontend-lint:
     name: Frontend Lint
     runs-on: ubuntu-latest
@@ -113,11 +142,22 @@ jobs:
           DATABASE_URL: "postgresql://dummy:dummy@localhost:5432/dummy"
           SHADOW_DATABASE_URL: "postgresql://dummy:dummy@localhost:5432/dummy_shadow"
 
+      # The frontend coverage floor is enforced by
+      # test.coverage.thresholds in frontend/vitest.config.ts, so this step fails
+      # the job when either suite drops below its floor. Nothing extra to wire
+      # here.
       - name: Run frontend tests with coverage
         working-directory: frontend
         run: npm run test:coverage
 
+      # Dependabot-triggered runs get a read-only GITHUB_TOKEN and no access to
+      # repository secrets, so SONAR_TOKEN is empty and both of these steps
+      # would fail — making the quality gate non-blocking *and* the PR red. They
+      # are skipped for that actor only. The skip is stated in the log by the
+      # step below, so "the gate did not run" is never mistaken for "the gate
+      # passed"; the coverage steps above still gate the PR.
       - name: SonarQube Scan
+        if: github.actor != 'dependabot'
         uses: SonarSource/sonarqube-scan-action@v8
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
@@ -125,6 +165,7 @@ jobs:
           SHADOW_DATABASE_URL: "postgresql://dummy:dummy@localhost:5432/dummy_shadow"
 
       - name: SonarQube Quality Gate check
+        if: github.actor != 'dependabot'
         uses: SonarSource/sonarqube-quality-gate-action@v1
         timeout-minutes: 5
         env:
@@ -132,29 +173,13 @@ jobs:
           DATABASE_URL: "postgresql://dummy:dummy@localhost:5432/dummy"
           SHADOW_DATABASE_URL: "postgresql://dummy:dummy@localhost:5432/dummy_shadow"
 
-  deploy:
-    name: Deploy to Oracle Cloud
-    runs-on: ubuntu-latest
-    needs: [frontend-lint, backend-lint, backend-build, backend-test]
-    if: github.ref == 'refs/heads/main'
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Deploy via SSH
-        uses: appleboy/ssh-action@v1
-        with:
-          host: ${{ secrets.DEPLOY_HOST }}
-          username: ${{ secrets.DEPLOY_USER }}
-          key: ${{ secrets.DEPLOY_KEY }}
-          timeout: "30m"
-          script: |
-            cd ~/foot-play
-            git pull origin main
-            sudo docker compose -f docker-compose.prod.yml --env-file .env.production up -d --build
-            sudo docker compose -f docker-compose.prod.yml --env-file .env.production exec -T backend npx prisma migrate deploy
-            # Seed database
-            sudo docker run --rm -v ~/foot-play/scripts:/app -v ~/foot-play/tsconfig.base.json:/tsconfig.base.json:ro -w /app node:20-alpine sh -c "npm install && npx ts-node --transpile-only src/download-data.ts"
-            sudo docker compose -f docker-compose.prod.yml --env-file .env.production exec -T backend npx ts-node --transpile-only --project prisma/tsconfig.json prisma/seed.ts
-            sleep 10
-            curl -f http://localhost/api/health || exit 1
+      - name: Record that the Sonar quality gate was not evaluated
+        if: github.actor == 'dependabot'
+        run: |
+          echo "::warning title=Sonar quality gate skipped::This run was" \
+            "triggered by Dependabot, which runs with a read-only GITHUB_TOKEN" \
+            "and no repository secrets, so SONAR_TOKEN is unavailable and the" \
+            "SonarQube scan and quality gate were skipped rather than failed." \
+            "The backend and frontend coverage gates above still gate this PR;" \
+            "Sonar findings are simply not evaluated. A human should review the" \
+            "diff, and the quality gate is enforced on every non-Dependabot run."

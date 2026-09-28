@@ -1,6 +1,6 @@
 # Development 2: Data Pipeline
 
-**Status**: `ready for implementation`
+**Status**: `shipped in v0.1.2`
 **Source**: `docs/v0.1/plan-v1.0-decomposition.md` (Development 2)
 **Estimated Effort**: M (4-5 days)
 

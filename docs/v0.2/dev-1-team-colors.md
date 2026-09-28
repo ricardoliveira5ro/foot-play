@@ -1,6 +1,6 @@
 # Development 1: Team-Specific Shirt Colors
 
-**Status**: `implemented`
+**Status**: `shipped in v0.2.1`
 **Source**: `docs/v0.2/plan-v0.2-overview.md` (Feature 1)
 **Estimated Effort**: S (2-3 days)
 

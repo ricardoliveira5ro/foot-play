@@ -117,10 +117,10 @@ describe('POST /api/guess/reveal-one', () => {
 });
 
 describe('app basics', () => {
-  it('GET /api/health returns ok', async () => {
+  it('GET /api/health returns ok with version and commit', async () => {
     const res = await request(app).get('/api/health');
     expect(res.status).toBe(200);
-    expect(res.body).toEqual({ status: 'ok' });
+    expect(res.body).toEqual({ status: 'ok', version: 'unknown', commit: 'unknown' });
   });
 
   it('unknown routes return 404', async () => {

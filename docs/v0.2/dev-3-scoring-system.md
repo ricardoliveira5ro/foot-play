@@ -1,6 +1,6 @@
 # Development 3: Precision XI Scoring System
 
-**Status**: `planned`
+**Status**: `shipped in v0.2.3`
 **Source**: `docs/v0.2/plan-v0.2-overview.md` (Feature 3)
 **Estimated Effort**: M (3-4 days)
 
