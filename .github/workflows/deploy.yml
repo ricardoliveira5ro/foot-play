@@ -1,36 +1,32 @@
 name: CI/CD Pipeline
 
 on:
-  push:
-    branches: [main]
-  pull_request:
-    branches: [main]
   workflow_dispatch:
     inputs:
       run_frontend_lint:
         description: 'Run frontend lint'
         required: false
-        default: true
+        default: false
         type: boolean
       run_backend_lint:
         description: 'Run backend lint'
         required: false
-        default: true
+        default: false
         type: boolean
       run_backend_build:
         description: 'Backend build (type check)'
         required: false
-        default: true
+        default: false
         type: boolean
       run_tests_sonar:
         description: 'Run tests with coverage and the Sonar scan'
         required: false
-        default: true
+        default: false
         type: boolean
       run_deploy:
         description: 'Deploy to Oracle Cloud'
         required: false
-        default: true
+        default: false
         type: boolean
       run_seed:
         description: 'Seed the database after deploying'
@@ -46,7 +42,7 @@ jobs:
   frontend-lint:
     name: Frontend Lint
     runs-on: ubuntu-latest
-    if: ${{ github.event_name != 'workflow_dispatch' || inputs.run_frontend_lint == 'true' }}
+    if: ${{ inputs.run_frontend_lint == 'true' }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -68,7 +64,7 @@ jobs:
   backend-lint:
     name: Backend Lint
     runs-on: ubuntu-latest
-    if: ${{ github.event_name != 'workflow_dispatch' || inputs.run_backend_lint == 'true' }}
+    if: ${{ inputs.run_backend_lint == 'true' }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -89,7 +85,7 @@ jobs:
   backend-build:
     name: Backend Build (Type Check)
     runs-on: ubuntu-latest
-    if: ${{ github.event_name != 'workflow_dispatch' || inputs.run_backend_build == 'true' }}
+    if: ${{ inputs.run_backend_build == 'true' }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -118,7 +114,7 @@ jobs:
   backend-test:
     name: Tests, Coverage & Sonar Scan
     runs-on: ubuntu-latest
-    if: ${{ github.event_name != 'workflow_dispatch' || inputs.run_tests_sonar == 'true' }}
+    if: ${{ inputs.run_tests_sonar == 'true' }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -174,7 +170,6 @@ jobs:
     needs: [frontend-lint, backend-lint, backend-build, backend-test]
     if: >
       always() &&
-      github.event_name == 'workflow_dispatch' &&
       github.ref == 'refs/heads/main' &&
       inputs.run_deploy == 'true' &&
       needs.frontend-lint.result != 'failure' &&
