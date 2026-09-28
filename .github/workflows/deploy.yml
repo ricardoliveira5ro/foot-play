@@ -6,30 +6,30 @@ on:
       run_frontend_lint:
         description: 'Run frontend lint'
         required: false
-        default: false
+        default: true
         type: boolean
       run_backend_lint:
         description: 'Run backend lint'
         required: false
-        default: false
+        default: true
         type: boolean
       run_backend_build:
         description: 'Backend build (type check)'
         required: false
-        default: false
+        default: true
         type: boolean
       run_tests_sonar:
         description: 'Run tests with coverage and the Sonar scan'
         required: false
-        default: false
+        default: true
         type: boolean
       run_deploy:
-        description: 'Deploy to Oracle Cloud'
+        description: 'Deploy to Oracle Cloud (main only)'
         required: false
-        default: false
+        default: true
         type: boolean
       run_seed:
-        description: 'Seed the database after deploying'
+        description: 'Seed the database after deploying (main only)'
         required: false
         default: false
         type: boolean
@@ -163,6 +163,16 @@ jobs:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
           DATABASE_URL: "postgresql://dummy:dummy@localhost:5432/dummy"
           SHADOW_DATABASE_URL: "postgresql://dummy:dummy@localhost:5432/dummy_shadow"
+
+  validate-deploy-ref:
+    name: Validate Deploy Branch
+    runs-on: ubuntu-latest
+    if: ${{ inputs.run_deploy == 'true' && github.ref != 'refs/heads/main' }}
+    steps:
+      - name: Fail with clear message
+        run: |
+          echo "::error::Deploy and Seed only run on the main branch. Re-run the workflow with branch 'main' selected."
+          exit 1
 
   deploy:
     name: Deploy to Oracle Cloud
