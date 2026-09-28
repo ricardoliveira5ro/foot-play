@@ -1,6 +1,6 @@
 {
   "name": "footplay",
-  "version": "0.1.0",
+  "version": "0.2.3",
   "private": true,
   "description": "FootPlay — Football data platform",
   "workspaces": [
@@ -13,7 +13,8 @@
     "build": "echo 'Build will be wired per workspace'",
     "lint": "npm run lint -w frontend && ESLINT_USE_FLAT_CONFIG=false eslint backend/src/",
     "format": "prettier --write .",
-    "data-pipeline": "npx -w scripts ts-node src/download-data.ts"
+    "data-pipeline": "npx -w scripts ts-node src/download-data.ts",
+    "release": "npx -w scripts ts-node src/release.ts"
   },
   "devDependencies": {
     "concurrently": "^10.0.3",
