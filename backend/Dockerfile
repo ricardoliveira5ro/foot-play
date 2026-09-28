@@ -2,7 +2,7 @@
 FROM node:20-alpine AS deps
 WORKDIR /app
 COPY backend/package.json ./
-RUN npm install
+RUN npm install -g npm@latest && npm install
 
 # Stage 2: build
 FROM node:20-alpine AS build
