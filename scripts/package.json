@@ -3,8 +3,8 @@
   "version": "0.2.3",
   "private": true,
   "dependencies": {
-    "adm-zip": "^0.5",
-    "axios": "^1",
+    "adm-zip": "^0.6",
+    "axios": "^1.20.0",
     "csv-parse": "^5"
   },
   "devDependencies": {
