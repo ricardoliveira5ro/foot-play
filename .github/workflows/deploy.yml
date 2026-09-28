@@ -1,6 +1,8 @@
 name: CI/CD Pipeline
 
 on:
+  push:
+    branches: [main]
   workflow_dispatch:
     inputs:
       run_frontend_lint:
@@ -42,7 +44,7 @@ jobs:
   frontend-lint:
     name: Frontend Lint
     runs-on: ubuntu-latest
-    if: ${{ inputs.run_frontend_lint }}
+    if: ${{ github.event_name == 'push' || inputs.run_frontend_lint }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -64,7 +66,7 @@ jobs:
   backend-lint:
     name: Backend Lint
     runs-on: ubuntu-latest
-    if: ${{ inputs.run_backend_lint }}
+    if: ${{ github.event_name == 'push' || inputs.run_backend_lint }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -85,7 +87,7 @@ jobs:
   backend-build:
     name: Backend Build (Type Check)
     runs-on: ubuntu-latest
-    if: ${{ inputs.run_backend_build }}
+    if: ${{ github.event_name == 'push' || inputs.run_backend_build }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -114,7 +116,7 @@ jobs:
   backend-test:
     name: Tests, Coverage & Sonar Scan
     runs-on: ubuntu-latest
-    if: ${{ inputs.run_tests_sonar }}
+    if: ${{ github.event_name == 'push' || inputs.run_tests_sonar }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -181,7 +183,7 @@ jobs:
     if: >
       always() &&
       github.ref == 'refs/heads/main' &&
-      inputs.run_deploy &&
+      (github.event_name == 'push' || inputs.run_deploy) &&
       needs.frontend-lint.result != 'failure' &&
       needs.backend-lint.result != 'failure' &&
       needs.backend-build.result != 'failure' &&
