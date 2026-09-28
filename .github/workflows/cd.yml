@@ -72,14 +72,14 @@ jobs:
       # Ref is pinned to the resolved SHA so that the version below is read from
       # the same tree the server will get, not from whatever main points at.
       - name: Checkout deployed commit
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           ref: ${{ steps.resolve.outputs.sha }}
           fetch-depth: 1
           persist-credentials: false
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
           node-version: '24'
 
