@@ -3,6 +3,7 @@ name: Release on Merge
 on:
   pull_request:
     types: [closed]
+  workflow_dispatch:
 
 permissions:
   contents: write
@@ -15,12 +16,14 @@ jobs:
   publish:
     name: Publish GitHub Release
     runs-on: ubuntu-latest
-    if: github.event.pull_request.merged == true && github.event.pull_request.base.ref == 'main'
+    if: >
+      (github.event_name == 'pull_request' && github.event.pull_request.merged == true && github.event.pull_request.base.ref == 'main') ||
+      (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main')
     steps:
       - name: Checkout merge commit
         uses: actions/checkout@v4
         with:
-          ref: ${{ github.event.pull_request.merge_commit_sha }}
+          ref: ${{ github.event_name == 'pull_request' && github.event.pull_request.merge_commit_sha || github.ref }}
           fetch-depth: 0
 
       - name: Setup Node.js
@@ -36,7 +39,7 @@ jobs:
       - name: Resolve candidate version from CHANGELOG
         id: version
         run: |
-          VERSION="$(npm run release -- --next)"
+          VERSION="$(npm run --silent release -- --next 2>/dev/null)"
           if [ -z "$VERSION" ]; then
             echo "version=" >> "$GITHUB_OUTPUT"
             echo "No pending release: the top CHANGELOG entry is already tagged."
@@ -50,15 +53,15 @@ jobs:
         env:
           VERSION: ${{ steps.version.outputs.version }}
         run: |
-          npm run release -- --title "$VERSION" > release-title.txt
-          npm run release -- --notes "$VERSION" > release-notes.md
+          npm run --silent release -- --title "$VERSION" > release-title.txt
+          npm run --silent release -- --notes "$VERSION" > release-notes.md
 
       - name: Create GitHub Release
         if: steps.version.outputs.version != ''
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           VERSION: ${{ steps.version.outputs.version }}
-          SHA: ${{ github.event.pull_request.merge_commit_sha }}
+          SHA: ${{ github.event_name == 'pull_request' && github.event.pull_request.merge_commit_sha || github.ref }}
         run: |
           gh release create "$VERSION" \
             --target "$SHA" \
