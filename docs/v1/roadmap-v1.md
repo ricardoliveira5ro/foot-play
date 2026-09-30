@@ -270,7 +270,7 @@ re-litigated:
 
 | Patch | Ships | Rollback point |
 |---|---|---|
-| v1.1.1 | `hasCompleteLineups` predicate; filter-options endpoint returning runtime option lists **and POST-filter counts** (§4.4, §4.5) + autocomplete `name`/`displayName` fix + **widen the frontend vitest include and delete the shadowed `frontend/vitest.config.mts`** (R7, §8) | v1.0.x |
+| v1.1.1 | `hasCompleteLineups` predicate; filter-options endpoint returning runtime option lists **and POST-filter counts** (§4.4, §4.5) + autocomplete `name`/`displayName` fix + **widen the frontend vitest include and delete the dead `frontend/vitest.config.mts`** (R7, §8) | v1.0.x |
 | v1.1.2 | Filter state encoded in URL query params | v1.1.1 |
 | v1.1.3 | Team + Opponent multi-selects, searchable, grouped | v1.1.2 |
 | v1.1.4 | Competition multi-select + Season range + empty state | v1.1.3 |
@@ -346,15 +346,50 @@ are the complete clue inventory; nothing derived from `redCards` is ever scored.
 The opponent is an **optional scorable bonus** in Easy, Normal and Hard, and a
 **hard requirement** in Expert.
 
-In Expert, the Finish action stays **locked until all 22 shirts are resolved**.
-Finishing with 11/22 is not available; the opponent lineup is not optional
-decoration, it is half the puzzle.
+**The completion gate is one condition, and the mode table is its only input.** A
+game completes when the target half is fully resolved *and* either the mode does
+not require the opponent, or the opponent half is resolved too:
+
+```
+all.length > 0
+  && every target-half shirt is resolved
+  && (!DIFFICULTY_CONFIG[difficulty].opponentRequired
+      || every opponent-half shirt is resolved)
+```
+
+`opponentRequired` is **read from the mode table, never from a comparison against
+a mode name**, so a future mode that requires the opponent inherits the gate with
+no code change and a new mode that does not inherits its absence. In Easy, Normal
+and Hard the condition is already satisfied the moment the last target-half shirt
+resolves, so those three modes auto-complete at 11/22 and the flag is load-bearing
+rather than decorative. In Expert the Finish action stays **locked until all 22
+shirts are resolved**; finishing at 11/22 is not available, because the opponent
+lineup is not optional decoration, it is half the puzzle.
+
+The Finish affordance is a **control plus a confirmation**, not a screen: it
+appears on the board, states its own unresolved count, and asks the player to
+confirm. It is introduced in **v1.2.2** with the mode table that drives it,
+confirmed in **v1.2.3** where the third non-Expert mode proves the flag is read
+rather than hardcoded, and **asserted absent in v1.2.4** — Expert is the only mode
+that renders it, and the assertion is a test, not a comment.
+
+**Surrender is the one way out of the gate, and it costs the bonus, not the run.**
+A surrender ends the game with whatever is resolved. In Expert that yields an
+11-slot result whenever the opponent half was never touched, and in the other
+three modes it means the optional bonus is simply not collected. An untouched
+opponent half is therefore **tolerated on every result path** — the surrender
+overlay, the GameComplete breakdown, and the §7 share grid. §7's "22, always" for
+Expert is a statement about **Finish-locked** results only; a surrendered Expert
+result is 11 slots, because surrender does not claim the opponent was played.
 
 The bonus must be **visually labelled as optional** wherever it is optional —
 otherwise the UI implies a requirement that does not exist in three of the four
-modes. That labelling lands in **v1.2.5, not earlier**, because "optional" is
-only a meaningful word once a mode exists where it is not. Labelling it in v1.2.4,
-in the same patch that introduces the mode making it required, buys nothing.
+modes. The label reads `opponentRequired` from the mode table, which is **the
+same field the completion gate reads** (R1, §9.1), so the label and the gate are
+incapable of disagreeing: one flag, one truth, two consumers. That labelling lands
+in **v1.2.5, not earlier**, because "optional" is only a meaningful word once a
+mode exists where it is not. Labelling it in v1.2.4, in the same patch that
+introduces the mode making it required, buys nothing.
 
 ### 5.3 Scoring under a multiplier
 
@@ -513,16 +548,23 @@ surface enters the codebase in exactly one patch.
 | v1.4.2 | Copy-to-clipboard + the composed share text | v1.4.1 |
 
 **The block's shape is "one slot per shirt in scope for that result", not a
-fixed 11.** The three cases are:
+fixed 11.** The four cases are:
 
 | Case | Slots | Why |
 |---|---|---|
 | Easy / Normal / Hard, opponent not attempted | 11 | The opponent half is out of scope for that result |
 | Easy / Normal / Hard, opponent attempted | 22 | The opponent half is in scope and renders alongside the target half |
-| Expert | 22, always | Finish stays locked until all 22 are resolved (§5.2), so an Expert result cannot end at 11 |
+| Expert, finished | 22, always | Finish stays locked until all 22 are resolved (§5.2), so a **Finish-locked** Expert result cannot end at 11 |
+| Expert, surrendered | 11 | Surrender ends the run without the gate ever passing (§5.2), so an untouched opponent half is out of scope exactly as it is in Easy |
+
+The single condition behind all four rows is `opponentAttempted` — the opponent
+half is in scope when the player put at least one attempt into it (ratified
+decision, §9.1). A surrendered Expert game and a Normal game the player never
+opposed are the same case, and the grid treats them identically; that is the
+point of deriving the flag from the shirts instead of the mode.
 
 11 is therefore a **special case** of the rule, not the definition of the block.
-The score and the mode are carried in **all three** cases — the mode is what
+The score and the mode are carried in **all four** cases — the mode is what
 makes the score comparable (§6.2).
 
 **Un-resolved slots are rendered empty or greyed, never omitted.** A slot
@@ -560,7 +602,7 @@ to describe.
 | R4 | **4 GB ARM memory.** Accumulating a map over ~1.27M event rows costs 130–200 MB | OOM on the shared instance | **Owned by v1.0.1**, which is where the exposure actually is — the seed streams the CSVs and writes ~219k appearance rows, so it needs a streaming join, never a map over the raw event set (§3.2). **This authorises no `Appearance` indexes:** those are v1.0.2's budget, and its index list is closed at `Game.season`, `Game.date`, `Game.targetTeamId`. A specifier must not read this mitigation as licence to add indexes beyond that list |
 | R5 | **227 games with no captain row** (2.2%) | Captain clue absent for those games | **No work required — owned by nobody, deliberately.** Fully covered by the degradation rule (no icon, no error, §3.1), and §5.5 states the captain clue needs no v1.0 work. Recorded for completeness, not as a defect risk |
 | R6 | **Autocomplete `name` / `displayName` mismatch.** Search queries `Player.name` (`backend/src/services/playerService.ts:6-9`) and returns `p.name` (`:16`), while the Wordle answer is evaluated against `displayName` — in production via `displayName ?? name` (`backend/src/services/matchService.ts:111`); the `USE_MOCK` branch shows the same asymmetry at `frontend/lib/api.ts:92`. 92% of players mismatch; for 19% the display name is not even a substring of the name | Autocomplete can suggest a name that is not the answer | Owned by v1.1.1, which ships the `name`/`displayName` fix (§4.4) — in place before difficulty modes, where wrong suggestions are costlier |
-| R7 | **Frontend vitest include is `src/**` only** (`frontend/vitest.config.ts:16`) | Tests under `frontend/components/**` are **silently not collected** — they can be broken and still report green | **Owned by v1.1.1** (§4.4), which already ships the `name`/`displayName` harness-accuracy fix: widen `frontend/vitest.config.ts:16` beyond `src/**`, and delete the dead `frontend/vitest.config.mts`, which is shadowed by the `.ts` one, so there is only one source of truth. This lands *before* the UI-heavy patches that would rely on component coverage — v1.2.2–v1.2.5 and v1.4.1–v1.4.2 |
+| R7 | **Frontend vitest include is `src/**` only** (`frontend/vitest.config.ts:16`) | **Tests are silently not collected** — not a missing directory, a missing *suite*. A test file outside the include is never run and never reported: it can be broken, or not exist at all, and the suite still reports green. Today that is `frontend/components/**` (v1.1.1's `Shirt.colors.test.tsx` is the proof) and, from v1.1.2 onward, it would also be `frontend/app/**` — three test files live there (`FilterUrlSync.test.tsx`, `page.test.tsx`, `page.hydration.test.tsx`) and **none** of `src/**`, `components/**` or `tests/**` matches them | **Owned by v1.1.1** (§4.4), which already ships the `name`/`displayName` harness-accuracy fix. The remedy is to **enumerate** the roots, not to "widen past `src/**`": the include must list `src/**`, `components/**`, `tests/**` **and `app/**`**, because the last one is a Next.js App Router convention, not something a reader infers from the others. v1.1.1 also deletes the dead `frontend/vitest.config.mts`, which is never read because the `.ts` one resolves first (`CONFIG_NAMES × CONFIG_EXTENSIONS` resolve in order and the first hit wins, so `vitest.config.ts` is the effective config), so there is only one source of truth. This lands *before* the UI-heavy patches that would rely on component coverage — v1.1.2, v1.2.2–v1.2.5 and v1.4.1–v1.4.2 |
 | R8 | **Empty filter results are common.** 13 of 28 competitions have ≤35 games; 4 have exactly one season | Narrow filter combinations legitimately produce nothing, and will look like a bug | Explicit empty state is in scope for v1.1.4; the counts shown — the per-option POST-filter counts and the total for the applied filter set — are POST-filter and computed once per applied filter set, never recomputed on toggle (§4.4, §4.5). Per-option counts that recompute on every toggle are rejected (§4.3) |
 | R9 | **Option lists shift with the dataset.** The seed is gated by a 25-team curated whitelist (`scripts/curated-teams.json`, duplicated in `frontend/lib/curatedTeams.ts:8`) and the owner is actively expanding it — 24 of the 25 currently have qualifying games (17 clubs at ~550–660 games each; the 8 national teams at 3–9 each) | Hardcoded option lists go stale silently and ship filters that select nothing | All option lists read from the DB at runtime (§4.2). The whitelist is assumed to grow |
 
@@ -581,15 +623,39 @@ is not an acceptable outcome.
 
 Five items are not closed. Each has a working default so that specification can
 proceed, and each is **revisable** without unwinding the roadmap — none of them
-change the version boundaries.
+change the version boundaries. **O1 has since been ratified** and is now carried
+in §9.1 as a closed decision; the remaining four are still open.
 
 | # | Open question | Default | Revisable because |
 |---|---|---|---|
-| O1 | **Streak scope.** One streak per day, or one per (day, difficulty)? | One result per day, **global across difficulties** | The alternative is defensible. It is **mostly** contained inside v1.3.2 — the streak key is one field — but the per-(day, difficulty) key also changes v1.3.2's already-played-today state, which is owned by the same patch, and it changes the v1.4 share text, which carries the mode in order to disambiguate a result (§6.2). The **boundaries** are unaffected: every touchpoint already sits inside v1.3.2 or v1.4, so the headline claim holds. What changes is the amount of work, not which patches are involved |
+| O1 | **Streak scope.** One streak per day, or one per (day, difficulty)? | **Ratified — closed as "one result per day, global across difficulties."** See §9.1, row R3. The rationale below is retained as the record of why the alternative was not chosen | The alternative was defensible. It is **mostly** contained inside v1.3.2 — the streak key is one field — but the per-(day, difficulty) key also changes v1.3.2's already-played-today state, which is owned by the same patch, and it changes the v1.4 share text, which carries the mode in order to disambiguate a result (§6.2). The **boundaries** are unaffected: every touchpoint already sits inside v1.3.2 or v1.4, so the headline claim holds. What changes is the amount of work, not which patches are involved |
 | O2 | **Re-seed vs daily history.** A re-seed changes the dataset and therefore the daily selection | Accept the shift; document it | Operational, not architectural |
 | O3 | **Shootout goals.** Do penalty-shootout goals count? | **Do not count** | Depends on what the measured labels actually say — v1.0.1 measures the dismissal, own-goal and shootout label vocabulary before the mapping is frozen (v1.0.1 patch row, §3) |
 | O4 | **Own goals.** Attribute to the scoring player or to the team? | Attribute to the scoring player (the `player_id` on the event row) | **Provisional, and revisable.** Revisit in v1.0.1 if the measured event label indicates own goals are recorded against a different player or not at all; the columns are empty today (§1.1), so the default cannot be confirmed from the data until v1.0.1 measures it |
 | O5 | **Yellow cards as a clue.** | **Yellow cards are not a clue in any mode.** The send-off icon is a visual decoration only and is not a scored clue in any mode — see §3.1 | Yellow cards are near-universal at the top level and would make Easy trivially solvable. The send-off icon is deliberately excluded from scoring because the dismissal data behind it is the known-risky part of v1.0 (R2, §3.3): a wrong-looking icon is tolerable, a wrong-looking scoring clue is not |
+
+### 9.1 Ratified decisions
+
+**This table is authoritative.** Every line's plans and overviews link here, and a
+plan **verifies** the ratified answer — it never re-decides it. Where a plan and
+this table disagree, the table wins and the plan is a defect to be corrected, not
+an escalation to be resolved locally. A genuinely new question that this table
+does not cover is still an escalation; a question this table *does* cover is not.
+
+| # | Ratified decision | Answer | Owning patch |
+|---|---|---|---|
+| R1 | **Opponent completion gate.** Is the opponent half required to complete a game? | One condition for all four modes: `all.length > 0 && all target-half shirts resolved && (!DIFFICULTY_CONFIG[difficulty].opponentRequired \|\| all opponent-half shirts resolved)`. `opponentRequired` is read from the mode table, never compared against a mode name. Easy/Normal/Hard auto-complete at 11/22; Expert is Finish-locked at 22/22 (§5.2) | v1.2.2, v1.2.3, v1.2.4 |
+| R2 | **Surrendered Expert result.** Does the §7 grid hold 11 or 22 slots after an Expert surrender? | **11.** Surrender never passes the gate, so an untouched opponent half is out of scope exactly as in Easy. "22, always" in §7 is scoped to **Finish-locked** results. Skipping the opponent forfeits the §5.3 optional bonus, never the run | v1.2.4, v1.4.1 |
+| R3 | **Streak scope** (was O1). One streak per day, or one per (day, difficulty)? | **One result per day, global across difficulties.** `playedKeys` gates by day, not by (day, difficulty); `STORAGE_KEY = 'footplay.daily.v1'` is the containment seam. A re-seed may shift or break a streak, and that is **accepted, documented known behavior** (O2), not a defect | v1.3.2 |
+| R4 | **E1 — share-grid scope condition.** Does the grid use `opponentRequired`, `opponentAttempted`, or both? | **`opponentAttempted` alone**, derived as `opponentShirts.some((shirt) => shirt.attempts > 0)` and never stored. Deriving it from the shirts is what makes R2 fall out for free and what keeps the flag from going stale. The mode-table property test over `opponentRequired` is **retained** as a guard on the table, not as the grid's condition | v1.4.1 |
+| R5 | **E2 — position-order source of truth.** Is a shared `positionOrder.ts` module created, and is the anchor name-based or index-based? | **Yes.** Extract `POSITION_ORDER` and `getPositionLabel` to `frontend/src/lib/positionOrder.ts`. Retain the **name-based** anchor with the **grep fallback** (L-3) — no positional lookup | v1.4.1 |
+| R6 | **E3 — `vitest.config.mts`.** Does it shadow `vitest.config.ts`? | **No.** `frontend/vitest.config.ts` is the config that runs; the `.mts` file is **dead, not shadowing**. v1.1.1 deletes it, which is a cleanup, not a fix for a shadowing bug | v1.1.1, v1.4.1 |
+| R7 | **E4 — `hasPlayed` gating the clipboard action.** Does the share button read `hasPlayed`? | **No.** There is **no `hasPlayed` gating**; the share control appears on the completion overlay whenever one is shown. The clipboard path performs **no `localStorage` read at all**, so there is no hydration-order dependency to get wrong | v1.4.2 |
+| R8 | **E5 — `renderShareText` ships uncalled.** Is an uncalled export acceptable? | **Yes, deliberately.** v1.4.1 ships `renderShareText` uncalled as its **rollback boundary**; the first use is v1.4.2 Task 5.2. Until then `frontend/src/lib/shareGrid.ts` is **byte-for-byte unchanged** by v1.4.2 | v1.4.1, v1.4.2 |
+| R9 | **`LineupPlayer` shape.** Which fields does the frontend lineup type carry? | `goals`, `assists`, `redCards`, `isCaptain` — all **required**, added in v1.0.2 on both halves in one commit. Backend and frontend never disagree; v1.2 builds on these names and does not rename them | v1.0.2 |
+| R10 | **`completeLineupsWhere` return type.** `Prisma.GameWhereInput` or `Prisma.Sql`? | **`Prisma.Sql`**, in `backend/src/lib/lineupCompleteness.ts`. The frozen `GameWhereInput` signature is unimplementable in Prisma 7 and shipping a weaker predicate would be a silent correctness hole. The **name is preserved**; only the return type is corrected | v1.1.1 |
+| R11 | **`ParsedEventType.assist`.** Does the union carry an `assist` member? | **Yes, and the API never sends it.** That is why `ParsedEventRow` carries a separate `isAssist: boolean` and the seed maps the literal `'assist'` marker onto it. `classifyEvent` does **not** emit `'assist'`; reading the union as if the API populated it is the trap | v1.0.1 |
+| R12 | **Dataset download timeout.** `axios.get` `timeout` for the data zip. | **`600000` ms**, raised from the current `120000` in `scripts/src/download-data.ts:18`. The single response grows by ~170 MB decompressed, so 120 s is a coin flip on a cold origin, not headroom | v1.0.1 |
 
 ## 10. Out of scope for v1.x
 
