@@ -162,7 +162,7 @@
   git commit -m "feat(frontend): add pure shirt badge decision helper"
   ```
 
-**Verify:** `cd frontend && npx vitest run --coverage src/lib/shirtBadges.test.ts 2>&1 | grep -A2 shirtBadges` shows 100% on lines and branches.
+**Verify:** `cd frontend && npx vitest run --coverage src/lib/shirtBadges.test.ts` shows 100% on lines and branches.
 
 ---
 
@@ -612,7 +612,7 @@
 - [ ] **Step 3.6: Verify the changelog is parseable.**
 
   ```bash
-  npm run release -- --notes v1.0.3 | head -5
+  npm run release -- --notes v1.0.3
   ```
 
   Expected: `_2026-09-29_`.

@@ -29,7 +29,7 @@
   cd frontend && npx tsc --noEmit
   ```
 
-  Do not carry a fixed number. The figures recorded in `docs/v1/v1.2/overview.md:189-190` (backend 13/175, frontend 9/173) were measured on `cda2db0` and are a **snapshot, not a baseline**: v1.0.1 (+2 backend files), v1.0.2 (+1) and v1.1.1 (+4 backend, +2 frontend) all land before this patch, so the real numbers at v1.2.1 are already higher. Measure at every boundary, record the actual number, and use the delta from the measurement — not the absolute, and not the table.
+  Do not carry a fixed number. The figures recorded in `docs/v1/v1.2/overview.md:193-194` (backend 13/175, frontend 9/173) were measured on `cda2db0` and are a **snapshot, not a baseline**: v1.0.1 (+2 backend files), v1.0.2 (+1) and v1.1.1 (+4 backend, +2 frontend) all land before this patch, so the real numbers at v1.2.1 are already higher. Measure at every boundary, record the actual number, and use the delta from the measurement — not the absolute, and not the table.
 
 ---
 
@@ -65,7 +65,7 @@
 
 - [ ] **Step 1.0: Renumbering preflight — `gameId` is a shared resource, not a local constant.**
 
-  Step 1.1 hard-codes `gameId: 5` for the R1(a) test. `Appearance` is `@@unique([gameId, playerId])` **and** `gameId` is the primary key, so a collision is a constraint violation, not a test failure with a good message. **`gameId: 5` is already claimed by v1.1.1**, whose Task 2 seeds a complete game at `gameId: 5` (`docs/v1/v1.1/plan-v1.1.1-filter-foundation.md:206`); v1.1.1 renumbered *itself* upward only because nothing claimed 5 at the time it was written (`docs/v1/v1.1/plan-v1.1.1-filter-foundation.md:177`). By the time this patch runs, 5 is taken.
+  Step 1.1 hard-codes `gameId: 5` for the R1(a) test. `Appearance` is `@@unique([gameId, playerId])` **and** `gameId` is the primary key, so a collision is a constraint violation, not a test failure with a good message. **`gameId: 5` is already claimed by v1.1.1**, whose Task 2 seeds a complete game at `gameId: 5` (`docs/v1/v1.1/plan-v1.1.1-filter-foundation.md:207`); v1.1.1 renumbered *itself* upward only because nothing claimed 5 at the time it was written (`docs/v1/v1.1/plan-v1.1.1-filter-foundation.md:178`). By the time this patch runs, 5 is taken.
 
   ```bash
   grep -rn "gameId: 5\|createCompleteGame(" backend/src/__tests__/
@@ -172,7 +172,7 @@
 - [ ] **Step 1.2: Verify red.**
 
   ```bash
-  cd backend && npx vitest run src/__tests__/integration/routes/guess.test.ts src/__tests__/integration/matchService.test.ts 2>&1 | tail -40
+  cd backend && npx vitest run src/__tests__/integration/routes/guess.test.ts src/__tests__/integration/matchService.test.ts
   ```
 
   Expected: **FAIL**. `guess.test.ts` fails on both `toEqual` calls with a received object missing `token` (`- Expected  - 1 / + Received  + 0`, `token: undefined`). `matchService.test.ts` fails on both new tests because `ap.token` is `undefined` — the first on `expect(ap.token).toBe(...)`, the second on `new Set(tokens).size` being `1` rather than `2`. Every failure is the field being absent, not a typo.
@@ -215,13 +215,13 @@
 - [ ] **Step 1.5: Verify green, then run the full backend regression and the coverage gate.**
 
   ```bash
-  cd backend && npm run test 2>&1 | tail -12
+  cd backend && npm run test
   ```
 
   Expected: every file green, and the test count **two higher than the measurement taken at the start of this task** (this task adds exactly two tests). Record the real number in the changelog. Do not assert `177` — the absolute was measured on `cda2db0` and v1.0.1, v1.0.2 and v1.1.1 have all landed since. Step 1.0 above is a **renumbering** preflight that greps for an existing `gameId: 5` claim; it runs no suite, so it measures nothing — if you need a number, take it here, before the first test is written.
 
   ```bash
-  cd backend && npm run test:coverage 2>&1 | tail -25
+  cd backend && npm run test:coverage
   ```
 
   Expected: no threshold failure on lines / statements / functions / branches. The new `.map` in `getRevealAppearances` is fully covered by the two route tests and the two service tests; the pre-existing `displayName ?? name ?? ''` branches are unchanged.
@@ -286,13 +286,13 @@
 - [ ] **Step 2.3: Verify the red — and understand which tool reports it.**
 
   ```bash
-  cd frontend && npx tsc --noEmit 2>&1 | tail -30
+  cd frontend && npx tsc --noEmit
   ```
 
   Expected: errors **only** in `frontend/src/lib/reveal.test.ts` — one per `RevealPlayer` literal, each reading `Property 'token' is missing in type ... but required in type 'RevealPlayer'`. That is the intended red; Task 3 rewrites that file against the new type. Any other error means Step 2.1 or 2.2 is wrong — fix it before continuing.
 
   ```bash
-  cd frontend && npm run test 2>&1 | tail -12
+  cd frontend && npm run test
   ```
 
   Expected: **the frontend file and test counts are unchanged from whatever Step 1.0 measured — and that is correct.** Vitest transpiles TypeScript with esbuild and performs no type checking, so a required-field change is invisible to the test run. The type check above is this task's red, not the suite. This is why every task in this plan lists `npx tsc --noEmit` separately. The pass signal is *unchanged*, not a number: assert nothing absolute here.
@@ -449,7 +449,7 @@
 - [ ] **Step 3.2: Verify red.**
 
   ```bash
-  cd frontend && npx vitest run src/lib/reveal.test.ts 2>&1 | tail -20
+  cd frontend && npx vitest run src/lib/reveal.test.ts
   ```
 
   Expected: **FAIL** with a module-resolution error, `Failed to resolve import "./reveal"`. That is the red.
@@ -499,13 +499,13 @@
 - [ ] **Step 3.4: Verify green, then the frontend regression.**
 
   ```bash
-  cd frontend && npx vitest run src/lib/reveal.test.ts 2>&1 | tail -20
+  cd frontend && npx vitest run src/lib/reveal.test.ts
   ```
 
   Expected: `Test Files 1 passed (1)` / `Tests 9 passed (9)`.
 
   ```bash
-  cd frontend && npm run test 2>&1 | tail -12
+  cd frontend && npm run test
   ```
 
   Expected: every file green, and the test count **+3** against the measurement taken at the start of this task — this file's six old tests are replaced by nine new ones. Record the real number; do not assert an absolute.
@@ -577,13 +577,13 @@
 - [ ] **Step 4.3: Run the full frontend regression and the types.**
 
   ```bash
-  cd frontend && npx tsc --noEmit && npm run test 2>&1 | tail -12
+  cd frontend && npx tsc --noEmit && npm run test
   ```
 
   Expected: `tsc` clean and every file green. Record the real file and test counts in the changelog; do not assert either against a number written here — the `176` that used to sit in this sentence was measured on `cda2db0`, and v1.0.1, v1.0.2 and v1.1.1 have all landed since.
 
   ```bash
-  cd frontend && npm run lint 2>&1 | tail -20
+  cd frontend && npm run lint
   ```
 
   Expected: no new warnings.
@@ -609,7 +609,7 @@
 8. `revealMatches` does not mutate the shirts it is given.
 9. `getRevealAppearances` still returns `number` and `player`, and `backend/src/__tests__/integration/matchService.test.ts` is not weakened to accommodate the change.
 10. No shared-seed fixture was added: `matchService.test.ts:61` and `guess.test.ts:57` still assert 8 players for game 1 home.
-11. Frontend: every test file green, `tsc` clean, `lint` clean. Backend: every test file green, coverage gate satisfied on all four metrics. Neither suite is asserted against a fixed count — both are measured and recorded, per `docs/v1/v1.2/overview.md:205`.
+11. Frontend: every test file green, `tsc` clean, `lint` clean. Backend: every test file green, coverage gate satisfied on all four metrics. Neither suite is asserted against a fixed count — both are measured and recorded, per `docs/v1/v1.2/overview.md:209`.
 12. Reverting this patch alone returns the app to v1.1.x behaviour with no data repair — the change is one additive response field plus one pure function.
 
 ## Validation

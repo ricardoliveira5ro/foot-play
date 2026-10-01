@@ -10,6 +10,10 @@
 
 ---
 
+> **Ratified decisions are not decided here.** Roadmap [§9.1](../roadmap-v1.md#91-ratified-decisions) is authoritative for every decision the owner has closed; a plan's preflight **verifies** the ratified answer and never re-decides it. Where a plan and that table disagree, the table wins and the plan is the defect. A question the table does not cover is still an escalation.
+
+---
+
 ## The five patches
 
 | Patch | What lands | Files it adds | Rollback to |
@@ -228,7 +232,7 @@ Two project-specific facts that the per-patch plans rely on:
 ## Closed escalation — the §5.2 `opponentRequired` gate
 
 **This is resolved, and it is not an open dependency of any patch in this line.**
-The answer is roadmap §5.2 as ratified, recorded as **R1** in roadmap §9.1.
+The answer is roadmap §5.2 as ratified, recorded as **RD1** in roadmap §9.1.
 
 The tension was that §5.2 calls the opponent "an optional scorable bonus" in Easy,
 Normal and Hard while `checkGameComplete` had always required all 22 shirts, so
@@ -248,7 +252,7 @@ the table: **(a)** keep 22/22 everywhere and correct the docs, or **(b)** let
   gains a second input — `opponentAttempted` — so a game that ended at 11/22 says
   the bonus was not played instead of pointing at points that are not on the line.
 - **Surrender is unchanged and ungated.** A surrendered `expert` result is an
-  11-slot result (R2), and every result path tolerates an untouched opponent half.
+  11-slot result (RD2), and every result path tolerates an untouched opponent half.
 
 **What it does not change:** §5.1's mode table stays exactly as written, and the
 *labelling* still lands in v1.2.5 and not in v1.2.4, for the reason §5.2 and §11

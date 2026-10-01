@@ -13,7 +13,7 @@
 ## Global Constraints
 
 - **This patch changes no attempt budget and no mask.** `DIFFICULTY_CONFIG.expert` is `{ attempts: 3, showShirtNumber: false, showFirstLetter: false, showScorersClue: false, showCaptainClue: false, opponentRequired: true, multiplier: 3 }` and has said so since v1.2.2 Task 1. The three-attempt budget works today because `gameState.ts:154` and all three page call sites read `DIFFICULTY_CONFIG[difficulty].attempts`; the mask works because `maskedShirtNumber` reads `showShirtNumber`. The only new behaviour in this patch is the gate.
-- **The completion predicate is mode-dependent, and this is ratified, not incidental** (roadmap §5.2, R1 in §9.1). `checkGameComplete` (`gameState.ts:111-114`) currently requires every shirt on **both** boards to be `correct` or `failed`, and that has governed all four modes since before v1.2. This patch changes that to one condition:
+- **The completion predicate is mode-dependent, and this is ratified, not incidental** (roadmap §5.2, RD1 in §9.1). `checkGameComplete` (`gameState.ts:111-114`) currently requires every shirt on **both** boards to be `correct` or `failed`, and that has governed all four modes since before v1.2. This patch changes that to one condition:
 
   ```
   all.length > 0
@@ -24,10 +24,10 @@
 
   `opponentRequired` is read from the mode table. **Comparing against a mode name is forbidden here** — `difficulty === 'expert'` would make the gate silently wrong for any future mode, and v1.2.2's Global Constraints make the mode table the one place a mode is described by data. The consequence, which the tests below pin: in `easy`, `normal` and `hard` the condition is satisfied the moment the last target-half shirt resolves, so those three modes **auto-complete at 11/22**. That is a behaviour change to three shipped modes, and it is the one the roadmap ratified. The alternative — leaving three modes Finish-locked at 22/22 — was what the flag contradicted, and it is closed.
 - **`FINISH_GAME` is the only transition to `complete` when `opponentRequired` is true, and it is gated.** A dispatch with 11/22 resolved in `expert` must leave `gameStatus: 'playing'` and leave the shirts untouched. The gate is in the reducer, not in the button: a disabled button is a UI convenience and is not a guarantee.
-- **Auto-complete is suppressed only when `opponentRequired` is true.** In `easy`, `normal` and `hard` the target half's last shirt still ends the game by itself. Suppressing it everywhere would add a button to three modes that never needed one — and under R1 those three modes do not need one.
+- **Auto-complete is suppressed only when `opponentRequired` is true.** In `easy`, `normal` and `hard` the target half's last shirt still ends the game by itself. Suppressing it everywhere would add a button to three modes that never needed one — and under RD1 those three modes do not need one.
 - **The Finish control is rendered only when `DIFFICULTY_CONFIG[difficulty].opponentRequired` is true.** It is not rendered-and-disabled in the other modes; it does not exist there. A permanently disabled button in Easy reads as a broken feature. This patch adds the **absence assertion** that makes the flag load-bearing: after this patch no test anywhere may find a Finish control in `easy`, `normal` or `hard`.
 - **The Finish affordance is a control plus a confirmation.** v1.2.2 introduces the control and its confirmation step using the board's existing dialog pattern; this patch consumes it unchanged. Do not invent a second affordance here, and do not escalate a question about its shape — it is already ratified as "a control that states its unresolved count and asks the player to confirm", within existing patterns and not a screen.
-- **Surrender is unaffected by the gate, and must stay that way.** `SURRENDER` already transitions to a terminal state in every mode. This patch must not gate surrender on the opponent half, must not add opponent shirts to the surrendered board, and must not require the player to resolve anything in order to give up. A surrendered `expert` result is therefore an 11-slot result whenever the opponent half was untouched (roadmap §7, R2), and the share grid in v1.4.1 must be able to render it.
+- **Surrender is unaffected by the gate, and must stay that way.** `SURRENDER` already transitions to a terminal state in every mode. This patch must not gate surrender on the opponent half, must not add opponent shirts to the surrendered board, and must not require the player to resolve anything in order to give up. A surrendered `expert` result is therefore an 11-slot result whenever the opponent half was untouched (roadmap §7, RD2), and the share grid in v1.4.1 must be able to render it.
 - **The disabled label states the unresolved count**, e.g. `Finish — 11 of 22 resolved`, so the player can see what is blocking them rather than being told "not available".
 - **No new component test outside `frontend/src/`.** This is a house rule rather than a consequence of the include: after v1.1.1 the include enumerates `src/**`, `components/**`, `tests/**` and `app/**`, so an out-of-`src/` test would still be collected — but it would fall outside the coverage `include` (`src/**`). Every new test file carries `// @vitest-environment jsdom` and imports outward with `../../components/...`. v1.1.1 owns the include list; this patch does not touch `frontend/vitest.config.ts`.
 - **The multiplier is still inert.** `expert.multiplier` is read by nothing until v1.2.5. Do not wire it here.
@@ -48,7 +48,7 @@
 
 | File | Change |
 |---|---|
-| `frontend/src/lib/gameState.ts` | `checkGameComplete` becomes mode-dependent (R1), `FINISH_GAME` action, `finishGame` in the hook, conditional auto-complete |
+| `frontend/src/lib/gameState.ts` | `checkGameComplete` becomes mode-dependent (RD1), `FINISH_GAME` action, `finishGame` in the hook, conditional auto-complete |
 | `frontend/src/lib/gameState.test.ts` | gate tests: Expert 11/22 refusal, Expert 22/22 completion, **11/22 auto-complete in Easy/Normal/Hard**, surrender tolerance |
 | `frontend/src/lib/gameState.hook.test.ts` | `finishGame` exposed |
 | `frontend/src/components/FinishButton.test.tsx` | created in **v1.2.2**; this patch adds the three-mode **absence** assertions |
@@ -80,7 +80,7 @@ whether it exists.
   ```ts
   // GameAction gains:
   | { type: 'FINISH_GAME' }
-  // checkGameComplete gains a difficulty parameter (R1):
+  // checkGameComplete gains a difficulty parameter (RD1):
   export function checkGameComplete(
     target: ShirtGameData[],
     opponent: ShirtGameData[],
@@ -109,7 +109,7 @@ whether it exists.
         };
       }
 
-      /** Target half fully resolved, opponent half untouched — the R1 gate shape. */
+      /** Target half fully resolved, opponent half untouched — the RD1 gate shape. */
       function expertTargetOnly() {
         const mk = (state: ShirtState) => ({ ...blank, state });
         return {
@@ -165,7 +165,7 @@ whether it exists.
         };
       }
 
-      /** Only the target half resolved. The R1 case: 11/22. */
+      /** Only the target half resolved. The RD1 case: 11/22. */
       function targetHalfOnly(difficulty: Difficulty) {
         const mk = (state: ShirtState) => ({ ...blank, state });
         return {
@@ -189,7 +189,7 @@ whether it exists.
       });
 
       it('auto-completes Normal at 11 of 22, opponent untouched', () => {
-        // The load-bearing R1 case: the opponent half is a bonus, not a gate.
+        // The load-bearing RD1 case: the opponent half is a bonus, not a gate.
         const state = targetHalfOnly('normal');
         const next = gameReducer(state, {
           type: 'SUBMIT_GUESS',
@@ -236,7 +236,7 @@ whether it exists.
       }
 
       it('ends an Expert game at 11 resolved when the player surrenders', () => {
-        // R2: the gate guards Finish, never surrender. A surrendered Expert
+        // RD2: the gate guards Finish, never surrender. A surrendered Expert
         // result is an 11-slot result, and v1.4.1's grid must be able to say so.
         const state = surrenderedExpert();
         const next = gameReducer(state, { type: 'SURRENDER' });
@@ -271,7 +271,7 @@ whether it exists.
 - [ ] **Step 1.2: Verify red.**
 
   ```bash
-  cd frontend && npx vitest run src/lib/gameState.test.ts 2>&1 | tail -30
+  cd frontend && npx vitest run src/lib/gameState.test.ts
   ```
 
   Expected: **FAIL** on the new blocks. `resolvedShirtCount` is not exported; the `FINISH_GAME` cases hit no case in the reducer and fall through to `state`; `does not auto-complete an Expert game` fails because the current `handleSubmitGuess` sets `complete` at 22/22 regardless of mode; `auto-completes Normal at 11 of 22` fails because the current `checkGameComplete` demands all 22; and both `surrender is not gated` cases fail only if surrender has been changed to mark the opponent half — if they pass, that is a correct finding, not a reason to weaken them.
@@ -292,11 +292,11 @@ whether it exists.
      }
      ```
 
-  2. Rewrite `checkGameComplete` itself, which ends at line 114, to the ratified R1 condition. It gains a third parameter, `difficulty`:
+  2. Rewrite `checkGameComplete` itself, which ends at line 114, to the ratified RD1 condition. It gains a third parameter, `difficulty`:
 
      ```ts
      /**
-      * The completion gate (roadmap §5.2, R1).
+      * The completion gate (roadmap §5.2, RD1).
       *
       * One condition for all four modes. The target half must be fully
       * resolved; the opponent half must be resolved only when the mode table
@@ -304,20 +304,29 @@ whether it exists.
       * DIFFICULTY_CONFIG — never `difficulty === 'expert'` — so a future mode
       * inherits the right behaviour from its row.
       *
-      * `all.length > 0` keeps an empty board from being "complete".
+      * The emptiness guard returns false for an empty lineup, so an
+       * empty board can never read as "complete".
       */
      export function checkGameComplete(
        target: ShirtGameData[],
        opponent: ShirtGameData[],
        difficulty: Difficulty,
      ): boolean {
-       if (target.length === 0) return false;
+       const all = [...target, ...opponent];
+       if (all.length === 0) return false;
        const settled = (s: ShirtGameData) => s.state === 'correct' || s.state === 'failed';
        if (!target.every(settled)) return false;
        if (DIFFICULTY_CONFIG[difficulty].opponentRequired) return opponent.every(settled);
        return true;
      }
      ```
+
+     **The emptiness guard is written against `all`, not `target`.** That is the form
+     the Global Constraints above state, and it is the form the Risks table's entry on a
+     duplicated predicate is written against: `FinishButton` additionally requires
+     `total === 22`, which a target-half-only guard would not tolerate on a partial
+     lineup. Writing `all` keeps the constraint, the implementation and the risk row
+     describing **one** predicate rather than three that look alike.
 
      Add the `DIFFICULTY_CONFIG` import from `./difficulty` if it is not already imported in this file, and the `Difficulty` type.
 
@@ -379,7 +388,7 @@ whether it exists.
 
   ```ts
   // Auto-complete applies only where the mode does NOT require the opponent
-  // (§5.2, R1). Where it does, the player must press Finish even at 22/22: the
+  // (§5.2, RD1). Where it does, the player must press Finish even at 22/22: the
   // opponent is half the puzzle, and an explicit finish makes that requirement
   // visible instead of implicit. checkGameComplete carries the mode-dependent
   // half of the condition; this negation carries the "may it end by itself" half.
@@ -393,7 +402,7 @@ whether it exists.
 - [ ] **Step 1.6: Verify green.**
 
   ```bash
-  cd frontend && npx vitest run src/lib/gameState.test.ts 2>&1 | tail -20
+  cd frontend && npx vitest run src/lib/gameState.test.ts
   ```
 
   Expected: the file green, including all pre-existing tests. The pre-existing completion tests run at `DEFAULT_DIFFICULTY` (`normal`), where `opponentRequired` is `false`, so they still auto-complete — but note that they now do so at **11/22**, not 22/22, because `checkGameComplete` no longer demands the opponent half there. If a pre-existing test asserts 22/22 as a precondition for `complete`, that assertion was pinning the bug this patch fixes; update it to set up the target half only, and say so in the changelog rather than re-narrowing the predicate.
@@ -417,8 +426,8 @@ whether it exists.
 - [ ] **Step 1.8: Run the full frontend.**
 
   ```bash
-  cd frontend && npx vitest run src/lib/gameState.test.ts src/lib/gameState.hook.test.ts 2>&1 | tail -20
-  cd frontend && npx tsc --noEmit && npm run test 2>&1 | tail -12 && npm run lint 2>&1 | tail -20
+  cd frontend && npx vitest run src/lib/gameState.test.ts src/lib/gameState.hook.test.ts
+  cd frontend && npx tsc --noEmit && npm run test && npm run lint
   ```
 
   Expected: both files green; `tsc` clean; no new lint warnings.
@@ -439,7 +448,7 @@ alongside the mode table that drives it, because a control whose only input is
 `DIFFICULTY_CONFIG[difficulty].opponentRequired` cannot be written before the
 table that supplies it. v1.2.3 confirms it across the third non-Expert mode. This
 task's job is the remaining half of the decision: the **absence assertion**
-(roadmap §5.2, R1) — proof that `opponentRequired: false` removes the control
+(roadmap §5.2, RD1) — proof that `opponentRequired: false` removes the control
 rather than disabling it.
 
 **Files:**
@@ -456,7 +465,7 @@ rather than disabling it.
 
   ```tsx
     it('renders nothing at all in Normal, even fully resolved', () => {
-      // The absence assertion (R1). "Fully resolved" is the case that matters:
+      // The absence assertion (RD1). "Fully resolved" is the case that matters:
       // a control that merely greys out at 22/22 in Normal would still be a
       // requirement the player can see and cannot satisfy, which is the exact
       // confusion the flag exists to remove.
@@ -496,10 +505,10 @@ rather than disabling it.
 - [ ] **Step 2.2: Verify red.**
 
   ```bash
-  cd frontend && npx vitest run src/components/FinishButton.test.tsx 2>&1 | tail -25
+  cd frontend && npx vitest run src/components/FinishButton.test.tsx
   ```
 
-  Expected: **FAIL** if v1.2.2's `FinishButton` renders a disabled control instead of returning `null` for a non-required mode, or if it compares against the literal `'expert'`. If all three pass, that is a **verified** result, not a skipped step: record it in the changelog and keep the tests, because they are the standing guard for R1.
+  Expected: **FAIL** if v1.2.2's `FinishButton` renders a disabled control instead of returning `null` for a non-required mode, or if it compares against the literal `'expert'`. If all three pass, that is a **verified** result, not a skipped step: record it in the changelog and keep the tests, because they are the standing guard for RD1.
 
 - [ ] **Step 2.3: Make the control obey the flag, if it does not already.**
 
@@ -515,12 +524,12 @@ rather than disabling it.
 
   ```bash
   cd frontend && grep -n "FinishButton" app/missing-eleven/page.tsx
-  cd frontend && npx tsc --noEmit && npm run test 2>&1 | tail -12 && npm run lint 2>&1 | tail -20
+  cd frontend && npx tsc --noEmit && npm run test && npm run lint
   ```
 
   Expected: the page renders `FinishButton` only inside the `gameStatus === 'playing'` view, and the surrender flow still calls `surrender` and never `finishGame`. `tsc` clean; the suite count is the Task 1 exit count plus 3; no new lint warnings.
 
-  **Surrender stays ungated.** The page must not require anything of the opponent half before enabling the surrender control, and `handleSurrender` must not mark untouched opponent shirts `failed`. A surrendered `expert` result is 11 slots (R2), and fabricating `failed` shirts would make v1.4.1's grid believe the opponent was played.
+  **Surrender stays ungated.** The page must not require anything of the opponent half before enabling the surrender control, and `handleSurrender` must not mark untouched opponent shirts `failed`. A surrendered `expert` result is 11 slots (RD2), and fabricating `failed` shirts would make v1.4.1's grid believe the opponent was played.
 
 - [ ] **Step 2.5: Commit.**
 
@@ -558,7 +567,7 @@ rather than disabling it.
 - [ ] **Step 3.2: Verify red.**
 
   ```bash
-  cd frontend && npx vitest run src/lib/difficulty.test.ts 2>&1 | tail -20
+  cd frontend && npx vitest run src/lib/difficulty.test.ts
   ```
 
   Expected: **FAIL** — `DIFFICULTIES` is `['easy', 'normal', 'hard']`.
@@ -590,7 +599,7 @@ rather than disabling it.
 
   Expert's row reads `3 attempts · no clues · number hidden · opponent required`.
 
-  **"Optional" here is a claim about the gate, not yet about points.** Under R1 the three non-Expert modes now auto-complete the moment the target half is resolved, so `opponent optional` describes a real, observable difference between the rows. It says nothing about scoring yet: v1.2.5 is the patch that makes the opponent a labelled optional *bonus* (§5.2) and the patch that makes the ×3 multiplier visible. Until then the points do not differ by mode at all, and the selector must not imply that they do.
+  **"Optional" here is a claim about the gate, not yet about points.** Under RD1 the three non-Expert modes now auto-complete the moment the target half is resolved, so `opponent optional` describes a real, observable difference between the rows. It says nothing about scoring yet: v1.2.5 is the patch that makes the opponent a labelled optional *bonus* (§5.2) and the patch that makes the ×3 multiplier visible. Until then the points do not differ by mode at all, and the selector must not imply that they do.
 
   In `frontend/src/components/DifficultySelector.test.tsx`, add:
 
@@ -608,14 +617,14 @@ rather than disabling it.
 - [ ] **Step 3.5: Verify green and run everything.**
 
   ```bash
-  cd frontend && npx vitest run src/lib/difficulty.test.ts src/components/DifficultySelector.test.tsx 2>&1 | tail -20
+  cd frontend && npx vitest run src/lib/difficulty.test.ts src/components/DifficultySelector.test.tsx
   ```
 
   Expected: both green; `difficulty.test.ts` back to 7 tests, the selector 6.
 
   ```bash
-  cd frontend && npx tsc --noEmit && npm run test 2>&1 | tail -12 && npm run lint 2>&1 | tail -20
-  cd backend  && npm run test 2>&1 | tail -12
+  cd frontend && npx tsc --noEmit && npm run test && npm run lint
+  cd backend  && npm run test
   ```
 
   Expected: frontend all green; backend unchanged.
@@ -632,7 +641,7 @@ rather than disabling it.
 ## Closed escalation — the §5.2 `opponentRequired` tension
 
 **This is resolved. Do not re-open it inside v1.2.4, and do not carry it into
-v1.2.5.** The answer is roadmap §5.2 as ratified, and it is recorded as **R1** in
+v1.2.5.** The answer is roadmap §5.2 as ratified, and it is recorded as **RD1** in
 roadmap §9.1.
 
 The tension was that §5.2 calls the opponent an "optional scorable bonus" in
@@ -658,15 +667,17 @@ the bug.
 "optional bonus" *labelling* still lands in v1.2.5 and not here, for the reason
 §5.2 and §11 rule 5 give.
 
+---
+
 ## Acceptance criteria
 
 1. `FINISH_GAME` completes an `expert` game at 22/22 and changes nothing but `gameStatus`.
 2. `FINISH_GAME` with the target half resolved but the opponent half untouched leaves `gameStatus: 'playing'` and both shirt arrays referentially untouched, in `expert`.
 3. `FINISH_GAME` at 21/22 leaves `gameStatus: 'playing'`.
 4. An `expert` game does **not** auto-complete when the 22nd shirt resolves; it stays `playing` until Finish.
-5. `easy`, `normal` and `hard` **auto-complete at 11/22** with the opponent half untouched — the ratified R1 consequence, asserted for all three modes.
+5. `easy`, `normal` and `hard` **auto-complete at 11/22** with the opponent half untouched — the ratified RD1 consequence, asserted for all three modes.
 6. `checkGameComplete` takes `difficulty` and reads `DIFFICULTY_CONFIG[difficulty].opponentRequired`; no call site omits the argument and no branch compares a mode name.
-7. `SURRENDER` ends an `expert` game from 11 resolved shirts, leaves `gameStatus: 'surrendered'`, and marks no untouched opponent shirt `failed` — the R2 11-slot result.
+7. `SURRENDER` ends an `expert` game from 11 resolved shirts, leaves `gameStatus: 'surrendered'`, and marks no untouched opponent shirt `failed` — the RD2 11-slot result.
 8. The Finish control renders **nothing at all** when `opponentRequired` is false, asserted for `easy`, `normal` and `hard` at `resolved={22}`, and asserted by a property test over `DIFFICULTIES` rather than by hand-written mode cases.
 9. The Finish control is created in **v1.2.2** and consumed here unchanged: a control plus a confirmation inside the existing board and dialog patterns, not a screen. This patch adds no new prop, route, or dialog.
 10. The gate is enforced in the reducer, not only by a `disabled` attribute.
@@ -682,7 +693,7 @@ the bug.
 | Check | Command | Pass signal |
 |---|---|---|
 | Gate + auto-complete | `cd frontend && npx vitest run src/lib/gameState.test.ts` | all green, including the four updated pre-existing completion tests |
-| R1 config-driven gate | `grep -n "opponentRequired" frontend/src/lib/gameState.ts` | hits only inside `checkGameComplete` and `handleSubmitGuess`; no `=== 'expert'` |
+| RD1 config-driven gate | `grep -n "opponentRequired" frontend/src/lib/gameState.ts` | hits only inside `checkGameComplete` and `handleSubmitGuess`; no `=== 'expert'` |
 | Every call site updated | `grep -rn "checkGameComplete" frontend/src frontend/app` | no call omits the `difficulty` argument |
 | Surrender stays ungated | `cd frontend && npx vitest run src/lib/gameState.test.ts -t "surrender is not gated"` | 2 passed |
 | Hook surface | `cd frontend && npx vitest run src/lib/gameState.hook.test.ts` | all green |
@@ -692,7 +703,9 @@ the bug.
 | Types | `cd frontend && npx tsc --noEmit` | no output |
 | Lint | `cd frontend && npm run lint` | no output |
 | One mode branch only | `grep -rn "=== 'expert'\|=== 'easy'\|=== 'normal'\|=== 'hard'" frontend/src/lib frontend/app frontend/components frontend/src/components` | no output |
-| Gate is in the reducer | `grep -n "checkGameComplete" frontend/src/lib/gameState.ts` | the predicate, `handleSubmitGame` completion site, and `handleFinishGame` |
+| Gate is in the reducer | `grep -n "checkGameComplete" frontend/src/lib/gameState.ts` | the predicate, the `handleSubmitGuess` completion site, and `handleFinishGame` |
+| Emptiness guard is over the **whole** lineup, not one half | `grep -n "all\.length" frontend/src/lib/gameState.ts` | exactly one hit, inside `checkGameComplete`, on the emptiness guard Step 1.3 writes against `[...target, ...opponent]` |
+| …and that guard is not over one half | `grep -n "target\.length" frontend/src/lib/gameState.ts` | no output — the pre-patch bug this patch removes was a `target`-only guard |
 | No scoring change | `git diff --stat <base> -- frontend/src/lib/scoring.ts frontend/components/GameComplete.tsx` | empty |
 | Tests are collected | `cd frontend && npx vitest list 2>&1 \| grep -c FinishButton` | 1, not 0 |
 | Backend untouched | `cd backend && npm run test` | every file green; count measured and recorded, not asserted |
@@ -701,10 +714,10 @@ the bug.
 
 | Risk | Mitigation |
 |---|---|
-| **Three shipped modes now end at 11/22 instead of 22/22.** | Ratified (R1) and asserted in both directions: Normal/Easy/Hard auto-complete at 11/22, and `expert` refuses. The pre-existing completion tests are updated to a target half, and the change is recorded in the changelog rather than hidden in a re-narrowed predicate. |
+| **Three shipped modes now end at 11/22 instead of 22/22.** | Ratified (RD1) and asserted in both directions: Normal/Easy/Hard auto-complete at 11/22, and `expert` refuses. The pre-existing completion tests are updated to a target half, and the change is recorded in the changelog rather than hidden in a re-narrowed predicate. |
 | **A pre-existing test asserts 22/22 as a precondition for `complete`.** | That assertion was pinning the defect. Update the fixture to a target half; do **not** re-narrow `checkGameComplete` to make it pass. If a test genuinely needs a 22/22 completion, it should set `difficulty: 'expert'`. |
 | **Suppressing auto-complete in Expert surprises a player who has just solved 22/22** and sees nothing happen. | The Finish control is present and enabled at that moment, and v1.2.2's confirmation makes the last step explicit. If playtesting finds it confusing, the fix is a copy change, not a behaviour change. |
-| **The gate is duplicated** between the control's `locked` expression and `checkGameComplete`. | They are not the same predicate: the control also requires `total === 22`, which the reducer's `all.length > 0` check tolerates. Duplication here is a UI courtesy; the reducer is authoritative and is the one with tests. A comment on each says so. |
+| **The gate is duplicated** between the control's `locked` expression and `checkGameComplete`. | They are not the same predicate: the control also requires `total === 22`, which the reducer's emptiness guard tolerates. Duplication here is a UI courtesy; the reducer is authoritative and is the one with tests. A comment on each says so. |
 | **The surrender path quietly gains an opponent requirement.** | `surrender is not gated` asserts both the 11-slot outcome and that untouched opponent shirts stay `default` with `attempts === 0`. A synthetic `failed` would make v1.4.1's `opponentAttempted` claim the opponent was played. |
 | **`state.difficulty` read inside `handleSubmitGuess` is the mode at submit time**, not the mode when the game started. | The selector is not rendered once `gameStatus === 'playing'`, so the mode cannot change mid-game. Asserted in v1.2.2's "leaves the board and the shirts untouched" test and by the conditional render. |
 | **Expert's three attempts shipped in v1.2.2 but were untestable** — no UI could select the mode. | Task 3 makes it selectable and the existing config-driven attempt tests cover the budget. The `does not auto-complete` tests are new here and carry the mode-specific risk. |
@@ -712,5 +725,5 @@ the bug.
 **Escalate before proceeding only if:** `DIFFICULTY_CONFIG` no longer exposes
 `opponentRequired` as a boolean per mode, or a future mode needs "required to
 complete" and "opponent in the share grid" to differ — the latter is v1.4.1's
-concern and is closed there (R4). The §5.2 gate question itself is **not** an
+concern and is closed there (RD4). The §5.2 gate question itself is **not** an
 escalation any more.

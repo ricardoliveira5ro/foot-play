@@ -10,6 +10,10 @@
 
 ---
 
+> **Ratified decisions are not decided here.** Roadmap [§9.1](../roadmap-v1.md#91-ratified-decisions) is authoritative for every decision the owner has closed; a plan's preflight **verifies** the ratified answer and never re-decides it. Where a plan and that table disagree, the table wins and the plan is the defect. A question the table does not cover is still an escalation.
+
+---
+
 ## The two patches
 
 | Patch | What lands | Files it adds | Rollback to |
@@ -39,13 +43,20 @@ Roadmap §7 fixes the rule: **one slot per shirt in scope for that result**, wit
 |---|---|---|
 | Easy / Normal / Hard, opponent not attempted | 11 | The opponent half is out of scope for that result |
 | Easy / Normal / Hard, opponent attempted | 22 | The opponent half is in scope and renders alongside the target half |
-| Expert | 22, always | Finish stays locked until all 22 resolve (§5.2), so an Expert result cannot end at 11 |
+| Expert, finished | 22, always | Finish stays locked until all 22 resolve (§5.2), so a **Finish-locked** Expert result cannot end at 11 |
+| Expert, surrendered, opponent untouched | 11 | Surrender ends the run without the gate passing (§5.2, RD2), so an untouched opponent half is out of scope exactly as in Easy |
+
+All four rows fall out of the single condition `opponentAttempted` (§9.1, RD4) — which is
+why the third and fourth rows cannot be distinguished by asking the mode. A surrendered
+Expert game and a Normal game the player never opposed are the same case. Row 4's
+qualifier is load-bearing: an Expert game surrendered *after* attempts went into the
+opponent half is **22 slots**, by the same rule as row 2.
 
 `buildShareGrid` counts the shirts it is handed. It does not pad to 11, truncate to 11, or special-case the length — the 11 and 22 above are what the real call sites produce, and a three-shirt half yields three slots. A test pins that, so a future "always pad to 11" change fails loudly instead of silently making a short lineup look complete.
 
 **Un-resolved slots are rendered, never omitted.** A slot belongs to the grid once its shirt is in scope; what varies is whether that shirt was resolved. Omitting them would make a deliberately 11-slot Easy result indistinguishable from an Expert result that resolved only 11 shirts — the exact confusion the mode label exists to prevent. So a shirt in scope with no resolution still gets a slot, and a grid with no slots at all still renders its tally line.
 
-**Score and mode ride along in all three cases.** The mode is what makes the score comparable (§6.2); a bare number across four multipliers is not a result anyone can argue about. Both are read from `DIFFICULTY_CONFIG` — the module never names a mode, so a future fifth mode is handled by the table rather than by a branch someone has to remember to add.
+**Score and mode ride along in all four cases.** The mode is what makes the score comparable (§6.2); a bare number across four multipliers is not a result anyone can argue about. Both are read from `DIFFICULTY_CONFIG` — the module never names a mode, so a future fifth mode is handled by the table rather than by a branch someone has to remember to add.
 
 ---
 
@@ -53,7 +64,7 @@ Roadmap §7 fixes the rule: **one slot per shirt in scope for that result**, wit
 
 **Two glyphs, not three.** `🟩` (`U+1F7E9`) is a correct shirt; `⬛` (`U+2B1B`) is everything else. There is no `🟨`, and that is a decision rather than an omission. `SlotOutcome` is frozen to `'correct' | 'failed'`, so a yellow slot would have to be a *failed* slot wearing a colour that claims "close" — a third look with no third meaning. `ShirtState` really does have four members (`'default' | 'in-progress' | 'correct' | 'failed'`), and the mapping is deliberately lossy: `correct` is the only claim the grid makes, and `'default'` and `'in-progress'` render as `failed`. Throwing would let a refactor that surfaced the grid mid-game take down the dialog; omitting would break the never-omitted rule above. `⬛` is the honest rendering of "did not get solved", and because the block is a fixed-emoji monospace grid, both rows align regardless of the glyph's ink coverage.
 
-**`opponentAttempted` is derived, never stored.** `GameComplete` passes `opponentShirts.some((shirt) => shirt.attempts > 0)`. This flag is the whole reason the 11/22 split works, and getting it from anywhere else breaks a real case: a **surrendered** game in Normal has an opponent half sitting in state that was never played, and `state !== 'default'` would misclassify that as a 22-slot result the player never attempted. Deriving it from the shirts means it cannot go stale, needs no reducer change, and adds no `GameState` field. `opponentRequired` supplies the other half of the condition, read from the config table rather than by naming Expert.
+**`opponentAttempted` is derived, never stored.** `GameComplete` passes `opponentShirts.some((shirt) => shirt.attempts > 0)`. This flag is the whole reason the 11/22 split works, and getting it from anywhere else breaks a real case: a **surrendered** game in Normal has an opponent half sitting in state that was never played, and `state !== 'default'` would misclassify that as a 22-slot result the player never attempted. Deriving it from the shirts means it cannot go stale, needs no reducer change, and adds no `GameState` field. It is also the **only** scope input: `opponentRequired` is not read by the grid at all, because a surrendered Expert game has the flag set and nothing attempted (RD4).
 
 **No `document.execCommand('copy')` fallback, on evidence.** The obvious fallback is dead code here, and shipping dead code as a safety net is how the next reader ends up maintaining two copy paths:
 
@@ -75,19 +86,42 @@ The fragment is dropped. It is never sent to the server and is not part of a rep
 
 ---
 
-## Cross-line contract escalation
+## Ratified decisions applied
 
-Raised in the two plans' Task 1 preflights; none was resolved by renaming anything.
+These were raised as escalations in the two plans' Task 1 preflights and have since
+been **ratified by the owner**. The authoritative record is roadmap **§9.1**; this
+table is a pointer, not a second source of truth. None was resolved by renaming
+anything.
 
-| # | Discrepancy | What v1.4 does |
-|---|---|---|
-| **E1** | `DIFFICULTY_CONFIG.opponentRequired` currently means *"Expert needs an explicit Finish to complete"* (v1.2.4). v1.4.1 reuses it to mean *"the opponent half is always in scope for the share grid"*. For Expert the two coincide, and for the other three modes both are false, so the reuse is correct today — but one flag now carries two meanings. | Consumes the field as-is and documents both meanings. **This is the one thing to revisit if a future mode wants "required to complete" and "opponent not in the share grid" to differ**; a second flag would be the fix, and it belongs to that patch, not this one. |
-| **E2** | `POSITION_ORDER` and `getPositionLabel` live inside `GameComplete.tsx:50-93` today. The frozen v1.4 contract does not mention them, but the block and the dialog must order shirts identically. | v1.4.1 Task 2 extracts them, with the comparator, to `frontend/src/lib/positionOrder.ts` and deletes the component's copy. One table, two importers, and an existing dialog test that fails if the extraction is wrong. |
-| **E3** | R7 (roadmap §8) assigns widening the vitest include past `src/**` — and deleting the shadowing `frontend/vitest.config.mts` — to **v1.1.1**, deliberately ahead of the UI-heavy patches. v1.2.2's own Global Constraints nonetheless assert the opposite, that the `.mts` file is the effective config. | v1.4 touches neither file. Both plans' preflights **verify** the include was widened and the `.mts` deleted, and escalate if not. A failure in the never-before-collected `frontend/components/Shirt.colors.test.tsx` belongs to v1.1.1 and must not be absorbed here. |
-| **E4** | v1.3's handoff says `hasPlayed(streak, todayKey)` is "the already-played-today gate the share affordance sits behind", which reads as though v1.4 must gate the copy control. | Read as: the gate blocks *starting* a second daily, and the share affordance sits behind it in the only sense that matters — the game-over dialog is reachable only by playing. **No gating code in v1.4**, and the v1.4.2 preflight checks the copy control is reachable from the dialog. Stated here because the alternative reading would put a storage read in the clipboard path, and §11 rule 8 makes all storage v1.3.2's. |
-| **E5** | `renderShareText` ships in v1.4.1 with no caller, which reads as dead code. | Deliberate, and it is the mechanism that protects the rollback point: v1.4.2's entire job is to call it, and shipping it earlier means v1.4.2 needs no change to a module v1.4.1 froze. An export that the next patch in the same line is contractually required to call is not dead code. |
+| # | Question raised | Ratified answer | Where it lands |
+|---|---|---|---|
+| **E1** | Does the share grid's scope condition read `opponentRequired`, `opponentAttempted`, or both? | **`opponentAttempted` alone.** `opponentRequired` is **dropped** from the grid condition. When the opponent is required it was necessarily attempted, so the derived flag is sufficient — one flag, one meaning. | `plan-v1.4.1-share-grid.md`, Task 3 |
+| **E2** | Is `POSITION_ORDER` copied into a second file, or extracted? | **Extracted**, to `frontend/src/lib/positionOrder.ts`. The component's copy is deleted, so two consumers cannot drift. | `plan-v1.4.1-share-grid.md`, Task 2 |
+| **E3** | Does `vitest.config.mts` shadow `vitest.config.ts`? | **No — it is dead, not shadowing.** `vitest.config.ts` wins on vitest 5.0.0's resolution order (`CONFIG_NAMES × CONFIG_EXTENSIONS`, first hit wins) and the `.mts` is never read. v1.1.1 deletes it, which is a cleanup. | `plan-v1.4.1` Task 1, `plan-v1.4.2` Task 1 — both **verify** only |
+| **E4** | Does the copy control gate on v1.3's `hasPlayed(streak, todayKey)`? | **No.** No gating code, and the clipboard path reads no storage at all. | `plan-v1.4.2-clipboard-share.md`, Global Constraints |
+| **E5** | Is `renderShareText` shipping in v1.4.1 with no caller acceptable? | **Yes, deliberately.** It is the rollback boundary: v1.4.2's whole job is to call it, so the module stays byte-for-byte unedited. | `plan-v1.4.1` Task 4, `plan-v1.4.2` Step 5.2 |
 
-**Open decisions applied (roadmap §9 defaults):** O1 (streak scope) is still open and *does not block v1.4* — the tally line already carries the mode label out of `DIFFICULTY_CONFIG`, so if O1 flips to per-(day, difficulty) the label goes from decorative to load-bearing and no v1.4 code changes. O5 is inherited and irrelevant here: the share block makes no claim about yellow cards, because it makes no claim about any clue.
+**The stale-alarm behind E3 is resolved.** The earlier framing here said v1.2.2's
+Global Constraints "assert the opposite, that the `.mts` file is the effective config".
+That argument was **wrong and has been removed from both places**: v1.2.2 already
+states correctly that the `.mts` is dead and never read. There was never a
+disagreement between v1.2.2 and v1.4 on this point — only this overview's
+misreading of it.
+
+**E1's resolution is a correction, not a clarification.** The earlier framing here
+argued that `opponentRequired` carries two meanings but that the reuse is "correct
+today", because for Expert the two flags coincide and for the other three modes both
+are false. That reasoning missed the case that matters: a **surrendered** Expert game
+has `opponentRequired: true` and `opponentAttempted: false`. Under the old condition
+that game rendered 22 slots for a half the player never touched. Reading the mode
+answered a question about the **mode** when the question is about the **play**.
+
+**Streak scope is settled.** roadmap §9.1 RD3 ratified one streak per day, global
+across difficulties. The tally line still carries the mode label out of
+`DIFFICULTY_CONFIG` — not to disambiguate a streak, but because §6.2 makes a score
+meaningless across four multipliers without it. O5 is inherited and irrelevant here:
+the share block makes no claim about yellow cards, because it makes no claim about any
+clue.
 
 ---
 

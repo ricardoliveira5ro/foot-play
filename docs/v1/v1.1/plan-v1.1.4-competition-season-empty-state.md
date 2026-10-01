@@ -97,7 +97,7 @@
 - [ ] **Step 1.2: Run it and confirm red.**
 
   ```bash
-  cd frontend && npx vitest run src/lib/competitionFilters.test.ts 2>&1 | tail -20
+  cd frontend && npx vitest run src/lib/competitionFilters.test.ts
   ```
 
 - [ ] **Step 1.3: Implement.**
@@ -127,7 +127,7 @@
 - [ ] **Step 1.4: Verify green and commit.**
 
   ```bash
-  cd frontend && npx vitest run src/lib/competitionFilters.test.ts 2>&1 | tail -20
+  cd frontend && npx vitest run src/lib/competitionFilters.test.ts
   git add frontend/src/lib/competitionFilters.ts frontend/src/lib/competitionFilters.test.ts
   git commit -m "feat: add competition and season range helpers"
   ```
@@ -209,7 +209,7 @@
 - [ ] **Step 2.3: Run both and confirm red.**
 
   ```bash
-  cd frontend && npx vitest run src/components/CompetitionMultiSelect.test.tsx src/components/SeasonRange.test.tsx 2>&1 | tail -25
+  cd frontend && npx vitest run src/components/CompetitionMultiSelect.test.tsx src/components/SeasonRange.test.tsx
   ```
 
 - [ ] **Step 2.4: Implement both controls.**
@@ -221,7 +221,7 @@
 - [ ] **Step 2.5: Verify green and commit.**
 
   ```bash
-  cd frontend && npx vitest run src/components/ 2>&1 | tail -30
+  cd frontend && npx vitest run src/components/
   git add frontend/src/components/CompetitionMultiSelect.tsx frontend/src/components/CompetitionMultiSelect.test.tsx frontend/src/components/SeasonRange.tsx frontend/src/components/SeasonRange.test.tsx
   git commit -m "feat: add competition and season range filter controls"
   ```
@@ -272,7 +272,7 @@
 - [ ] **Step 3.2: Run it and confirm red.**
 
   ```bash
-  cd frontend && npx vitest run src/components/FilterEmptyState.test.tsx 2>&1 | tail -20
+  cd frontend && npx vitest run src/components/FilterEmptyState.test.tsx
   ```
 
 - [ ] **Step 3.3: Implement.**
@@ -304,7 +304,7 @@
 - [ ] **Step 3.4: Verify green and commit.**
 
   ```bash
-  cd frontend && npx vitest run src/components/FilterEmptyState.test.tsx 2>&1 | tail -20
+  cd frontend && npx vitest run src/components/FilterEmptyState.test.tsx
   git add frontend/src/components/FilterEmptyState.tsx frontend/src/components/FilterEmptyState.test.tsx
   git commit -m "feat: add the filter empty state with an escape hatch"
   ```
@@ -347,7 +347,7 @@
 - [ ] **Step 4.2: Run and confirm red.**
 
   ```bash
-  cd frontend && npx vitest run src/components/FilterPanel.test.tsx 2>&1 | tail -25
+  cd frontend && npx vitest run src/components/FilterPanel.test.tsx
   ```
 
 - [ ] **Step 4.3: Implement.**
@@ -363,7 +363,7 @@
 - [ ] **Step 4.4: Verify green and commit.**
 
   ```bash
-  cd frontend && npx vitest run src/components/FilterPanel.test.tsx 2>&1 | tail -30
+  cd frontend && npx vitest run src/components/FilterPanel.test.tsx
   git add frontend/src/components/FilterPanel.tsx frontend/src/components/FilterPanel.test.tsx
   git commit -m "feat: add competition and season dimensions to the filter panel"
   ```
@@ -404,7 +404,7 @@
 - [ ] **Step 5.2: Run and confirm red.**
 
   ```bash
-  cd frontend && npx vitest run app/missing-eleven/page.test.tsx 2>&1 | tail -30
+  cd frontend && npx vitest run app/missing-eleven/page.test.tsx
   ```
 
 - [ ] **Step 5.3: Implement the switch.**
@@ -428,8 +428,8 @@
 - [ ] **Step 5.4: Verify green, then run everything.**
 
   ```bash
-  cd frontend && npx vitest run app/missing-eleven/ src/components/ src/lib/ 2>&1 | tail -35
-  cd frontend && npm run test 2>&1 | tail -35
+  cd frontend && npx vitest run app/missing-eleven/ src/components/ src/lib/
+  cd frontend && npm run test
   ```
 
 - [ ] **Step 5.5: Commit.**
@@ -456,14 +456,14 @@
 - [ ] **Step 6.1: Run the full frontend suite with coverage and a production build.**
 
   ```bash
-  cd frontend && npm run test:coverage 2>&1 | tail -40
-  cd frontend && npm run build 2>&1 | tail -40
+  cd frontend && npm run test:coverage
+  cd frontend && npm run build
   ```
 
 - [ ] **Step 6.2: Live-smoke all four dimensions.**
 
   ```bash
-  curl -s 'http://localhost:3000/api/matches/filter-options' | head -c 800
+  curl -s 'http://localhost:3000/api/matches/filter-options'
   ```
 
   In the browser:
@@ -492,3 +492,53 @@
   git add docs/v1/v1.1/CHANGELOG-v1.1.4.md docs/v1/v1.1/overview.md
   git commit -m "docs: close out the v1.1 filter line"
   ```
+
+## Acceptance criteria
+
+1. This patch renders **Competition, Season, and the empty state**. It does not change the Team/Opponent behaviour frozen in v1.1.3; the v1.1.3 suites stay green untouched.
+2. The empty state is keyed on `filterOptions.total === 0`, **not** on the match request failing. A successful response whose `total` is zero shows the empty state; an empty state reached because of an error is a defect.
+3. A 404 or a network failure still renders the **error** state, not the empty state. The two are distinguished by the request outcome, and the tests cover both.
+4. `total` counts games that pass the **completeness predicate**, so a zero here means "no complete game matches", never "no game exists at all".
+5. The empty state is **escapable**: a clear-filters action returns the user to an unfiltered list without a page reload.
+6. Season options stop at **2025**; the data runs to 2026-06-28 and 2026 is partial. No `null` season option is offered, and season is never treated as equivalent to a date.
+7. Season is a **range**, not two independent filters: `seasonFrom` and `seasonTo` are one control (`SeasonRange`) and one serialized pair.
+8. `seasonFrom > seasonTo` yields zero results and is **explained** in the empty state. It is never silently normalised or swapped, because swapping would show games the user did not ask for.
+9. `paramsToFilters` clamps an out-of-range bound to `null` **per dimension**, so one bad bound does not discard the other filters.
+10. Competition and Season obey the same R5 facet exclusion as the club dimensions: selecting one does not collapse its own list to zeros.
+11. Draft-then-apply continues to hold for both new controls, exactly as in v1.1.3 — no dimension writes on toggle.
+12. New components live in `frontend/src/components/`, not `frontend/components/`.
+13. Accessibility holds for both new controls and for the empty state's actions: labelled inputs, `aria-expanded`/`aria-controls` on each trigger, and keyboard-reachable clear/apply actions.
+14. `FilterEmptyState` is presentational — it renders what it is given and calls back; it does not fetch or read filter state.
+15. No backend, schema, or API change in this patch, and no new dependencies.
+16. `npm run test`, `npm run build`, `npx tsc --noEmit`, and `npm run lint` are all clean, and every new suite is collected. No suite is asserted against a fixed count — it is measured and recorded, per `docs/v1/v1.2/overview.md:209`.
+
+## Validation
+
+| Check | Command | Pass signal |
+|---|---|---|
+| Frontend suite | `cd frontend && npm run test` | every file green; count measured and recorded, not asserted |
+| The new controls and the empty state | `cd frontend && npx vitest run src/components/CompetitionMultiSelect.test.tsx src/components/SeasonRange.test.tsx src/components/FilterEmptyState.test.tsx src/lib/competitionFilters.test.ts` | every case green |
+| The panel wiring | `cd frontend && npx vitest run src/components/FilterPanel.test.tsx` | both controls present and obeying draft-then-apply |
+| The page mount | `cd frontend && npx vitest run app/missing-eleven/page.test.tsx` | empty state appears on `total === 0` and the error state still appears on failure |
+| Production build | `cd frontend && npm run build` | no output |
+| Types | `cd frontend && npx tsc --noEmit` | no output |
+| Lint | `cd frontend && npm run lint` | no output |
+| No 2026 or null season option is offered | `grep -rn "2026" frontend/src/lib/competitionFilters.ts frontend/src/components/SeasonRange.tsx` | no output |
+| The range is one control | `grep -rn "seasonFrom" frontend/src/components/SeasonRange.tsx` | both bounds handled in the one component |
+| The v1.1.3 suites are untouched | `cd frontend && npx vitest run src/components/ClubMultiSelect.test.tsx src/components/FilterPanel.test.tsx` | still green |
+| No backend drift | `git diff --stat -- backend/` | empty — this patch is frontend-only |
+| The include was not re-narrowed (R7) | `grep -n "include:" frontend/vitest.config.ts` | unchanged from v1.1.1 |
+
+## Risks
+
+| Risk | Mitigation |
+|---|---|
+| **The empty state is shown for the wrong reason** — a network failure or 404 renders "no games match" when the truth is that the app cannot reach the backend. | The empty state is keyed on a successful response with `total === 0` (criteria 2–3), and both branches are asserted in `page.test.tsx`. Keying on request failure would be the defect. |
+| **An inverted season range is silently normalised**, so `seasonFrom > seasonTo` shows games the user did not ask for instead of explaining the problem. | Zero results plus an explanation is the required behaviour (criterion 8); the swap-and-render approach is ruled out explicitly because it answers a different question than the one asked. |
+| **A partial 2026 season is offered as a filter**, so users select a competition-year that appears empty. | The bound is frozen at 2025 in the constraints, the option list is asserted against it, and the grep gate makes a stray `2026` visible in the two files that could introduce it. |
+| **One bad bound discards the whole filter set**, so a single malformed `seasonFrom` silently clears Team and Opponent too. | Clamping is **per dimension** (criterion 9), asserted by a test that supplies one out-of-range bound alongside valid club selections. |
+| **A facet collapses to zeros** for competition or season, making an applied filter impossible to widen. | R5 applies to the new dimensions exactly as it does to the club dimensions (criterion 10), and the panel test covers both new controls. |
+| **The panel's behaviour for Team/Opponent regresses** while the new controls are wired in. | v1.1.3 is frozen and its suites are re-run as a gate (criterion 1); a change to `ClubMultiSelect` is out of scope for this patch. |
+| **The empty state becomes a dead end** on a filter combination the user cannot easily unpick. | Escapability is a criterion, not an enhancement (criterion 5), asserted through the clear action rather than inferred from markup. |
+
+**Escalate before proceeding if:** the `total` v1.1.1 returns cannot be distinguished from a failed request at the point the page decides which state to render — for example if a partial response omits `total`. That would mean the empty state has no sound key, and the fix belongs upstream in v1.1.1's response contract rather than in a client-side guess here.

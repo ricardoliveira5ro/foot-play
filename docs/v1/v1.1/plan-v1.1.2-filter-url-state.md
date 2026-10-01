@@ -68,7 +68,7 @@
 - [ ] **Step 1.2: Run it and confirm red.**
 
   ```bash
-  cd frontend && npx vitest run src/lib/filtersEqual.test.ts 2>&1 | tail -20
+  cd frontend && npx vitest run src/lib/filtersEqual.test.ts
   ```
 
 - [ ] **Step 1.3: Implement `filtersEqual`.**
@@ -121,7 +121,7 @@
 - [ ] **Step 1.5: Run and confirm red.**
 
   ```bash
-  cd frontend && npx vitest run src/lib/gameState.test.ts 2>&1 | tail -20
+  cd frontend && npx vitest run src/lib/gameState.test.ts
   ```
 
 - [ ] **Step 1.6: Implement the state change.**
@@ -144,7 +144,7 @@
 - [ ] **Step 1.7: Verify green, and that the existing state suite is unaffected.**
 
   ```bash
-  cd frontend && npx vitest run src/lib/gameState.test.ts src/lib/filtersEqual.test.ts 2>&1 | tail -25
+  cd frontend && npx vitest run src/lib/gameState.test.ts src/lib/filtersEqual.test.ts
   ```
 
   Every pre-existing `gameState.test.ts` case must still pass unchanged. The new state field must be inert for callers that do not use it.
@@ -215,7 +215,7 @@
 - [ ] **Step 2.3: Run and confirm red.**
 
   ```bash
-  cd frontend && npx vitest run src/lib/useFilterOptions.hook.test.ts 2>&1 | tail -20
+  cd frontend && npx vitest run src/lib/useFilterOptions.hook.test.ts
   ```
 
 - [ ] **Step 2.4: Implement the hook.**
@@ -258,7 +258,7 @@
 - [ ] **Step 2.5: Verify green, with coverage on the new file.**
 
   ```bash
-  cd frontend && npx vitest run src/lib/useFilterOptions.hook.test.ts --coverage 2>&1 | tail -30
+  cd frontend && npx vitest run src/lib/useFilterOptions.hook.test.ts --coverage
   ```
 
 - [ ] **Step 2.6: Commit.**
@@ -321,10 +321,10 @@
 - [ ] **Step 3.2: Run and confirm red.**
 
   ```bash
-  cd frontend && npx vitest run app/missing-eleven/FilterUrlSync.test.tsx 2>&1 | tail -20
+  cd frontend && npx vitest run app/missing-eleven/FilterUrlSync.test.tsx
   ```
 
-  Note the path: this test lives under `app/`, and **Task 1 of v1.1.1 is what makes `app/**` collectable** — the frozen include it produces enumerates four roots, and the fourth is `'app/**/*.{test,spec}.{js,mjs,cjs,ts,mts,cts,jsx,tsx}'` (`docs/v1/v1.1/plan-v1.1.1-filter-foundation.md:52`). Neither `src/**` nor `tests/**` matches `app/**`, so without that fourth entry this file is never run and the suite still reports green. Before writing, confirm the entry is actually present:
+  Note the path: this test lives under `app/`, and **Task 1 of v1.1.1 is what makes `app/**` collectable** — the frozen include it produces enumerates four roots, and the fourth is `'app/**/*.{test,spec}.{js,mjs,cjs,ts,mts,cts,jsx,tsx}'` (`docs/v1/v1.1/plan-v1.1.1-filter-foundation.md:53`). Neither `src/**` nor `tests/**` matches `app/**`, so without that fourth entry this file is never run and the suite still reports green. Before writing, confirm the entry is actually present:
 
   ```bash
   grep -n "app/\*\*" frontend/vitest.config.ts
@@ -411,7 +411,7 @@
 - [ ] **Step 3.5: Run and confirm red.**
 
   ```bash
-  cd frontend && npx vitest run app/missing-eleven/page.test.tsx 2>&1 | tail -25
+  cd frontend && npx vitest run app/missing-eleven/page.test.tsx
   ```
 
 - [ ] **Step 3.6: Wire the page.**
@@ -451,8 +451,8 @@
 - [ ] **Step 3.7: Verify green, then run the whole suite.**
 
   ```bash
-  cd frontend && npx vitest run app/missing-eleven/ 2>&1 | tail -30
-  cd frontend && npm run test 2>&1 | tail -30
+  cd frontend && npx vitest run app/missing-eleven/
+  cd frontend && npm run test
   ```
 
   Every pre-existing test must still pass. This patch changes the mount fetch, so a regression here shows up as a pre-existing failure — do not "fix" it by relaxing the old test.
@@ -497,7 +497,7 @@
 - [ ] **Step 4.2: Run and confirm red.**
 
   ```bash
-  cd frontend && npx vitest run src/lib/filters.test.ts 2>&1 | tail -20
+  cd frontend && npx vitest run src/lib/filters.test.ts
   ```
 
 - [ ] **Step 4.3: Implement.**
@@ -511,8 +511,8 @@
 - [ ] **Step 4.4: Verify green and commit.**
 
   ```bash
-  cd frontend && npx vitest run src/lib/filters.test.ts 2>&1 | tail -20
-  cd frontend && npx vitest run src/lib/ app/ 2>&1 | tail -20
+  cd frontend && npx vitest run src/lib/filters.test.ts
+  cd frontend && npx vitest run src/lib/ app/
   git add frontend/src/lib/filterParams.ts frontend/src/lib/filters.test.ts
   git commit -m "feat: export FILTER_PARAM_KEYS and guard it against drift"
   ```
@@ -533,14 +533,14 @@
 - [ ] **Step 5.1: Run the full frontend suite with coverage.**
 
   ```bash
-  cd frontend && npm run test 2>&1 | tail -40
-  cd frontend && npm run test:coverage 2>&1 | tail -40
+  cd frontend && npm run test
+  cd frontend && npm run test:coverage
   ```
 
 - [ ] **Step 5.2: Run a production build. This is the gate for the `Suspense` work.**
 
   ```bash
-  cd frontend && npm run build 2>&1 | tail -40
+  cd frontend && npm run build
   ```
 
   Expected: a clean build. If it fails with `missing-suspense-with-csr-bailout` or *"Entire page /missing-eleven deopted into client-side rendering"*, the `<Suspense>` boundary in Task 3.6(b) is missing or sits above rather than below `FilterUrlSync`, and the whole patch is not done. **`next dev` does not surface this; only `next build` does.** Do not accept a passing dev server as evidence.
@@ -574,3 +574,51 @@
   git add docs/v1/v1.1/CHANGELOG-v1.1.2.md
   git commit -m "docs: add v1.1.2 changelog and validation evidence"
   ```
+
+## Acceptance criteria
+
+1. This patch renders **zero** filter UI. The only change to the page is the `Suspense` boundary and the filter-aware fetch; no control, panel, or checkbox appears in this patch.
+2. `useSearchParams()` is called in **exactly one** file (`frontend/app/missing-eleven/FilterUrlSync.tsx`). `grep -rn "useSearchParams" frontend/app frontend/src` returns that file alone.
+3. `gameReducer`'s `SET_FILTERS` branch is a structural no-op when the incoming filters deep-equal the current ones — a new `filters` object with identical contents must not change `state.lastFetchedKey`. This single property is what breaks the URL↔state echo loop.
+4. The canonical filter string is the **single key** for both the URL and the fetch: one serialized form drives `lastFetchedKey` and `filtersToParams`, so the two cannot disagree.
+5. A hand-typed or shared URL produces exactly that filter set on load, and a malformed one falls back to `EMPTY_FILTERS` without throwing.
+6. `router.replace` is used, never `router.push`. A filter change must not add a history entry — pushing would trap the Back button on a filter edit.
+7. Unrelated query params survive a filter write. A tracked param that `FILTER_PARAM_KEYS` does not name is preserved verbatim.
+8. **No unvalidated string reaches `router.replace`.** Every write goes through `filtersToParams` on a validated `GameFilters` value; `grep -n "router.replace" frontend/app/missing-eleven/FilterUrlSync.tsx` shows one call site and it is fed from the validated path.
+9. **Writes never start before the read completes.** A first-load URL is adopted, not rewritten; otherwise the hook would immediately replace the URL it just read.
+10. The reducer never fetches. `grep -n "fetch" frontend/src/lib/gameState.ts` returns nothing new — network access stays in the hook.
+11. All three existing `fetchRandomMatch()` call sites are updated for the new signature, and the nullable return is handled at each one. A `GameResponse | null` result must not be dereferenced.
+12. Stale responses are discarded: a response whose key is not the current `lastFetchedKey` is dropped, not applied.
+13. `FILTER_PARAM_KEYS` is the single list of known filter params, and its guard test fails if a key is added to the serializer without being added to that list.
+14. Next 16's `missing-suspense-with-csr-bailout` is a **build** failure, not a runtime warning — the boundary is present and `npm run build` is green.
+15. No new dependencies, and no backend, Prisma, or API change in this patch.
+16. Every new test file is collected: the three created here live under `frontend/app/`, which the include widened in v1.1.1 covers. `cd frontend && npm run test` reports them; `tsc` and `lint` are clean. No suite is asserted against a fixed count — it is measured and recorded, per `docs/v1/v1.2/overview.md:209`.
+
+## Validation
+
+| Check | Command | Pass signal |
+|---|---|---|
+| Frontend suite | `cd frontend && npm run test` | every file green; count measured and recorded, not asserted |
+| The three new suites are collected | `cd frontend && npx vitest run app/missing-eleven/FilterUrlSync.test.tsx app/missing-eleven/page.test.tsx src/lib/filtersEqual.test.ts src/lib/useFilterOptions.hook.test.ts` | every case green and no "no test files found" |
+| Production build (the Suspense gate) | `cd frontend && npm run build` | no `missing-suspense-with-csr-bailout` error |
+| Types | `cd frontend && npx tsc --noEmit` | no output |
+| Lint | `cd frontend && npm run lint` | no output |
+| `useSearchParams` is in one file only | `grep -rln "useSearchParams" frontend/app frontend/src` | exactly `frontend/app/missing-eleven/FilterUrlSync.tsx` |
+| `push` never used for filters | `grep -rn "router.push" frontend/app/missing-eleven` | no output |
+| The reducer does not fetch | `grep -n "fetch" frontend/src/lib/gameState.ts` | no output |
+| Every call site updated | `grep -rn "fetchRandomMatch" frontend/src frontend/app frontend/lib` | every caller handles the `null` case |
+| No backend drift | `git diff --stat -- backend/` | empty — this patch is frontend-only |
+
+## Risks
+
+| Risk | Mitigation |
+|---|---|
+| **The URL↔state echo loop.** A filter write changes the URL, the URL re-seeds state, the state refetches, and the page spins. | The `SET_FILTERS` no-op on deep-equal (criterion 3) breaks the cycle at its source rather than debouncing it. `lastFetchedKey` is derived from the same canonical string used to write the URL, so a self-triggered refetch cannot produce a differing key. |
+| **`router.push` traps the Back button** on a filter edit, making the app feel broken to a keyboard user. | Asserted by the grep gate and covered by the sync test; `replace` is a constraint, not a preference. |
+| **A first-load URL is overwritten before it is read**, silently discarding the filters the user just pasted in. | Writes never start before the read completes (criterion 9), and the sync test asserts the URL is left byte-identical on first load. |
+| **A stale response overwrites a newer one**, showing results for filters the user has already moved off. | Stale keys are discarded (criterion 12) and pinned by a named test that resolves two fetches out of order. |
+| **The three new suites under `app/` are silently uncollected** — they report green while asserting nothing. | v1.1.1 widened `include` to cover `app/**` (R7) and this patch may not touch it. The Validation row that names all three files exists precisely to make a missing collection visible as "no test files found" rather than as a pass. |
+| **An invalid query string reaches `router.replace`**, writing a malformed URL the backend then rejects. | Every write is fed from a validated `GameFilters`; the parse fallback is asserted in Task 1, and the single-call-site grep makes a second, unvalidated write visible. |
+| **A missed `fetchRandomMatch()` call site** keeps the old destructuring shape and fails at runtime, not at build. | All three sites are enumerated in the constraints, the grep gate lists every caller, and the nullable return is asserted per call site. |
+
+**Escalate before proceeding if:** the canonical filter string cannot be made identical for the URL write and the fetch key — for example if the serializer is not order-stable across dimensions. That would mean two sources of truth for "which filters are active", which is the exact property this patch exists to establish. Ask before introducing a normalisation step rather than shipping two disagreeing serializers.

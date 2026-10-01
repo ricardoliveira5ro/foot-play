@@ -74,7 +74,7 @@ cd backend  && npm run test          # Test Files 13 passed (13) | Tests 175 pas
 cd frontend && npm run test          # Test Files  9 passed (9)  | Tests 173 passed (173)
 ```
 
-Both figures are confirmed by counting `it(`/`test(` in the tree (backend 175, frontend 173) and match `docs/v1/v1.2/overview.md:189-190`. v1.1.x and v1.2.x are planned but not in this tree, so **every delta below is relative to these figures and must be re-measured at Task 0**, not assumed.
+Both figures are confirmed by counting `it(`/`test(` in the tree (backend 175, frontend 173) and match `docs/v1/v1.2/overview.md:193-194`. v1.1.x and v1.2.x are planned but not in this tree, so **every delta below is relative to these figures and must be re-measured at Task 0**, not assumed.
 
 ---
 
@@ -91,8 +91,8 @@ Both figures are confirmed by counting `it(`/`test(` in the tree (backend 175, f
 - [ ] **Step 0.1: Record the real baselines.**
 
   ```bash
-  cd backend  && npm run test 2>&1 | tail -6
-  cd frontend && npm run test 2>&1 | tail -6
+  cd backend  && npm run test
+  cd frontend && npm run test
   ```
 
   Write the actual numbers into the changelog. Do not carry forward the table above.
@@ -294,7 +294,7 @@ Both figures are confirmed by counting `it(`/`test(` in the tree (backend 175, f
 - [ ] **Step 1.2: Run it and confirm red.**
 
   ```bash
-  cd frontend && npx vitest run src/lib/daily.test.ts 2>&1 | tail -20
+  cd frontend && npx vitest run src/lib/daily.test.ts
   ```
 
   Expected: `Cannot find module './daily'` — the module does not exist yet.
@@ -394,7 +394,7 @@ Both figures are confirmed by counting `it(`/`test(` in the tree (backend 175, f
 - [ ] **Step 1.4: Verify green.**
 
   ```bash
-  cd frontend && npx vitest run src/lib/daily.test.ts 2>&1 | tail -25
+  cd frontend && npx vitest run src/lib/daily.test.ts
   ```
 
   The five `selectDailyGameId` rows and the six `dailyHash32` rows must all pass with the literal values from Step 1.1.
@@ -416,7 +416,7 @@ Both figures are confirmed by counting `it(`/`test(` in the tree (backend 175, f
 - [ ] **Step 1.6: Regression — the whole frontend suite.**
 
   ```bash
-  cd frontend && npm run test 2>&1 | tail -20
+  cd frontend && npm run test
   ```
 
   All pre-existing tests must pass unchanged.
@@ -502,7 +502,7 @@ Both figures are confirmed by counting `it(`/`test(` in the tree (backend 175, f
 - [ ] **Step 2.2: Run it and confirm red.**
 
   ```bash
-  cd frontend && npx vitest run src/lib/filterParams.test.ts 2>&1 | tail -20
+  cd frontend && npx vitest run src/lib/filterParams.test.ts
   ```
 
   Expected: **red**, and red *only* on the new blocks. v1.1.1's filter-helper tests are already green and must still be green here — if one of them fails, the append landed in the wrong file.
@@ -547,8 +547,8 @@ Both figures are confirmed by counting `it(`/`test(` in the tree (backend 175, f
 - [ ] **Step 2.4: Verify green and run the suite.**
 
   ```bash
-  cd frontend && npx vitest run src/lib/filterParams.test.ts src/lib/daily.test.ts 2>&1 | tail -25
-  cd frontend && npm run test 2>&1 | tail -20
+  cd frontend && npx vitest run src/lib/filterParams.test.ts src/lib/daily.test.ts
+  cd frontend && npm run test
   ```
 
 - [ ] **Step 2.5: Commit.**
@@ -624,7 +624,7 @@ Both figures are confirmed by counting `it(`/`test(` in the tree (backend 175, f
 - [ ] **Step 3.2: Run it and confirm red.**
 
   ```bash
-  cd backend && npx vitest run src/__tests__/unit/dailyKey.test.ts 2>&1 | tail -20
+  cd backend && npx vitest run src/__tests__/unit/dailyKey.test.ts
   ```
 
 - [ ] **Step 3.3: Implement `dailyKey.ts`.**
@@ -663,7 +663,7 @@ Both figures are confirmed by counting `it(`/`test(` in the tree (backend 175, f
 - [ ] **Step 3.4: Verify green.**
 
   ```bash
-  cd backend && npx vitest run src/__tests__/unit/dailyKey.test.ts 2>&1 | tail -20
+  cd backend && npx vitest run src/__tests__/unit/dailyKey.test.ts
   ```
 
 - [ ] **Step 3.5: Write the failing `dailySelection` test, with the shared fixture.**
@@ -736,7 +736,7 @@ Both figures are confirmed by counting `it(`/`test(` in the tree (backend 175, f
 - [ ] **Step 3.6: Run it and confirm red.**
 
   ```bash
-  cd backend && npx vitest run src/__tests__/unit/dailySelection.test.ts 2>&1 | tail -20
+  cd backend && npx vitest run src/__tests__/unit/dailySelection.test.ts
   ```
 
 - [ ] **Step 3.7: Implement `dailySelection.ts`.**
@@ -769,8 +769,8 @@ Both figures are confirmed by counting `it(`/`test(` in the tree (backend 175, f
 - [ ] **Step 3.8: Verify both suites agree, then run the backend suite.**
 
   ```bash
-  cd backend && npx vitest run src/__tests__/unit/dailyKey.test.ts src/__tests__/unit/dailySelection.test.ts 2>&1 | tail -25
-  cd backend && npm run test 2>&1 | tail -20
+  cd backend && npx vitest run src/__tests__/unit/dailyKey.test.ts src/__tests__/unit/dailySelection.test.ts
+  cd backend && npm run test
   ```
 
   The cross-boundary guard: both files now assert the **same six hash values and the same five selection mappings**. Any edit to one implementation that is not made in the other fails that side's suite.
@@ -889,7 +889,7 @@ Both figures are confirmed by counting `it(`/`test(` in the tree (backend 175, f
 - [ ] **Step 4.2: Run it and confirm red.**
 
   ```bash
-  cd backend && npx vitest run src/__tests__/integration/dailyService.test.ts 2>&1 | tail -20
+  cd backend && npx vitest run src/__tests__/integration/dailyService.test.ts
   ```
 
 - [ ] **Step 4.3: Implement the service.**
@@ -965,7 +965,7 @@ Both figures are confirmed by counting `it(`/`test(` in the tree (backend 175, f
 - [ ] **Step 4.4: Verify green.**
 
   ```bash
-  cd backend && npx vitest run src/__tests__/integration/dailyService.test.ts 2>&1 | tail -25
+  cd backend && npx vitest run src/__tests__/integration/dailyService.test.ts
   ```
 
   **The load-bearing test here is "returns a game that is genuinely playable."** 530 of 10,219 games have an empty opponent lineup; a daily puzzle with an empty half is unrecoverable until tomorrow.
@@ -973,7 +973,7 @@ Both figures are confirmed by counting `it(`/`test(` in the tree (backend 175, f
 - [ ] **Step 4.5: Regression.**
 
   ```bash
-  cd backend && npm run test 2>&1 | tail -20
+  cd backend && npm run test
   ```
 
 - [ ] **Step 4.6: Commit.**
@@ -1074,7 +1074,7 @@ Both figures are confirmed by counting `it(`/`test(` in the tree (backend 175, f
 - [ ] **Step 5.2: Run it and confirm red.**
 
   ```bash
-  cd backend && npx vitest run src/__tests__/integration/routes/daily.test.ts 2>&1 | tail -20
+  cd backend && npx vitest run src/__tests__/integration/routes/daily.test.ts
   ```
 
   Expected: `404` on every case — `/daily` is currently swallowed by `/:id` (a non-numeric id is a 400) or not found.
@@ -1143,7 +1143,7 @@ Both figures are confirmed by counting `it(`/`test(` in the tree (backend 175, f
 - [ ] **Step 5.5: Verify green and confirm the route order.**
 
   ```bash
-  cd backend && npx vitest run src/__tests__/integration/routes/daily.test.ts src/__tests__/integration/routes/matches.test.ts 2>&1 | tail -25
+  cd backend && npx vitest run src/__tests__/integration/routes/daily.test.ts src/__tests__/integration/routes/matches.test.ts
   grep -n "router.get" backend/src/routes/matches.ts
   ```
 
@@ -1152,7 +1152,7 @@ Both figures are confirmed by counting `it(`/`test(` in the tree (backend 175, f
 - [ ] **Step 5.6: Regression, and the coverage gate.**
 
   ```bash
-  cd backend && npm run test:coverage 2>&1 | tail -30
+  cd backend && npm run test:coverage
   ```
 
   All four metrics must be ≥ 95% (`backend/vitest.config.ts:26-30`). `dailyKey.ts`, `dailySelection.ts`, `dailyService.ts` and the new route branch all sit inside `coverage.include: ['src/**/*.ts']`, so every branch above is required, not optional.
@@ -1262,7 +1262,7 @@ Both figures are confirmed by counting `it(`/`test(` in the tree (backend 175, f
 - [ ] **Step 6.2: Run it and confirm red.**
 
   ```bash
-  cd frontend && npx vitest run src/lib/fetchDailyMatch.test.ts 2>&1 | tail -25
+  cd frontend && npx vitest run src/lib/fetchDailyMatch.test.ts
   ```
 
 - [ ] **Step 6.3: Add the mock dataset export.**
@@ -1323,8 +1323,8 @@ Both figures are confirmed by counting `it(`/`test(` in the tree (backend 175, f
 - [ ] **Step 6.5: Verify green and run the suite.**
 
   ```bash
-  cd frontend && npx vitest run src/lib/fetchDailyMatch.test.ts 2>&1 | tail -25
-  cd frontend && npm run test 2>&1 | tail -20
+  cd frontend && npx vitest run src/lib/fetchDailyMatch.test.ts
+  cd frontend && npm run test
   ```
 
 - [ ] **Step 6.6: Commit.**
@@ -1420,7 +1420,7 @@ Both figures are confirmed by counting `it(`/`test(` in the tree (backend 175, f
 - [ ] **Step 7.2: Run it and confirm red.**
 
   ```bash
-  cd frontend && npx vitest run src/lib/gameState.test.ts 2>&1 | tail -25
+  cd frontend && npx vitest run src/lib/gameState.test.ts
   ```
 
 - [ ] **Step 7.3: Implement the state change.**
@@ -1471,8 +1471,8 @@ Both figures are confirmed by counting `it(`/`test(` in the tree (backend 175, f
 - [ ] **Step 7.4: Verify green and that nothing else moved.**
 
   ```bash
-  cd frontend && npx vitest run src/lib/gameState.test.ts src/lib/gameState.hook.test.ts 2>&1 | tail -25
-  cd frontend && npm run test 2>&1 | tail -20
+  cd frontend && npx vitest run src/lib/gameState.test.ts src/lib/gameState.hook.test.ts
+  cd frontend && npm run test
   ```
 
   Every pre-existing `gameState` case must pass **unchanged**. The two new fields must be inert for callers that do not read them.
@@ -1572,7 +1572,7 @@ Both figures are confirmed by counting `it(`/`test(` in the tree (backend 175, f
 - [ ] **Step 8.2: Run it and confirm red.**
 
   ```bash
-  cd frontend && npx vitest run app/missing-eleven/FilterUrlSync.test.tsx 2>&1 | tail -25
+  cd frontend && npx vitest run app/missing-eleven/FilterUrlSync.test.tsx
   ```
 
   **If this reports "no test files found", the vitest `include` does not cover `app/**` — stop and raise the R7 blocker (Task 0.3). v1.3.1 does not widen the include.**
@@ -1638,7 +1638,7 @@ Both figures are confirmed by counting `it(`/`test(` in the tree (backend 175, f
 - [ ] **Step 8.4: Verify green.**
 
   ```bash
-  cd frontend && npx vitest run app/missing-eleven/FilterUrlSync.test.tsx 2>&1 | tail -30
+  cd frontend && npx vitest run app/missing-eleven/FilterUrlSync.test.tsx
   ```
 
   Every v1.1.2 test in this file must still pass unchanged, including *"preserves an unrelated `?daily=` param when writing"* — which this patch now makes load-bearing rather than hypothetical.
@@ -1646,7 +1646,7 @@ Both figures are confirmed by counting `it(`/`test(` in the tree (backend 175, f
 - [ ] **Step 8.5: Regression.**
 
   ```bash
-  cd frontend && npm run test 2>&1 | tail -20
+  cd frontend && npm run test
   ```
 
 - [ ] **Step 8.6: Commit.**
@@ -1744,7 +1744,7 @@ Both figures are confirmed by counting `it(`/`test(` in the tree (backend 175, f
 - [ ] **Step 9.2: Run it and confirm red.**
 
   ```bash
-  cd frontend && npx vitest run src/components/DailyEntry.test.tsx 2>&1 | tail -20
+  cd frontend && npx vitest run src/components/DailyEntry.test.tsx
   ```
 
 - [ ] **Step 9.3: Implement the component.**
@@ -1823,13 +1823,13 @@ Both figures are confirmed by counting `it(`/`test(` in the tree (backend 175, f
 - [ ] **Step 9.4: Verify green.**
 
   ```bash
-  cd frontend && npx vitest run src/components/DailyEntry.test.tsx 2>&1 | tail -25
+  cd frontend && npx vitest run src/components/DailyEntry.test.tsx
   ```
 
 - [ ] **Step 9.5: Regression.**
 
   ```bash
-  cd frontend && npm run test 2>&1 | tail -20
+  cd frontend && npm run test
   ```
 
 - [ ] **Step 9.6: Commit.**
@@ -2144,7 +2144,7 @@ Both figures are confirmed by counting `it(`/`test(` in the tree (backend 175, f
 - [ ] **Step 10.2: Run it and confirm red.**
 
   ```bash
-  cd frontend && npx vitest run app/missing-eleven/page.test.tsx 2>&1 | tail -30
+  cd frontend && npx vitest run app/missing-eleven/page.test.tsx
   ```
 
 - [ ] **Step 10.3: Add the three pieces of state.**
@@ -2328,7 +2328,7 @@ Both figures are confirmed by counting `it(`/`test(` in the tree (backend 175, f
 - [ ] **Step 10.7: Verify green.**
 
   ```bash
-  cd frontend && npx vitest run app/missing-eleven/ 2>&1 | tail -35
+  cd frontend && npx vitest run app/missing-eleven/
   ```
 
 - [ ] **Step 10.8: Prove the hydration constraint holds.**
@@ -2423,7 +2423,7 @@ Both figures are confirmed by counting `it(`/`test(` in the tree (backend 175, f
 - [ ] **Step 10.10: Regression.**
 
   ```bash
-  cd frontend && npm run test 2>&1 | tail -25
+  cd frontend && npm run test
   ```
 
   Every pre-existing page test must still pass unchanged. This patch changes the load path, so a regression surfaces as a pre-existing failure — do not relax the old test.
@@ -2449,8 +2449,8 @@ Both figures are confirmed by counting `it(`/`test(` in the tree (backend 175, f
 - [ ] **Step 11.1: Run both suites with coverage.**
 
   ```bash
-  cd backend  && npm run test:coverage 2>&1 | tail -30
-  cd frontend && npm run test:coverage 2>&1 | tail -30
+  cd backend  && npm run test:coverage
+  cd frontend && npm run test:coverage
   ```
 
   Backend: all four metrics ≥ 95%. Frontend: record the actual numbers; there is no threshold, so the number is information, not a gate.
@@ -2458,7 +2458,7 @@ Both figures are confirmed by counting `it(`/`test(` in the tree (backend 175, f
 - [ ] **Step 11.2: Run the production build. This is the gate for the `Suspense` work.**
 
   ```bash
-  cd frontend && npm run build 2>&1 | tail -30
+  cd frontend && npm run build
   ```
 
   A failure mentioning `missing-suspense-with-csr-bailout` or *"deopted into client-side rendering"* means the `<Suspense>` from Task 10.6 is missing or sits above rather than below `FilterUrlSync`. **A passing dev server is not evidence.**
@@ -2477,20 +2477,20 @@ Both figures are confirmed by counting `it(`/`test(` in the tree (backend 175, f
 
   ```bash
   TODAY=$(date -u +%F)
-  curl -s "localhost:3000/api/matches/daily?date=$TODAY" | head -c 200
+  curl -s "localhost:3000/api/matches/daily?date=$TODAY"
   # expect: a GameResponse with homeLineup and awayLineup
 
   # determinism
-  curl -s "localhost:3000/api/matches/daily?date=$TODAY" | grep -o '"gameId":[0-9]*' | head -1
-  curl -s "localhost:3000/api/matches/daily?date=$TODAY" | grep -o '"gameId":[0-9]*' | head -1
+  set -o pipefail; curl -s "localhost:3000/api/matches/daily?date=$TODAY" | grep -o '"gameId":[0-9]*' | head -1
+  set -o pipefail; curl -s "localhost:3000/api/matches/daily?date=$TODAY" | grep -o '"gameId":[0-9]*' | head -1
   # expect: identical ids
 
   # two days differ
-  curl -s "localhost:3000/api/matches/daily?date=2026-01-01" | grep -o '"gameId":[0-9]*' | head -1
-  curl -s "localhost:3000/api/matches/daily?date=2026-01-02" | grep -o '"gameId":[0-9]*' | head -1
+  set -o pipefail; curl -s "localhost:3000/api/matches/daily?date=2026-01-01" | grep -o '"gameId":[0-9]*' | head -1
+  set -o pipefail; curl -s "localhost:3000/api/matches/daily?date=2026-01-02" | grep -o '"gameId":[0-9]*' | head -1
 
   # filters are ignored (§6.2)
-  curl -s "localhost:3000/api/matches/daily?date=2026-01-01&teamIds=1&competitionIds=Zzz" | grep -o '"gameId":[0-9]*' | head -1
+  set -o pipefail; curl -s "localhost:3000/api/matches/daily?date=2026-01-01&teamIds=1&competitionIds=Zzz" | grep -o '"gameId":[0-9]*' | head -1
 
   # malformed date is a 400, not a wrong puzzle
   curl -s -o /dev/null -w '%{http_code}\n' "localhost:3000/api/matches/daily?date=2026-02-30"   # expect 400
@@ -2540,6 +2540,58 @@ Both figures are confirmed by counting `it(`/`test(` in the tree (backend 175, f
 
 ---
 
+## Acceptance criteria
+
+1. `selectDailyGameId(candidates, key)` is **total, deterministic, and pure**: the same candidate id set and the same `YYYY-MM-DD` key always yield the same id, and the function performs no I/O. It is mirrored byte-for-byte across the network boundary and pinned by a shared fixture table, so a client and server cannot disagree about today's puzzle.
+2. The day key is **UTC**, and the rollover is `00:00:00Z` exactly once worldwide. A test pins the boundary from both sides.
+3. **No `Date.parse` is applied to a `DailyKey` anywhere.** `grep -rn "Date.parse" frontend/src backend/src` returns no occurrence that receives a daily key.
+4. There is **zero** `localStorage` access in this patch — not read-only, zero. `grep -rn "localStorage" frontend/src frontend/app` returns no output.
+5. The selection pool is the **whole eligible dataset**, not "games played that day". A day key selects from every eligible game id, and the fixtures cover a pool that is not the set of that day's plays.
+6. The daily game must be **playable**: it satisfies the completeness predicate, so the shared render path cannot produce a board with holes.
+7. Daily **ignores filters structurally**, not by convention: the daily path never reads the filter state, and a test proves a filter in the URL does not change the selected id.
+8. `FilterUrlSync` remains the app's only URL reader and only URL writer. `grep -rn "useSearchParams" frontend/app frontend/src` still names exactly one file.
+9. A day key that is **not today** is never playable and never silently falls back to another day. The error path is asserted directly.
+10. **"New puzzle" leaves daily mode** — it does not fetch a second daily puzzle. `daily` is cleared from the state, and the next fetch is a normal random match.
+11. The page knows the URL has been read before it loads a game; hydration is sequenced so no game is fetched against an unparsed URL.
+12. `GET /api/matches/daily` validates the `YYYY-MM-DD` key and rejects a malformed one, rather than defaulting.
+13. `fetchDailyMatch` and its mock branch agree on shape, so the mock path cannot drift from the network path.
+14. No Prisma schema change and no migration: `git diff --stat -- backend/prisma/schema.prisma` is empty.
+15. `npm run test`, `npm run build`, `npx tsc --noEmit`, and `npm run lint` are clean on both workspaces, and every new suite is collected. Neither suite is asserted against a fixed count — both are measured and recorded, per `docs/v1/v1.2/overview.md:209`.
+
+## Validation
+
+| Check | Command | Pass signal |
+|---|---|---|
+| Backend unit + integration | `cd backend && npm run test` | every file green; count measured and recorded, not asserted |
+| Backend coverage gate | `cd backend && npm run test:coverage` | no threshold failure on lines / statements / functions / branches |
+| Frontend suite | `cd frontend && npm run test` | every file green; count measured and recorded, not asserted |
+| The pure daily module | `cd frontend && npx vitest run src/lib/daily.test.ts` | every case green, including both sides of the UTC rollover |
+| The shared fixture table | `cd frontend && npx vitest run src/lib/daily.shared.test.ts` | client and server mirrors agree on every fixture row |
+| The backend mirror | `cd backend && npx vitest run src/__tests__/integration/dailyService.test.ts` | every fixture row agrees with the client |
+| The daily entry point | `cd frontend && npx vitest run app/missing-eleven/DailyEntry.test.tsx` | green, including the not-today error path |
+| Production build | `cd frontend && npm run build` | no output |
+| Types | `cd frontend && npx tsc --noEmit` | no output |
+| Lint | `cd frontend && npm run lint` | no output |
+| **Zero storage access** | `grep -rn "localStorage" frontend/src frontend/app` | no output — v1.3.2 owns the only storage surface |
+| No `Date.parse` on a daily key | `grep -rn "Date.parse" frontend/src/lib/daily.ts backend/src/lib/daily.ts` | no output |
+| `FilterUrlSync` is still the only URL reader | `grep -rln "useSearchParams" frontend/app frontend/src` | exactly one file |
+| No schema drift | `git diff --stat -- backend/prisma/schema.prisma` | empty — no migration in this patch |
+
+## Risks
+
+| Risk | Mitigation |
+|---|---|
+| **Client and server resolve the same day to different games**, so a shared link shows one puzzle to its sender and another to its recipient. | `selectDailyGameId` is pure and mirrored across the network boundary, and a **shared fixture table** pins both implementations to the same rows. Divergence is a fixture failure, not a runtime surprise. |
+| **The day boundary drifts with the viewer's timezone**, so a puzzle rolls over at different times for different users. | The key is UTC and the rollover is `00:00:00Z` worldwide, exactly once. Tests pin both sides of the boundary rather than only the happy path. |
+| **A `Date.parse` creeps into a key comparison** and reintroduces local-time behaviour into a UTC rule. | Called out as a standing prohibition and enforced by a grep gate over both daily modules; no key ever reaches a date parser. |
+| **Storage is touched in this patch**, which would take the project's first storage surface away from v1.3.2's single, reviewable adapter. | Zero access is a constraint, not a preference, and the grep gate makes any occurrence a hard failure. v1.3.2 owns the surface and can be reviewed as one place. |
+| **Filters silently narrow the daily puzzle**, breaking the promise that every player gets the same game. | Daily ignores filters **structurally** — the path never reads filter state — and a test proves a filter in the URL does not change the selected id. |
+| **"New puzzle" fetches a second daily** rather than leaving daily mode, producing two puzzles and a confusing state. | Leaving daily mode is asserted explicitly; the daily param is cleared and the next fetch is a normal random match. |
+| **A stale or hand-edited `daily` key** resolves to another day instead of failing. | The key is validated at the endpoint and on the client, and a not-today key is never playable and never falls back — the error path is a named test. |
+| **A re-seed shifts which game a day resolves to**, so a shared link changes meaning over time. | Documented known behaviour under §11 Rule 8, recorded in the Escalations table below rather than solved here. The daily game is identified by day key, not by game id, so the link keeps working; only its content may differ. |
+
+---
+
 ## Escalations
 
 These were raised when this plan was written. Each is a contract discrepancy, not an implementation choice, and none was resolved by renaming anything.
@@ -2558,6 +2610,6 @@ These were raised when this plan was written. Each is a contract discrepancy, no
 
 - **`DailyKey` and `toDailyKey` are the only inputs v1.3.2 needs.** Every streak value is a `DailyKey`, and `toDailyKey(new Date())` is how "today" is obtained post-mount.
 - **`isPlayableDaily` is how v1.3.2 decides which completion to record.** A completion is recorded against `state.dailyKey` — the day the puzzle *started* — never against a freshly computed today. Recomputing at completion time would let a player finish just after midnight and be credited to the wrong day.
-- **`STORAGE_KEY = 'footplay.daily.v1'` is the O1 seam.** Bumping it is how a per-(day, difficulty) streak invalidates the old shape with no migration and no repair.
-- **`playedKeys` gates by DAY, not by (day, difficulty)** — that is the O1 default, and it is why `DailyEntry`'s already-played gate will hide the Start button after a Normal completion.
+- **`STORAGE_KEY = 'footplay.daily.v1'` is the ratified-scope seam** (§9.1, RD3). Bumping it is how a *future* reversal to per-(day, difficulty) would invalidate the old shape with no migration and no repair. The decision itself is settled; this is the note that makes a reversal cheap rather than the note that leaves it open.
+- **`playedKeys` gates by DAY, not by (day, difficulty)** — that is the **ratified** answer (§9.1, RD3), not a default awaiting sign-off, and it is why `DailyEntry`'s already-played gate will hide the Start button after a Normal completion. §6.2 makes daily and difficulty orthogonal axes: a daily streak answers only "did you play today", and keying it by difficulty would penalise a player for choosing Easy.
 - **The `GET /api/matches/daily` 400-on-malformed-date behaviour is the model's contract for a persisted day key too.** v1.3.2 never sends a key that `isDailyKey` would reject, because `loadStreak` refuses to persist one it cannot validate.

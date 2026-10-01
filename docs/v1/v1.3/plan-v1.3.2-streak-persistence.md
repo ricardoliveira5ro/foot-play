@@ -4,7 +4,7 @@
 
 **Goal:** A player's daily completions persist in `localStorage`: current streak, longest streak, and already-played-today state. This is the **first and only storage surface in the project** (§11 Rule 8), and it must not regress the hydration constraint that v0.2.5 fixed by removing storage.
 
-**Architecture:** One pure module (`frontend/src/lib/streak.ts`) owns all streak arithmetic — `daysBetween`, `nextStreak`, `hasPlayed`, and the `isStreakState` validator — and is fully testable in a node environment with no DOM. One storage adapter (`frontend/src/lib/streakStorage.ts`) is the **only module that names `localStorage`**; it reads, validates, and writes the persisted `StreakState` under `STORAGE_KEY = 'footplay.daily.v1'`. The page initialises `streak` to the shared `EMPTY_STREAK` (identical on server and first client render), reads storage in a mount effect, and records a completion in an effect that fires on `gameStatus === 'complete'` — which covers both a win and a surrender, so **surrender counts as participation (E5)**. `DailyEntry` gains an optional `streak` prop and hides its Start button once today is in `playedKeys` (O1: one result per day, global across difficulties).
+**Architecture:** One pure module (`frontend/src/lib/streak.ts`) owns all streak arithmetic — `daysBetween`, `nextStreak`, `hasPlayed`, and the `isStreakState` validator — and is fully testable in a node environment with no DOM. One storage adapter (`frontend/src/lib/streakStorage.ts`) is the **only module that names `localStorage`**; it reads, validates, and writes the persisted `StreakState` under `STORAGE_KEY = 'footplay.daily.v1'`. The page initialises `streak` to the shared `EMPTY_STREAK` (identical on server and first client render), reads storage in a mount effect, and records a completion in an effect that fires on `gameStatus === 'complete'` — which covers both a win and a surrender, so **surrender counts as participation (E5)**. `DailyEntry` gains an optional `streak` prop and hides its Start button once today is in `playedKeys` (**ratified**, §9.1 RD3: one result per day, global across difficulties).
 
 **Tech Stack:** TypeScript, React 19, Next.js 16 App Router, Vitest + jsdom + Testing Library (frontend). No backend change: §10 of the roadmap excludes server-side persistence, so this patch is frontend-only and its rollback point is v1.3.1.
 
@@ -20,7 +20,18 @@
 
 - **Recording the same day twice is a no-op (O1: one result per day).** `nextStreak` returns the input state by reference when `lastPlayedKey === completedKey`, and `playedKeys` never contains a duplicate. This is what makes the completion effect safe to re-fire when a player replays today's puzzle after completing it.
 
-- **`playedKeys` gates by DAY, not by (day, difficulty).** That is the O1 default: one result per day, global across difficulties. `STORAGE_KEY = 'footplay.daily.v1'` is the containment seam — if O1 is ever reversed to per-(day, difficulty), bumping the key to `footplay.daily.v2` invalidates the old shape with no migration and no repair.
+- **`playedKeys` gates by DAY, not by (day, difficulty).** That is the **ratified** answer (roadmap §9.1, RD3), not a default awaiting sign-off: **one streak per day, global across difficulties.** §6.2 treats daily and difficulty as orthogonal axes — a daily streak answers only "did you play today" — so keying it by difficulty would penalise a player for choosing Easy, and would answer a question nobody asked. `STORAGE_KEY = 'footplay.daily.v1'` is the containment seam: if a *future* decision reverses this to per-(day, difficulty), bumping the key to `footplay.daily.v2` invalidates the old shape with no migration and no repair.
+
+- **A re-seed can shift or break a streak, and that is documented known behavior, not a caveat to resolve** (roadmap §9 O2, §9.1 RD3). This is stated here so no implementer "fixes" it and no reviewer files it as a defect.
+
+  What a re-seed actually does is change or remove *the puzzle a day resolves to*, which has two consequences, and they are not the same severity:
+
+  | Consequence | Why it is not fixable in code |
+  |---|---|
+  | **The same day key resolves to a different game.** The player's *streak* is unaffected — the key is what is stored, not the game. Only the content behind a day they already played changes. | Nothing to fix. The stored shape is deliberately game-agnostic; that is what makes it survive a re-seed at all. |
+  | **A day becomes unreachable** (its game left the eligible pool), so the player cannot complete it. That day is a missed day, and `nextStreak` resets `current` to 1 on their next completion while `longest` survives. | The streak rule is §6.1's — "miss a day and the streak resets" — with no exception for operator actions. Adding one would mean persisting an "excused day" concept, which is new scope and a new storage shape. |
+
+  **This is pinned by tests, not left undefined.** `nextStreak` is a pure function of day keys, so the second row above is the ordinary missed-day path: the existing `a missed day resets current but keeps longest` test already pins the arithmetic, and Task 4's completion test pins that a completion on the day after an unreachable one resets `current` to 1 with `longest` intact. A re-seed does not need a dedicated test because it introduces **no new code path** — it only changes which game a key resolves to, and the key is all the streak module ever sees. That is the strongest form of "pinned" available here: the behavior is unreachable *by construction*, not merely untested.
 
 - **A surrendered daily counts as participation (E5, decided here).** The completion effect fires on `gameStatus === 'complete'` regardless of how the game became complete — the reducer sets that status for both a win (all shirts resolved) and `SURRENDER`. This is stated here, tested in Task 4, and recorded in the changelog, because it also decides what the v1.4 share text may claim.
 
@@ -1140,7 +1151,7 @@ They are recorded here as the origin of the delta arithmetic and for **nothing e
 
   > **E5 (decided): a surrendered daily counts as participation.** The completion effect fires on `gameStatus === 'complete'` regardless of how the game became complete. This is what the v1.4 share text may claim.
 
-  > **O2 (accepted, unchanged from v1.3.1): re-seed shifts daily history.** The streak is keyed to day keys whose puzzles may change after a re-seed. The streak itself is unaffected — it counts days played, not which game was played — but a re-seed can change which game a past day's link resolves to. Accepted and documented, not mitigated.
+  > **O2 (accepted, unchanged from v1.3.1): re-seed shifts daily history.** The streak is keyed to day keys whose puzzles may change after a re-seed. The streak itself is unaffected — it counts days played, not which game was played — but a re-seed can change which game a past day's link resolves to, and can make a day unreachable, which is an ordinary missed day under §6.1: `current` resets to 1, `longest` survives. This is **accepted, documented known behavior**, not a defect to mitigate.
 
 - [ ] **Step 5.8: Commit.**
 
@@ -1151,15 +1162,60 @@ They are recorded here as the origin of the delta arithmetic and for **nothing e
 
 ---
 
+## Acceptance criteria
+
+1. `frontend/src/lib/streakStorage.ts` is the **only** module that names `localStorage`. `grep -rln "localStorage" frontend/src frontend/app` returns that file alone; every other module reads and writes through its exported functions.
+2. All streak arithmetic lives in the pure module (`daysBetween`, `nextStreak`, `hasPlayed`, `isStreakState`) and is testable in a node environment with **no DOM**. No arithmetic is duplicated in a component.
+3. The hydration constraint holds for **every** storage read: nothing reads storage during the first render, and the streak display is correct on the very first paint after hydration.
+4. A completion is recorded against the **day the puzzle started**, never against a freshly computed "today". A game left open across the rollover records the day it began.
+5. Recording the same day twice is a **no-op** (O1: one result per day) — current streak, longest streak, and `playedKeys` are unchanged on the second record.
+6. `playedKeys` gates by **DAY, not by (day, difficulty)**. The type is `DailyKey[]` and `isStreakState` rejects any key `isDailyKey` would not.
+7. `loadStreak` **refuses to persist what it cannot validate**: corrupt JSON, an unknown shape, or a malformed key falls back to a clean state rather than being written back.
+8. No `Date.parse` is applied to a `DailyKey`, anywhere.
+9. A surrendered daily **counts as participation** (E5), so surrendering is not a missed day for streak purposes.
+10. A missed day resets **current** streak and preserves **longest**, pinned by the named test that already exists in the module.
+11. `DailyEntry` shows the streak and gates the already-played-today state; it does not own the arithmetic.
+12. This patch is **frontend-only** — no backend change, no Prisma schema change, no migration. Its rollback point is v1.3.1.
+13. `npm run test`, `npm run build`, `npx tsc --noEmit`, and `npm run lint` are clean, and every new suite is collected. The suite is measured and recorded, not asserted against a fixed count, per `docs/v1/v1.2/overview.md:209`.
+
+## Validation
+
+| Check | Command | Pass signal |
+|---|---|---|
+| Frontend suite | `cd frontend && npm run test` | every file green; count measured and recorded, not asserted |
+| The pure streak module | `cd frontend && npx vitest run src/lib/streak.test.ts` | every case green in a node environment, with no DOM |
+| The storage adapter | `cd frontend && npx vitest run src/lib/streakStorage.test.ts` | validation, rejection, and round-trip cases green |
+| The display and the today gate | `cd frontend && npx vitest run src/components/DailyEntry.test.tsx` | green, including the already-played-today path |
+| Production build | `cd frontend && npm run build` | no output |
+| Types | `cd frontend && npx tsc --noEmit` | no output |
+| Lint | `cd frontend && npm run lint` | no output |
+| **One module owns storage** | `grep -rln "localStorage" frontend/src frontend/app` | exactly `frontend/src/lib/streakStorage.ts` |
+| `playedKeys` is keyed by day | `grep -n "playedKeys" frontend/src/lib/streak.ts` | typed `DailyKey[]` — no difficulty field |
+| No `Date.parse` on a key | `grep -rn "Date.parse" frontend/src/lib/streak.ts frontend/src/lib/streakStorage.ts` | no output |
+| No backend drift | `git diff --stat -- backend/ backend/prisma/` | empty — frontend-only, no migration |
+| The include was not re-narrowed (R7) | `grep -n "include:" frontend/vitest.config.ts` | unchanged from v1.1.1 |
+
+---
+
+## Risks
+
+| Risk | Mitigation |
+|---|---|
+| **A re-seed changes which game a day resolves to, or makes a day unreachable** — so a streak can shift or break for reasons outside the player's control. | **Documented known behavior, not a defect** (roadmap §9 O2, §9.1 RD3). The streak module stores day keys and never the game, so the first row introduces no code path; the second is an ordinary missed day under §6.1, already pinned by `a missed day resets current but keeps longest`. No mitigation is added, deliberately: an "excused day" concept would be new scope and a new storage shape. |
+| **A per-(day, difficulty) streak is implemented by "helpfully" keying `playedKeys` on both fields.** | `playedKeys` is `DailyKey[]` — the type forbids it, and `isStreakState` rejects any key `isDailyKey` would not. The ratification's rationale (§6.2 orthogonality; penalising Easy) is in the Global Constraints so an implementer does not re-derive it. `STORAGE_KEY` remains the seam for a future reversal. |
+| **`hasPlayed` is read as a v1.4 gate on the copy control**, putting a `localStorage` read into the clipboard path. | Ratified **not** to exist (§9.1, RD7). v1.4.2's Step 5.3 greps for `hasPlayed` in `src/` and a hit is a failure. This row exists because the earlier handoff wording invited the inference. |
+
+---
+
 ## Escalations
 
 These were raised when this plan was written. Each is a contract discrepancy or a decision the roadmap left open; none was resolved by renaming anything.
 
 | # | Item | What v1.3.2 does | Needs |
 |---|---|---|---|
-| **E5** | Whether a *surrendered* daily counts toward the streak was not settled by §6.1. | **Decided: surrender counts as participation.** The completion effect fires on `gameStatus === 'complete'`, which the reducer sets for both a win and `SURRENDER`. Tested in Task 4, recorded in the changelog. | `lead` to ratify before v1.4, because the v1.4 share text may claim a streak. |
-| **O1** | One streak per day, or one per (day, difficulty)? | **One result per day, global across difficulties** (roadmap default). `playedKeys` gates by day; `STORAGE_KEY = 'footplay.daily.v1'` is the containment seam — reversing O1 means bumping the key, which invalidates the old shape with no migration. | None — default ratified by the roadmap. |
-| **O2** | A re-seed changes the dataset and therefore the daily selection. | **Accepted and documented** (changelog). The streak counts days played, not which game was played, so the streak itself is unaffected. | None — default ratified by the roadmap. |
+| **E5** | Whether a *surrendered* daily counts toward the streak was not settled by §6.1. | **Decided: surrender counts as participation.** The completion effect fires on `gameStatus === 'complete'`, which the reducer sets for both a win and `SURRENDER`. Tested in Task 4, recorded in the changelog. | `lead` to ratify before v1.4, because the v1.4 share text may claim a streak. A surrender also produces an **11-slot** share grid when the opponent half was untouched (roadmap §7, RD2), so the text may describe a partial result. |
+| **O1** | One streak per day, or one per (day, difficulty)? | **Ratified — closed as "one result per day, global across difficulties"** (roadmap §9.1, RD3). `playedKeys` gates by day; `STORAGE_KEY = 'footplay.daily.v1'` is the containment seam — a future reversal means bumping the key, which invalidates the old shape with no migration. §6.2 makes daily and difficulty orthogonal, so a per-difficulty streak would penalise playing on Easy. | **None — settled. Do not re-open.** |
+| **O2** | A re-seed changes the dataset and therefore the daily selection. | **Documented known behavior, not a caveat to resolve** (roadmap §9, §9.1 RD3). A re-seed can change which game a day resolves to — the streak is unaffected, because it stores day keys and never the game — or make a day unreachable, which is an ordinary missed day under §6.1 and resets `current` while `longest` survives. Both rows are in the Global Constraints table; the second introduces **no new code path**, so it is pinned by the existing missed-day test rather than by a re-seed-specific one. | **None — accepted behavior.** Recorded in the changelog. |
 | **E4 (carried)** | `frontend/node_modules` lacks `next/dist/docs/` in this working tree. | v1.3.2 adds no Next.js API surface at all — the storage work is plain React state + effects. The v1.3.1 note stands: an implementer with a populated `node_modules` should confirm `FilterUrlSync` still needs no Suspense move. | None for this patch. |
 
 ---
@@ -1167,6 +1223,6 @@ These were raised when this plan was written. Each is a contract discrepancy or 
 ## Handoff to v1.4
 
 - **`StreakState` is the input v1.4 needs for the share text.** The v1.4 block carries the mode and the score; whether it may also claim a streak depends on the E5 ratification above — a share text that implies "won" would be wrong for a surrendered completion.
-- **`hasPlayed(streak, todayKey)` is the already-played-today gate v1.4's share affordance sits behind.** The share button appears on the completion overlay, which is reachable exactly once per day in daily mode (O1).
-- **`STORAGE_KEY = 'footplay.daily.v1'` is the O1 seam.** If v1.4 or later reverses O1, bump the key — never migrate the old shape.
+- **`hasPlayed(streak, todayKey)` gates starting a second daily — and it is NOT a gate on v1.4's copy control.** The earlier phrasing here ("the gate v1.4's share affordance sits behind") invited the wrong inference and has been corrected by ratification (§9.1, RD7): v1.4 ships **no** `hasPlayed` gating and its clipboard path reads no storage at all. The completion overlay is reachable by playing, which is the only sense in which the affordance sits behind the gate.
+- **`STORAGE_KEY = 'footplay.daily.v1'` is the streak-scope seam.** A future reversal to per-(day, difficulty) means bumping the key — never migrating the old shape.
 - **The Rule 8 boundary is the revert contract.** Any future patch that needs storage goes through `streakStorage.ts`; a patch that does not need storage must not name `localStorage` at all.

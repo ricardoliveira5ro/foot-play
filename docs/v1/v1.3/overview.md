@@ -10,6 +10,10 @@
 
 ---
 
+> **Ratified decisions are not decided here.** Roadmap [§9.1](../roadmap-v1.md#91-ratified-decisions) is authoritative for every decision the owner has closed; a plan's preflight **verifies** the ratified answer and never re-decides it. Where a plan and that table disagree, the table wins and the plan is the defect. A question the table does not cover is still an escalation.
+
+---
+
 ## The two patches
 
 | Patch | What lands | Files it adds | Rollback to |
@@ -62,18 +66,41 @@ Raised in the v1.3.1 plan's Escalations table; none was resolved by renaming any
 
 | # | Discrepancy | What v1.3 does |
 |---|---|---|
-| **E1** | The frozen contract names `GameFilters` with non-null lists in `frontend/types/index.ts`; v1.1.x froze `GameFilterParams` with nullable lists in `frontend/types/filters.ts`. | Consumes `GameFilterParams` as v1.1.x actually froze it. Nothing in v1.3 names `GameFilters`. |
+| **E1** | The frozen contract names `GameFilters` with non-null lists in `frontend/types/index.ts`; v1.1.x froze `GameFilterParams` with nullable lists in `frontend/types/filters.ts`. **Resolved** — not a decision, just two names for one type. | Consumes `GameFilterParams` as v1.1.x actually froze it. Nothing in v1.3 names `GameFilters`. |
 | **E2** | The contract places filter helpers in `frontend/src/lib/filterParams.ts`; v1.1.1 Task 8 originally placed them in `frontend/types/filters.ts`, contradicting its own architecture line. | v1.1.1 now aligns to the contract, so `frontend/src/lib/filterParams.ts` **exists** by the time v1.3.1 runs. v1.3.1 **appends** `dailyToParams` / `paramsToDailyKey` to it and extends the existing test file; it does not move, re-export, or overwrite v1.1.1's filter helpers. |
 | **E3** | The contract puts selection on the client while the endpoint returns a resolved `GameResponse`. | A deliberate four-line duplicate, pinned by identical literal fixture tables in both suites. |
 | **E4** | `node_modules/next/dist/docs/` is absent in this working tree. | v1.3 adds no new `useSearchParams` surface; it extends v1.1.2's single reader with props. |
-| **E5** | Whether a surrendered daily counts toward the streak was unsettled. | **Decided in v1.3.2: surrender counts as participation** — the completion effect fires on `gameStatus === 'complete'` for wins and surrenders alike. Ratification needed before v1.4, whose share text may claim a streak. |
+| **E5** | Whether a surrendered daily counts toward the streak was unsettled. | **Decided in v1.3.2: surrender counts as participation** — the completion effect fires on `gameStatus === 'complete'` for wins and surrenders alike. Ratification needed before v1.4, whose share text may claim a streak. A surrender with an untouched opponent half is an **11-slot** grid (roadmap §7, RD2), so the share text describes a partial result and must not imply 22. |
 
-**Open decisions applied (roadmap §9 defaults):** O1 — one result per day, global across difficulties, with `STORAGE_KEY` as the containment seam; O2 — re-seed shifts daily history, accepted and documented.
+### Streak scope — ratified, and the re-seed consequence is known behavior
+
+**O1 is closed: one streak per day, global across difficulties** (roadmap §9.1, RD3).
+`playedKeys` gates by day, and `STORAGE_KEY = 'footplay.daily.v1'` is the containment
+seam for a future reversal. §6.2 treats daily and difficulty as **orthogonal axes**, so
+a daily streak answers only "did you play today"; keying it by difficulty would
+penalise a player for choosing Easy. This is ratified, not an open default — v1.3.1's
+and v1.3.2's plans verify it and do not re-decide it.
+
+**A re-seed can shift or break a streak, and that is documented known behavior rather
+than a caveat to resolve** (roadmap §9 O2). Two consequences, deliberately not merged:
+
+- **A day resolves to a different game.** The streak is unaffected — the stored shape is
+  day keys and never the game, which is exactly why it survives a re-seed.
+- **A day becomes unreachable.** That is an ordinary missed day under §6.1: `current`
+  resets to 1, `longest` survives. Adding an "excused day" exemption would be new scope
+  and a new storage shape, so no mitigation is added.
+
+The second row introduces no new code path, so it is pinned by the existing missed-day
+test rather than by a re-seed-specific one; the reasoning and the reasoning-as-tests
+sit in v1.3.2's Global Constraints and Risks table.
+
+**Open decisions inherited and irrelevant here:** O5 — the send-off icon is decoration
+in every mode, and a streak line makes no claim about any clue.
 
 ---
 
 ## Handoff to v1.4
 
 - `StreakState` and the E5 ratification are the inputs v1.4 needs for the share text.
-- `hasPlayed(streak, todayKey)` is the already-played-today gate the share affordance sits behind.
+- `hasPlayed(streak, todayKey)` gates **starting a second daily**, and it is **not** a gate on v1.4's copy control: v1.4 ships no `hasPlayed` gating and its clipboard path reads no storage at all (§9.1, RD7). The earlier phrasing of this bullet invited the wrong inference and is corrected here.
 - Any future storage access goes through `streakStorage.ts`; a patch that does not need storage must not name `localStorage` at all (Rule 8).

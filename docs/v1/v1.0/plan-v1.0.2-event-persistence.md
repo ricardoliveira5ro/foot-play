@@ -334,7 +334,7 @@
 
   ```bash
   cd backend && npm run dev &
-  curl -s localhost:3000/api/matches/1 | npx --yes json -a homeLineup 2>/dev/null | head -20
+  set -o pipefail; curl -s localhost:3000/api/matches/1 | npx --yes json -a homeLineup 2>/dev/null
   ```
 
   Expected: one object per shirt containing `token`, `nameLength`,
@@ -394,7 +394,7 @@ Task 2 and Task 3 are one deployable unit. The backend now returns four fields; 
 - [ ] **Step 3.1: Watch it fail first.**
 
   ```bash
-  cd frontend && npx tsc --noEmit 2>&1 | head -20
+  cd frontend && npx tsc --noEmit
   ```
 
   Expected RED. Right now it is green, because the type has not changed yet —
@@ -438,7 +438,7 @@ Task 2 and Task 3 are one deployable unit. The backend now returns four fields; 
 - [ ] **Step 3.3: Run `tsc` and read the failures.**
 
   ```bash
-  cd frontend && npx tsc --noEmit 2>&1 | head -30
+  cd frontend && npx tsc --noEmit
   ```
 
   Expected RED: `Property 'goals' is missing in type … but required in type 'LineupPlayer'` in `lib/mockData.ts`, `src/lib/gameState.test.ts`,
@@ -648,7 +648,7 @@ Task 2 and Task 3 are one deployable unit. The backend now returns four fields; 
 - [ ] **Step 4.6: Verify the changelog is parseable.**
 
   ```bash
-  npm run release -- --notes v1.0.2 | head -5
+  npm run release -- --notes v1.0.2
   ```
 
   Expected: `_2026-09-29_`. On failure the error names the pattern at `scripts/src/release.ts:9`.

@@ -160,7 +160,7 @@
 - [ ] **Step 1.2: Verify red.**
 
   ```bash
-  cd frontend && npx vitest run src/lib/difficulty.test.ts 2>&1 | tail -20
+  cd frontend && npx vitest run src/lib/difficulty.test.ts
   ```
 
   Expected: **FAIL** — `Failed to resolve import "./difficulty"`.
@@ -232,7 +232,7 @@
 - [ ] **Step 1.4: Verify green.**
 
   ```bash
-  cd frontend && npx vitest run src/lib/difficulty.test.ts 2>&1 | tail -20
+  cd frontend && npx vitest run src/lib/difficulty.test.ts
   ```
 
   Expected: `Test Files 1 passed (1)` / `Tests 7 passed (7)`.
@@ -356,7 +356,7 @@
 - [ ] **Step 2.2: Verify red.**
 
   ```bash
-  cd frontend && npx vitest run src/lib/shirtBadges.test.ts 2>&1 | tail -20
+  cd frontend && npx vitest run src/lib/shirtBadges.test.ts
   ```
 
   Expected: **FAIL** — `Failed to resolve import "./shirtBadges"`.
@@ -421,7 +421,7 @@
 - [ ] **Step 2.4: Verify green.**
 
   ```bash
-  cd frontend && npx vitest run src/lib/shirtBadges.test.ts 2>&1 | tail -20
+  cd frontend && npx vitest run src/lib/shirtBadges.test.ts
   ```
 
   Expected: `Test Files 1 passed (1)` and no failures.
@@ -515,7 +515,7 @@
 - [ ] **Step 3.2: Verify red.**
 
   ```bash
-  cd frontend && npx vitest run src/lib/gameState.test.ts src/lib/gameState.hook.test.ts 2>&1 | tail -30
+  cd frontend && npx vitest run src/lib/gameState.test.ts src/lib/gameState.hook.test.ts
   ```
 
   Expected: **FAIL** in both. The reducer tests fail on `initialState.difficulty` being `undefined` and on the `SET_DIFFICULTY` action being an unknown type; the hook test fails because `setDifficulty` is not a function.
@@ -586,13 +586,13 @@
 - [ ] **Step 3.4: Verify green.**
 
   ```bash
-  cd frontend && npx vitest run src/lib/gameState.test.ts src/lib/gameState.hook.test.ts 2>&1 | tail -20
+  cd frontend && npx vitest run src/lib/gameState.test.ts src/lib/gameState.hook.test.ts
   ```
 
-  Expected: `Test Files 2 passed (2)` and no failures. The `gameState` count is **+6** against the measurement taken at the start of this task (5 new tests in `gameState.test.ts`, 1 in the hook test) — record the real number. Do not assert a total: `docs/v1/v1.2/overview.md:205` is explicit that a suite is never forced to match a number in a plan, and v1.0.x, v1.1.x and v1.2.1 have all landed before this patch.
+  Expected: `Test Files 2 passed (2)` and no failures. The `gameState` count is **+6** against the measurement taken at the start of this task (5 new tests in `gameState.test.ts`, 1 in the hook test) — record the real number. Do not assert a total: `docs/v1/v1.2/overview.md:209` is explicit that a suite is never forced to match a number in a plan, and v1.0.x, v1.1.x and v1.2.1 have all landed before this patch.
 
   ```bash
-  cd frontend && npm run test 2>&1 | tail -12
+  cd frontend && npm run test
   ```
 
   Expected: every file green. This task adds **+6** against whatever the suite measured at the start of it (2 `difficulty` files' worth of tests in this plan's terms are already counted in Tasks 1–2: 7 for the mode table, 9 for the clue policy, 5 and 1 for the state change). **Measure and record the number; do not assert one.** The absolute totals written in earlier drafts of this step were arithmetic on a pre-v1.1.x baseline and were wrong in three different ways at once — do not reintroduce them.
@@ -668,7 +668,7 @@
 - [ ] **Step 4.3: Run the frontend regression.**
 
   ```bash
-  cd frontend && npx tsc --noEmit && npm run test 2>&1 | tail -12 && npm run lint 2>&1 | tail -20
+  cd frontend && npx tsc --noEmit && npm run test && npm run lint
   ```
 
   Expected: `tsc` clean, suite at the count recorded in Task 3 Step 3.4, no new lint warnings.
@@ -747,7 +747,7 @@
 - [ ] **Step 5.2: Verify red.**
 
   ```bash
-  cd frontend && npx vitest run src/components/DifficultySelector.test.tsx 2>&1 | tail -20
+  cd frontend && npx vitest run src/components/DifficultySelector.test.tsx
   ```
 
   Expected: **FAIL** — `Failed to resolve import "./DifficultySelector"`.
@@ -808,7 +808,7 @@
 - [ ] **Step 5.4: Verify green.**
 
   ```bash
-  cd frontend && npx vitest run src/components/DifficultySelector.test.tsx 2>&1 | tail -20
+  cd frontend && npx vitest run src/components/DifficultySelector.test.tsx
   ```
 
   Expected: `Test Files 1 passed (1)` / `Tests 4 passed (4)`.
@@ -838,7 +838,7 @@
 - [ ] **Step 5.6: Verify the full frontend suite and the types.**
 
   ```bash
-  cd frontend && npx tsc --noEmit && npm run test 2>&1 | tail -12 && npm run lint 2>&1 | tail -20
+  cd frontend && npx tsc --noEmit && npm run test && npm run lint
   ```
 
   Expected: `tsc` clean; suite count is the Task 3 count plus 4; no new lint warnings.
@@ -926,7 +926,7 @@
 - [ ] **Step 6.2: Verify red.**
 
   ```bash
-  cd frontend && npx vitest run src/components/WordleModal.test.tsx 2>&1 | tail -25
+  cd frontend && npx vitest run src/components/WordleModal.test.tsx
   ```
 
   Expected: **FAIL** on all three — `clues` and `difficulty` are not in `WordleModalProps`, and `data-testid="modal-clues"` does not exist. If the failures are *type* errors only, note that vitest does not type-check: the red must be a missing element, not a TS error.
@@ -996,19 +996,19 @@
 
   **`hasFirstLetter` is the only new field in this step.** It does not exist anywhere today, and it is the one thing the clue policy needs that the lineup payload does not carry. Add it as `hasFirstLetter: boolean` in `frontend/types/index.ts`, set it in v1.0.2's `buildLineup` to `p.name.trim().length > 0` — a player whose Wordle answer is empty has no first letter to give — and default it to `false` in `frontend/lib/mockData.ts` and in the fixtures. That is the whole of the payload work: **one** new field, not three.
 
-  `docs/v1/v1.2/overview.md:205` already anticipated exactly this fork ("its Task 6 either widens the lineup payload or the task is dropped"), and the answer is now settled: the payload is widened by **one** boolean, so Task 6 ships. If that single boolean turns out to require a Prisma column, an endpoint change, or any edit to a field v1.0.2 froze, **stop and ask** rather than widening further — dropping Task 6 remains a legitimate outcome, and the mode selector and the attempt budget are unaffected by it.
+  `docs/v1/v1.2/overview.md:211` already anticipated exactly this fork ("its Task 6 either adds one boolean to the lineup payload or is dropped outright"), and the answer is now settled: the payload is widened by **one** boolean, so Task 6 ships. If that single boolean turns out to require a Prisma column, an endpoint change, or any edit to a field v1.0.2 froze, **stop and ask** rather than widening further — dropping Task 6 remains a legitimate outcome, and the mode selector and the attempt budget are unaffected by it.
 
 - [ ] **Step 6.5: Verify green and run everything.**
 
   ```bash
-  cd frontend && npx vitest run src/components/WordleModal.test.tsx 2>&1 | tail -20
+  cd frontend && npx vitest run src/components/WordleModal.test.tsx
   ```
 
   Expected: `Test Files 1 passed (1)` / `Tests 21 passed (21)` (18 baseline + 3).
 
   ```bash
-  cd frontend && npx tsc --noEmit && npm run test 2>&1 | tail -12 && npm run lint 2>&1 | tail -20
-  cd backend  && npm run test 2>&1 | tail -12
+  cd frontend && npx tsc --noEmit && npm run test && npm run lint
+  cd backend  && npm run test
   ```
 
   Expected: frontend `tsc` clean, the full suite green, and the backend suite **identical to the measurement taken at the start of this patch** — this patch touches no backend file. The pass signal is *unchanged and green*, not a count: the pre-v1.2.1 `13/175` and post-v1.2.1 `13/177` figures both belong to `cda2db0`, and v1.0.1, v1.0.2 and v1.1.1 have landed since, so the real number is already different.
@@ -1030,7 +1030,7 @@ writes. A control cannot be specified before the data that decides whether it
 exists, and writing it in v1.2.4 would mean writing it against a table declared
 two patches earlier and never rendered. So: **introduced here**, **confirmed in
 v1.2.3** against the third non-Expert mode, and **asserted absent in v1.2.4**
-where Expert first needs it (roadmap §5.2, R1).
+where Expert first needs it (roadmap §5.2, RD1).
 
 **In these two modes the control renders nothing.** That is the expected result
 of the first three tests below, and a green run with zero rendered buttons is the
@@ -1157,7 +1157,7 @@ behind it.
 - [ ] **Step 7.2: Verify red.**
 
   ```bash
-  cd frontend && npx vitest run src/lib/gameState.test.ts src/components/FinishButton.test.tsx 2>&1 | tail -25
+  cd frontend && npx vitest run src/lib/gameState.test.ts src/components/FinishButton.test.tsx
   ```
 
   Expected: **FAIL** — `resolvedShirtCount` is not exported and `Failed to resolve import "./FinishButton"`.
@@ -1206,7 +1206,7 @@ behind it.
    * Two rules, both from the table and never from a mode name:
    *   - `opponentRequired === false` renders NOTHING, not a disabled control. A
    *     permanently disabled Finish in Easy reads as a broken feature, and
-   *     worse, as a requirement the game does not have (roadmap §5.2, R1).
+   *     worse, as a requirement the game does not have (roadmap §5.2, RD1).
    *   - `total === FULL_BOARD` guards the count against a partial lineup being
    *     "finished" by arithmetic.
    *
@@ -1294,8 +1294,8 @@ behind it.
 - [ ] **Step 7.6: Verify green.**
 
   ```bash
-  cd frontend && npx vitest run src/lib/gameState.test.ts src/components/FinishButton.test.tsx 2>&1 | tail -20
-  cd frontend && npx tsc --noEmit && npm run test 2>&1 | tail -12 && npm run lint 2>&1 | tail -20
+  cd frontend && npx vitest run src/lib/gameState.test.ts src/components/FinishButton.test.tsx
+  cd frontend && npx tsc --noEmit && npm run test && npm run lint
   ```
 
   Expected: both files green; `tsc` clean; no new lint warnings. The FinishButton file reports **5 passed**, and the two "renders nothing" cases passing is the correct result for this patch.

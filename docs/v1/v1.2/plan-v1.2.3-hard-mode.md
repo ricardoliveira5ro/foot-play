@@ -157,7 +157,7 @@
 - [ ] **Step 1.2: Verify red.**
 
   ```bash
-  cd frontend && npx vitest run src/lib/shirtNumberMask.test.ts 2>&1 | tail -20
+  cd frontend && npx vitest run src/lib/shirtNumberMask.test.ts
   ```
 
   Expected: **FAIL** — `Failed to resolve import "./shirtNumberMask"`.
@@ -223,7 +223,7 @@
 - [ ] **Step 1.4: Verify green.**
 
   ```bash
-  cd frontend && npx vitest run src/lib/shirtNumberMask.test.ts 2>&1 | tail -20
+  cd frontend && npx vitest run src/lib/shirtNumberMask.test.ts
   ```
 
   Expected: `Test Files 1 passed (1)` / `Tests 11 passed (11)`.
@@ -337,7 +337,7 @@
 - [ ] **Step 2.2: Verify red.**
 
   ```bash
-  cd frontend && npx vitest run src/components/Shirt.test.tsx 2>&1 | tail -25
+  cd frontend && npx vitest run src/components/Shirt.test.tsx
   ```
 
   Expected: **FAIL** on the Hard cases — `queryByTestId('shirt-number')` finds nothing because the span has no `data-testid`, and the aria label contains `?` but not `? (number hidden)`.
@@ -431,13 +431,13 @@
 - [ ] **Step 2.4: Verify green, then the whole frontend.**
 
   ```bash
-  cd frontend && npx vitest run src/components/Shirt.test.tsx 2>&1 | tail -25
+  cd frontend && npx vitest run src/components/Shirt.test.tsx
   ```
 
   Expected: `Test Files 1 passed (1)` / `Tests 9 passed (9)`.
 
   ```bash
-  cd frontend && npx tsc --noEmit && npm run test 2>&1 | tail -12 && npm run lint 2>&1 | tail -20
+  cd frontend && npx tsc --noEmit && npm run test && npm run lint
   ```
 
   Expected: `tsc` clean; the suite count is the v1.2.2 exit count plus 9 plus 11; no new lint warnings.
@@ -502,7 +502,7 @@
 - [ ] **Step 3.4: Verify the full frontend.**
 
   ```bash
-  cd frontend && npx tsc --noEmit && npm run test 2>&1 | tail -12 && npm run lint 2>&1 | tail -20
+  cd frontend && npx tsc --noEmit && npm run test && npm run lint
   ```
 
   Expected: all green at the count recorded in Task 2 Step 2.4.
@@ -559,7 +559,7 @@
 - [ ] **Step 4.2: Verify red.**
 
   ```bash
-  cd frontend && npx vitest run src/components/WordleModal.test.tsx 2>&1 | tail -25
+  cd frontend && npx vitest run src/components/WordleModal.test.tsx
   ```
 
   Expected: **FAIL** on all three — `data-testid="modal-shirt-number"` does not exist.
@@ -586,13 +586,13 @@
 - [ ] **Step 4.4: Verify green.**
 
   ```bash
-  cd frontend && npx vitest run src/components/WordleModal.test.tsx 2>&1 | tail -20
+  cd frontend && npx vitest run src/components/WordleModal.test.tsx
   ```
 
   Expected: the file's full count green, including v1.2.2's three clue-line tests.
 
   ```bash
-  cd frontend && npx tsc --noEmit && npm run test 2>&1 | tail -12 && npm run lint 2>&1 | tail -20
+  cd frontend && npx tsc --noEmit && npm run test && npm run lint
   ```
 
 - [ ] **Step 4.5: Commit.**
@@ -637,7 +637,7 @@
 - [ ] **Step 5.2: Verify red.**
 
   ```bash
-  cd frontend && npx vitest run src/lib/difficulty.test.ts 2>&1 | tail -20
+  cd frontend && npx vitest run src/lib/difficulty.test.ts
   ```
 
   Expected: **FAIL** — `DIFFICULTIES` is `['easy', 'normal']`.
@@ -682,14 +682,14 @@
 - [ ] **Step 5.5: Verify green and run everything.**
 
   ```bash
-  cd frontend && npx vitest run src/lib/difficulty.test.ts src/components/DifficultySelector.test.tsx 2>&1 | tail -20
+  cd frontend && npx vitest run src/lib/difficulty.test.ts src/components/DifficultySelector.test.tsx
   ```
 
   Expected: both files green; `difficulty.test.ts` now 8 tests, the selector 5.
 
   ```bash
-  cd frontend && npx tsc --noEmit && npm run test 2>&1 | tail -12 && npm run lint 2>&1 | tail -20
-  cd backend  && npm run test 2>&1 | tail -12
+  cd frontend && npx tsc --noEmit && npm run test && npm run lint
+  cd backend  && npm run test
   ```
 
   Expected: frontend `tsc` clean and the full count green; backend unchanged.
@@ -710,7 +710,7 @@ third `opponentRequired: false` row, and it is the one that proves the control
 reads the **table** rather than a hardcoded pair of mode names: Easy and Normal
 are the default and its sibling, so a two-mode check is satisfied by
 `mode !== 'expert' && mode !== 'hard'` as easily as by a table read. Three modes
-is where the shortcut starts to hurt (roadmap §5.2, R1).
+is where the shortcut starts to hurt (roadmap §5.2, RD1).
 
 **Nothing about the mask is touched here.** This task is a verification and, if
 v1.2.2 got it wrong, a one-line fix.
@@ -754,10 +754,10 @@ v1.2.2 got it wrong, a one-line fix.
 - [ ] **Step 6.2: Verify red.**
 
   ```bash
-  cd frontend && npx vitest run src/components/FinishButton.test.tsx 2>&1 | tail -25
+  cd frontend && npx vitest run src/components/FinishButton.test.tsx
   ```
 
-  Expected: **FAIL** if v1.2.2's `FinishButton` compared against a literal mode name or rendered a disabled control instead of returning `null`. If the Hard case passes, that is a **verified** result: record it in the changelog and keep the test, because it is the standing guard for R1 and for v1.2.4's absence assertion.
+  Expected: **FAIL** if v1.2.2's `FinishButton` compared against a literal mode name or rendered a disabled control instead of returning `null`. If the Hard case passes, that is a **verified** result: record it in the changelog and keep the test, because it is the standing guard for RD1 and for v1.2.4's absence assertion.
 
 - [ ] **Step 6.3: Fix the control if it reads a mode name.**
 
@@ -772,8 +772,8 @@ v1.2.2 got it wrong, a one-line fix.
 - [ ] **Step 6.4: Verify and commit.**
 
   ```bash
-  cd frontend && npx vitest run src/components/FinishButton.test.tsx 2>&1 | tail -20
-  cd frontend && npx tsc --noEmit && npm run test 2>&1 | tail -12 && npm run lint 2>&1 | tail -20
+  cd frontend && npx vitest run src/components/FinishButton.test.tsx
+  cd frontend && npx tsc --noEmit && npm run test && npm run lint
   git add frontend/src/components/FinishButton.test.tsx frontend/src/components/FinishButton.tsx
   git commit -m "test(frontend): confirm the Finish control across the third non-Expert mode"
   ```

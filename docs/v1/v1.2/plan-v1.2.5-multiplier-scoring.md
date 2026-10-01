@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** The multiplier in `DIFFICULTY_CONFIG` becomes real. Every shirt's score is scaled by the mode's multiplier — the correct branch and the failed branch both — and the GameComplete breakdown shows the multiplier it applied, so the displayed total is the sum of the visible line items. The opponent lineup is labelled as an **optional bonus** in Easy, Normal and Hard and as **required** in Expert, because a UI that shows the same two team sections in every mode implies a requirement that does not exist in three of them. Both labels read `opponentRequired` — the same field the completion gate reads since v1.2.4 — so the score breakdown and the gate cannot disagree (roadmap §5.2, §9.1 R1).
+**Goal:** The multiplier in `DIFFICULTY_CONFIG` becomes real. Every shirt's score is scaled by the mode's multiplier — the correct branch and the failed branch both — and the GameComplete breakdown shows the multiplier it applied, so the displayed total is the sum of the visible line items. The opponent lineup is labelled as an **optional bonus** in Easy, Normal and Hard and as **required** in Expert, because a UI that shows the same two team sections in every mode implies a requirement that does not exist in three of them. Both labels read `opponentRequired` — the same field the completion gate reads since v1.2.4 — so the score breakdown and the gate cannot disagree (roadmap §5.2, §9.1 RD1).
 
 **Architecture:** `scorePlayer` gains a fifth parameter with a default of `1`, and `computeTotalScore` gains a fifth parameter with a default of `1`, so every existing caller keeps working and every existing test keeps its expected value. The scaling is applied inside `scorePlayer` — the single place the two expressions live — and `computeTotalScore` forwards the multiplier and records it on each `PerPlayerScore` so the breakdown can render it. The total is **not** recomputed from the multiplier: it is the sum of the already-scaled line items, which is what makes the breakdown add up (§5.3).
 
@@ -20,8 +20,8 @@
 - **The multiplier is a default parameter, not a required one.** `scorePlayer(..., multiplier: number = 1)` and `computeTotalScore(..., multiplier: number = 1)`. The defaults preserve every existing test's expected value; changing them to required parameters would mean editing 20 passing assertions to re-state something the default already says.
 - **`PerPlayerScore` gains `multiplier: number`.** It is recorded on each line so the breakdown can render `×2` next to the points without re-deriving it. The `grandTotal` is still `perPlayer.reduce(...)` over the already-scaled `totalPoints` — no second multiplication anywhere.
 - **"Optional bonus" labelling lands here and not in v1.2.4.** §5.2 defers it to this patch for a stated reason: "optional" is only a meaningful word once a mode exists where the opponent is not required. It is now. v1.2.4's selector text says `opponent optional`, which describes the gate; this patch makes the *score section* say the same thing, which is where a player looks to find out what is worth points.
-- **The label reads `opponentRequired`, and that is now the whole story.** v1.2.4 made the completion gate mode-dependent (roadmap §5.2, R1), so the flag is no longer a description of something else: it is the same field the gate reads, the same field `FinishButton` reads, and the same field this label reads. One flag, one truth, three consumers — the label **cannot** contradict the gate, and there is no longer an open question about which way the gate goes. The three-mode `optional bonus` label is correct as written, and the `Expert required` case is the one that proves the label is conditional rather than hardcoded.
-- **The opponent label must be honest about a game the player never opposed.** A `normal` game that auto-completed at 11/22 (R1) has no opponent bonus to label, because there is no opponent bonus in the result. The GameComplete section is therefore rendered from the same question v1.4.1 asks of the share grid — *did the player put an attempt into the opponent half* — and an untouched half reads `optional bonus — not played this game` rather than implying points that are not on the line. A surrendered game says the same thing.
+- **The label reads `opponentRequired`, and that is now the whole story.** v1.2.4 made the completion gate mode-dependent (roadmap §5.2, RD1), so the flag is no longer a description of something else: it is the same field the gate reads, the same field `FinishButton` reads, and the same field this label reads. One flag, one truth, three consumers — the label **cannot** contradict the gate, and there is no longer an open question about which way the gate goes. The three-mode `optional bonus` label is correct as written, and the `Expert required` case is the one that proves the label is conditional rather than hardcoded.
+- **The opponent label must be honest about a game the player never opposed.** A `normal` game that auto-completed at 11/22 (RD1) has no opponent bonus to label, because there is no opponent bonus in the result. The GameComplete section is therefore rendered from the same question v1.4.1 asks of the share grid — *did the player put an attempt into the opponent half* — and an untouched half reads `optional bonus — not played this game` rather than implying points that are not on the line. A surrendered game says the same thing.
 - **No new component test outside `frontend/src/`**, and every new test file carries `// @vitest-environment jsdom` and imports outward with `../../components/...`.
 - **Regression commands, run at every task boundary:**
 
@@ -227,7 +227,7 @@
 - [ ] **Step 1.2: Verify red.**
 
   ```bash
-  cd frontend && npx vitest run src/lib/scoring.test.ts 2>&1 | tail -30
+  cd frontend && npx vitest run src/lib/scoring.test.ts
   ```
 
   Expected: **FAIL** across the new block — the extra arguments are ignored today, so every scaled expectation returns the unscaled value (`500` vs `1000`, `38` vs `75`), `line.multiplier` is `undefined`, and the `computeTotalScore` calls with a fifth argument compile fine but ignore it.
@@ -315,13 +315,13 @@
 - [ ] **Step 1.4: Verify green, then the whole frontend.**
 
   ```bash
-  cd frontend && npx vitest run src/lib/scoring.test.ts 2>&1 | tail -20
+  cd frontend && npx vitest run src/lib/scoring.test.ts
   ```
 
   Expected: the file green, all 20 pre-existing tests included. If any pre-existing assertion fails, the default argument is wrong — every number in `scoring.test.ts` before this patch is a ×1 expectation.
 
   ```bash
-  cd frontend && npx tsc --noEmit && npm run test 2>&1 | tail -12 && npm run lint 2>&1 | tail -20
+  cd frontend && npx tsc --noEmit && npm run test && npm run lint
   ```
 
   Expected: `tsc` clean, every file green, no new lint warnings. `GameComplete.test.tsx` and `GameComplete.tsx` will not compile-fail — `PerPlayerScore` gained a field, and any test constructing one literally needs it; add `multiplier: 1` to those literals.
@@ -444,7 +444,7 @@
 - [ ] **Step 2.2: Verify red.**
 
   ```bash
-  cd frontend && npx vitest run src/components/GameComplete.test.tsx 2>&1 | tail -30
+  cd frontend && npx vitest run src/components/GameComplete.test.tsx
   ```
 
   Expected: **FAIL** on the new block — `difficulty` is not a prop, so the four `data-testid`s do not exist. If the failures are only "unknown prop" type errors, note that vitest does not type-check: the red must be a missing element.
@@ -517,11 +517,11 @@
 
       ```tsx
       /**
-       * How the opponent section is labelled (§5.2, R1).
+       * How the opponent section is labelled (§5.2, RD1).
        *
        * `opponentRequired` says the mode needs the opponent; `opponentAttempted`
        * says whether the player actually put an attempt into it. Both matter,
-       * and they are different questions: under R1 a `normal` game can end at
+       * and they are different questions: under RD1 a `normal` game can end at
        * 11/22 with the opponent untouched, so "optional bonus" on its own would
        * point at points that are not on the line.
        */
@@ -570,14 +570,14 @@
 - [ ] **Step 2.5: Verify green and run everything.**
 
   ```bash
-  cd frontend && npx vitest run src/components/GameComplete.test.tsx 2>&1 | tail -20
+  cd frontend && npx vitest run src/components/GameComplete.test.tsx
   ```
 
   Expected: the file green, all 20 pre-existing tests included. A pre-existing failure means the multiplier is showing where it should not — check step 2.3 item 5.
 
   ```bash
-  cd frontend && npx tsc --noEmit && npm run test 2>&1 | tail -12 && npm run lint 2>&1 | tail -20
-  cd backend  && npm run test 2>&1 | tail -12
+  cd frontend && npx tsc --noEmit && npm run test && npm run lint
+  cd backend  && npm run test
   ```
 
   Expected: frontend all green; backend unchanged.
@@ -606,7 +606,7 @@
 11. The grand total shows `×2` in Hard and `×3` in Expert, and shows no multiplier badge in Normal.
 12. Each per-shirt line shows the multiplier that produced its number, or no badge when the multiplier is 1.
 13. The opponent section reads `required` in Expert, `optional bonus` in Easy/Normal/Hard **when the player put an attempt into the opponent half**, and `optional bonus — not played this game` when they did not. The label is a pure function of `DIFFICULTY_CONFIG[difficulty].opponentRequired` and `opponentShirts.some(s => s.attempts > 0)`, and of nothing else.
-14. An `expert` result always reads `required`; a `normal` game that auto-completed at 11/22 under R1 reads `not played this game`, because there is no bonus on the line to point at.
+14. An `expert` result always reads `required`; a `normal` game that auto-completed at 11/22 under RD1 reads `not played this game`, because there is no bonus on the line to point at.
 15. The multiplier display is not duplicated inline in two places; a shared formatter is used if one is needed.
 16. Frontend: full suite green, `tsc` clean, `lint` clean. Backend: untouched and green.
 
@@ -640,4 +640,4 @@
 | **Substituting the raw correct-letter count for the unique count** while scaling would inflate every failed shirt. | Pinned by the `does not double-count a repeated letter` test, which asserts both the unique-count value and its doubled counterpart. |
 | **The ×3 multiplier makes an Expert score unreadable** next to the other modes. | §5.4 accepts this explicitly: ×3 is the ceiling because going higher makes the score unreadable. A change here is a §5.4 change, not an implementation one. |
 
-**Escalate before proceeding only if:** the completion gate in `gameState.ts` no longer reads `DIFFICULTY_CONFIG[difficulty].opponentRequired`, or `GameComplete` no longer receives the opponent shirts and so cannot derive `opponentAttempted`. Either would break the shared-input property this patch relies on, and either means v1.2.4's R1 work was reverted. The §5.2 gate question itself is **closed** (roadmap §9.1, R1) and is not an escalation.
+**Escalate before proceeding only if:** the completion gate in `gameState.ts` no longer reads `DIFFICULTY_CONFIG[difficulty].opponentRequired`, or `GameComplete` no longer receives the opponent shirts and so cannot derive `opponentAttempted`. Either would break the shared-input property this patch relies on, and either means v1.2.4's RD1 work was reverted. The §5.2 gate question itself is **closed** (roadmap §9.1, RD1) and is not an escalation.

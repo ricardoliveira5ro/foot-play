@@ -95,7 +95,7 @@
 - [ ] **Step 1.2: Run it and confirm red.**
 
   ```bash
-  cd frontend && npx vitest run src/lib/clubFilters.test.ts 2>&1 | tail -20
+  cd frontend && npx vitest run src/lib/clubFilters.test.ts
   ```
 
 - [ ] **Step 1.3: Implement.**
@@ -118,7 +118,7 @@
 - [ ] **Step 1.4: Verify green, and check the diacritic case against real names.**
 
   ```bash
-  cd frontend && npx vitest run src/lib/clubFilters.test.ts 2>&1 | tail -20
+  cd frontend && npx vitest run src/lib/clubFilters.test.ts
   ```
 
   Pull three real club names from the seed and add them as explicit `it.each` cases so the helper is tested against the data it will actually see.
@@ -197,7 +197,7 @@
 - [ ] **Step 2.2b: Run it and confirm red.**
 
   ```bash
-  cd frontend && npx vitest run src/components/ClubMultiSelect.test.tsx 2>&1 | tail -20
+  cd frontend && npx vitest run src/components/ClubMultiSelect.test.tsx
   ```
 
 - [ ] **Step 2.3: Implement.**
@@ -231,7 +231,7 @@
 - [ ] **Step 2.4: Verify green.**
 
   ```bash
-  cd frontend && npx vitest run src/components/ClubMultiSelect.test.tsx 2>&1 | tail -25
+  cd frontend && npx vitest run src/components/ClubMultiSelect.test.tsx
   ```
 
 - [ ] **Step 2.5: Commit.**
@@ -298,7 +298,7 @@
 - [ ] **Step 3.2: Run it and confirm red.**
 
   ```bash
-  cd frontend && npx vitest run src/components/FilterPanel.test.tsx 2>&1 | tail -20
+  cd frontend && npx vitest run src/components/FilterPanel.test.tsx
   ```
 
 - [ ] **Step 3.3: Implement.**
@@ -335,7 +335,7 @@
 - [ ] **Step 3.4: Verify green.**
 
   ```bash
-  cd frontend && npx vitest run src/components/FilterPanel.test.tsx 2>&1 | tail -30
+  cd frontend && npx vitest run src/components/FilterPanel.test.tsx
   ```
 
 - [ ] **Step 3.5: Commit.**
@@ -380,7 +380,7 @@
 - [ ] **Step 4.2: Run and confirm red.**
 
   ```bash
-  cd frontend && npx vitest run app/missing-eleven/page.test.tsx 2>&1 | tail -25
+  cd frontend && npx vitest run app/missing-eleven/page.test.tsx
   ```
 
 - [ ] **Step 4.3: Mount the panel.**
@@ -398,8 +398,8 @@
 - [ ] **Step 4.4: Verify green, then run everything.**
 
   ```bash
-  cd frontend && npx vitest run app/missing-eleven/ src/components/ src/lib/ 2>&1 | tail -35
-  cd frontend && npm run test 2>&1 | tail -35
+  cd frontend && npx vitest run app/missing-eleven/ src/components/ src/lib/
+  cd frontend && npm run test
   ```
 
 - [ ] **Step 4.5: Commit.**
@@ -425,13 +425,13 @@
 - [ ] **Step 5.1: Run the full frontend suite with coverage.**
 
   ```bash
-  cd frontend && npm run test:coverage 2>&1 | tail -40
+  cd frontend && npm run test:coverage
   ```
 
 - [ ] **Step 5.2: Run a production build.**
 
   ```bash
-  cd frontend && npm run build 2>&1 | tail -40
+  cd frontend && npm run build
   ```
 
   Required, not optional. The page tree changed, and the `missing-suspense-with-csr-bailout` failure from v1.1.2 is only ever visible here.
@@ -442,7 +442,7 @@
 
   ```bash
   # capture the raw option list and pick a real club id
-  curl -s 'http://localhost:3000/api/matches/filter-options' | head -c 600
+  curl -s 'http://localhost:3000/api/matches/filter-options'
   ```
 
   Then in the browser:
@@ -464,3 +464,51 @@
   git add docs/v1/v1.1/CHANGELOG-v1.1.3.md
   git commit -m "docs: add v1.1.3 changelog and validation evidence"
   ```
+
+## Acceptance criteria
+
+1. This patch renders **Team and Opponent only**. Competition, Season, and the empty state belong to v1.1.4; their absence here is correct, not incomplete.
+2. `ClubMultiSelect` is the **single** control used for both dimensions. Team and Opponent differ only in label, the option field they read, and the callback they call — a second, near-identical multiselect is a defect.
+3. Counts are never recomputed on toggle. Toggling an option reads the numbers v1.1.1 already returned; `grep -rn "count" frontend/src/components/ClubMultiSelect.tsx` finds rendering only, no arithmetic.
+4. Counts are **numbers from the server**, never derived client-side. A client-side `options.length` or filtered-count fallback is a defect.
+5. The option universe is unfiltered and always complete: every club in the response is listed, regardless of the current selection, so a selected value does not vanish from its own list.
+6. A zero-count option is **visible, enabled, and selectable**. Hiding or disabling it would make a filter that returns nothing unreachable to fix.
+7. The Opponent list is the same clubs as the Team list, read from the `opponents` key.
+8. A club may be simultaneously a selected Team and a selected Opponent. The two dimensions are independent; coupling them is a defect.
+9. Both controls use the draft-then-apply contract from v1.1.1: edits land in a local draft and the URL/state change only on Apply.
+10. The panel **does not remount** on filter change — the user's in-progress search text and scroll position survive a fetch. `key` is not derived from the filter state.
+11. New components live in `frontend/src/components/`, not `frontend/components/`, so Vitest's flat `@` alias resolves them identically to the App Router.
+12. Accessibility is a requirement, not a finish: the trigger is a real `button` with `aria-expanded` and `aria-controls`; each option is a labelled `input[type=checkbox]` reachable by keyboard; the grouped list is announced; focus is visible.
+13. The panel is closed by default, and its open/closed state is not persisted to storage or the URL.
+14. No new dependencies, and no backend, schema, or API change in this patch.
+15. `npm run test`, `npm run build`, `npx tsc --noEmit`, and `npm run lint` are all clean, and every new suite is collected. No suite is asserted against a fixed count — it is measured and recorded, per `docs/v1/v1.2/overview.md:209`.
+
+## Validation
+
+| Check | Command | Pass signal |
+|---|---|---|
+| Frontend suite | `cd frontend && npm run test` | every file green; count measured and recorded, not asserted |
+| The new components | `cd frontend && npx vitest run src/components/ClubMultiSelect.test.tsx src/components/FilterPanel.test.tsx src/lib/clubFilters.test.ts` | every case green |
+| The page mount | `cd frontend && npx vitest run app/missing-eleven/page.test.tsx` | the panel renders and Apply reaches the URL |
+| Production build | `cd frontend && npm run build` | no output |
+| Types | `cd frontend && npx tsc --noEmit` | no output |
+| Lint | `cd frontend && npm run lint` | no output |
+| Counts are rendered, not computed | `grep -n "length\|filter(" frontend/src/components/ClubMultiSelect.tsx` | no client-side count arithmetic |
+| One control, not two | `grep -rln "checkbox" frontend/src/components` | only `ClubMultiSelect.tsx` (plus the panel composing it) |
+| Components resolve under the `@` alias | `grep -rn "from '@/components/TeamTabBar'" frontend/src/components` | resolves — the same import form the App Router uses |
+| No backend drift | `git diff --stat -- backend/` | empty — this patch is frontend-only |
+| The include was not re-narrowed (R7) | `grep -n "include:" frontend/vitest.config.ts` | unchanged from v1.1.1 |
+
+## Risks
+
+| Risk | Mitigation |
+|---|---|
+| **Counts recomputed on toggle**, so selecting a filter silently changes every other count and the list reshuffles under the cursor. | Counts are read from the single grouped query and never recomputed (criteria 3–4). The unfiltered, complete option universe (criterion 5) is what makes a recompute unnecessary; the panel test asserts the rendered counts are the server's. |
+| **The panel remounts on filter change**, discarding the user's search text mid-typing. | `key` is not derived from filter state (criterion 10), and the panel test asserts draft state survives an Apply → refetch cycle. |
+| **A zero-count option is hidden or disabled**, stranding the user on a filter that returns nothing with no way to widen it. | Zero-count options stay visible, enabled, and selectable (criterion 6), asserted by name in `ClubMultiSelect.test.tsx`. |
+| **A second multiselect is added for Opponent**, and the two drift. | One control, two configurations (criterion 2), with the grep gate listing every file rendering a checkbox list. |
+| **New components land in `frontend/components/`**, where Vitest cannot see them — a suite that reports green while asserting nothing. | The architecture note fixes the location, and `grep -rn "from '@/components/TeamTabBar'"` demonstrates the import form that resolves in both runners. |
+| **The two dimensions become coupled**, so selecting a team filters the team list to that team and the user cannot select a second one. | Independence is asserted in both directions (criterion 8); a club may hold both roles simultaneously. |
+| **Accessibility is treated as a finish**, leaving a keyboard user unable to reach an option. | Criterion 12 is a list of checkable properties, each asserted in `ClubMultiSelect.test.tsx`; the panel trigger's `aria-expanded`/`aria-controls` pair is named rather than implied. |
+
+**Escalate before proceeding if:** the counts v1.1.1 returns cannot support an unfiltered, complete option universe for one of the dimensions — for example if a facet legitimately returns a truncated list. That would contradict R5 and the grouped-query decision, and the fix belongs upstream in v1.1.1 rather than in a client-side recomputation here.

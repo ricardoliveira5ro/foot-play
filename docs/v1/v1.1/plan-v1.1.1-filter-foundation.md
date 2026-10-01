@@ -22,6 +22,7 @@
 - **Escalation — `lead` must ratify CONTRACT DEVIATION #1.** The two options are: **(A) recommended** — accept `Prisma.Sql`; the whole v1.1 backend filter path is raw SQL, which is required anyway for the grouped counts. **(B)** revert to `Prisma.GameWhereInput` and accept that the completeness rule degrades to something weaker than 11-per-side, which contradicts §1.1 and the data. Do **not** begin Task 4 under option (B) without a decision.
 - **Completeness is 11 starting-lineup appearances per side, correlated to the game's own `homeClubId` / `awayClubId`.** Not 22 total, not 11 total. `Appearance.type` is `starting_lineup` for 100% of rows today, but the predicate still filters on it, because a substitute appearance must not silently start counting toward a side.
 - **530 games are excluded before any filter exists.** Every query in this patch — random match, filter options, counts — carries the completeness predicate. There is no code path that can return one of the 530 games.
+- **This line uses `R#` in two different senses, and the difference is not cosmetic.** `R1`, `R4` and `R5` below are **v1.1-local constraint IDs**, declared in this list and reused by v1.1.2–v1.1.4; they are not roadmap IDs and resolve to nothing outside this line. `R6` and `R7` are **roadmap §8 risk IDs** and are cited that way elsewhere. Read a bare `R#` in a v1.1 plan as local unless it names a roadmap risk, and cite a roadmap §9.1 decision as `RD#` — §9.1's decisions are prefixed for exactly this reason, and §9 is authoritative where the two disagree. **Two `R#` collisions sit outside v1.1 and are not covered by this rule, so do not resolve them from it.** `plan-v1.0.1-event-measurement.md:14-16` declares its own local `R2` (dismissal encoding), `R3` (substitute goals) and `R4` (memory) that shadow roadmap §8 `R2`, `R3` and `R4` — the same local-vs-roadmap split, in the v1.0 line, with no note of its own. And `plan-v1.0.1-event-measurement.md:48` ("a cold R2 origin") uses the token for **Cloudflare R2 object storage**, the host of `DATA_URL` (`scripts/src/download-data.ts:7`, `*.r2.dev`), and is a risk identifier in no namespace at all. The local IDs above are not renamed to avoid this; a reader who greps `R2` across the tree must open the file that declares it before citing it.
 - **R1 — counts are required, never rejected.** `GET /api/matches/filter-options` returns per-option counts and `total` on every request, including all-zero. A missing or `null` count is a defect.
 - **R4 — one grouped query, never one query per option.** All five numbers come from a **single** `$queryRaw` statement. Adding a per-option lookup loop is a defect, and the 95% branch gate plus Task 5's test both hold the line.
 - **R5 — facet exclusion.** When a dimension is selected, its own groupBy is computed with that dimension's filter *removed*, so every option in the list carries a meaningful count instead of a self-referential 0. v1.1.2 depends on this: a fully selected team list must not collapse to zeros.
@@ -57,7 +58,7 @@
 
   ```bash
   cd frontend
-  npx vitest run components/Shirt.colors.test.tsx --reporter=verbose 2>&1 | tail -20
+  npx vitest run components/Shirt.colors.test.tsx --reporter=verbose
   ```
 
   Expected today: `No test files found` or zero collected tests. Record the exact output. This is the red for this task.
@@ -142,7 +143,7 @@
 
   ```bash
   cd frontend
-  npm run test 2>&1 | tail -30
+  npm run test
   ```
 
   Expected: the `Shirt colours` suite reports a non-zero test count, and the total collected file count is strictly greater than the baseline in Step 1.1. If the count did not move, the include did not take effect and the task is not done.
@@ -208,7 +209,7 @@
 - [ ] **Step 2.3: Verify the existing suite is still green before adding new tests.**
 
   ```bash
-  cd backend && npm run test 2>&1 | tail -30
+  cd backend && npm run test
   ```
 
   Expected: unchanged pass. Games 1–3 and 4 were not touched, so nothing in the current suite may move. A failure here means Step 2.2 mutated a frozen fixture — fix that before continuing.
@@ -262,7 +263,7 @@
 - [ ] **Step 3.2: Run it and confirm red.**
 
   ```bash
-  cd backend && npx vitest run src/__tests__/unit/lineupCompleteness.test.ts 2>&1 | tail -20
+  cd backend && npx vitest run src/__tests__/unit/lineupCompleteness.test.ts
   ```
 
   Expected: failure to resolve the module. This is the red.
@@ -320,7 +321,7 @@
 - [ ] **Step 3.5: Run it and confirm green, with coverage on the new module.**
 
   ```bash
-  cd backend && npx vitest run src/__tests__/unit/lineupCompleteness.test.ts --coverage.enabled --coverage.include='src/lib/lineupCompleteness.ts' 2>&1 | tail -25
+  cd backend && npx vitest run src/__tests__/unit/lineupCompleteness.test.ts --coverage.enabled --coverage.include='src/lib/lineupCompleteness.ts'
   ```
 
   Expected: all cases pass; 100% lines/branches/functions/statements for the new file.
@@ -430,13 +431,13 @@
 - [ ] **Step 4.5: Verify green and check the full backend suite.**
 
   ```bash
-  cd backend && npm run test 2>&1 | tail -40
+  cd backend && npm run test
   ```
 
   Then check the coverage gate explicitly, because the new SQL file is inside the measured set:
 
   ```bash
-  cd backend && npm run test:coverage 2>&1 | tail -40
+  cd backend && npm run test:coverage
   ```
 
   Expected: all four metrics still ≥ 95%.
@@ -498,7 +499,7 @@
 - [ ] **Step 5.2: Run it and confirm red.**
 
   ```bash
-  cd backend && npx vitest run src/__tests__/integration/filterService.test.ts 2>&1 | tail -20
+  cd backend && npx vitest run src/__tests__/integration/filterService.test.ts
   ```
 
 - [ ] **Step 5.3: Build the SQL fragment helpers.**
@@ -586,8 +587,8 @@
 - [ ] **Step 5.6: Verify green, with both suites and coverage.**
 
   ```bash
-  cd backend && npx vitest run src/__tests__/unit/filterQuery.test.ts src/__tests__/integration/filterService.test.ts 2>&1 | tail -30
-  cd backend && npm run test:coverage 2>&1 | tail -40
+  cd backend && npx vitest run src/__tests__/unit/filterQuery.test.ts src/__tests__/integration/filterService.test.ts
+  cd backend && npm run test:coverage
   ```
 
 - [ ] **Step 5.7: Commit.**
@@ -635,7 +636,7 @@
 - [ ] **Step 6.2: Run it and confirm red.**
 
   ```bash
-  cd backend && npx vitest run src/__tests__/integration/routes/filterOptions.test.ts 2>&1 | tail -20
+  cd backend && npx vitest run src/__tests__/integration/routes/filterOptions.test.ts
   ```
 
 - [ ] **Step 6.3: Register the route above `/:id`.**
@@ -652,7 +653,7 @@
 - [ ] **Step 6.4: Verify green, and verify the mount path.**
 
   ```bash
-  cd backend && npx vitest run src/__tests__/integration/routes/filterOptions.test.ts 2>&1 | tail -20
+  cd backend && npx vitest run src/__tests__/integration/routes/filterOptions.test.ts
   ```
 
   Confirm in `backend/src/app.ts` that the matches router is mounted so the final path is `/api/matches/filter-options` and **not** shadowed by any other `/api/matches/:something` route. If a `GET /api/matches/random` route exists, confirm it is also registered before `/:id`.
@@ -695,7 +696,7 @@
 - [ ] **Step 7.2: Run it and confirm red.**
 
   ```bash
-  cd backend && npx vitest run src/__tests__/integration/playerService.test.ts 2>&1 | tail -20
+  cd backend && npx vitest run src/__tests__/integration/playerService.test.ts
   ```
 
 - [ ] **Step 7.3: Implement the change.**
@@ -712,7 +713,7 @@
 - [ ] **Step 7.4: Verify green.**
 
   ```bash
-  cd backend && npx vitest run src/__tests__/integration/playerService.test.ts 2>&1 | tail -20
+  cd backend && npx vitest run src/__tests__/integration/playerService.test.ts
   ```
 
 - [ ] **Step 7.5: Commit.**
@@ -769,7 +770,7 @@
 
   `paramsToFilters` and `filtersToParams` are the **pure** URL helpers; `fetchFilterOptions` / `fetchRandomMatch` are the **async** API-client functions. The pure and async families are named differently on purpose, so a caller can never pass a `URLSearchParams` where a `GameFilterParams` is required.
 
-  **The frozen names and the file placement are two different things, and both are frozen.** The escalation already on record (E1, `docs/v1/v1.3/overview.md:65`) is that the contract spells the backend-side type `GameFilters` while this line froze the frontend type as `GameFilterParams`; that naming discrepancy is *not* resolved here. What this task fixes is only the file placement: there is **no `frontend/types/filters.ts`**. Anything that appears in a JSON response goes in `frontend/types/index.ts`; anything that is a function goes in `frontend/src/lib/`, beside its own test file. `EMPTY_FILTERS` is a value rather than a wire shape, and it lives with the types because `paramsToFilters` returns it and v1.1.2's reducer compares against it.
+  **The frozen names and the file placement are two different things, and both are frozen.** The escalation already on record (E1, `docs/v1/v1.3/overview.md:69`) is that the contract spells the backend-side type `GameFilters` while this line froze the frontend type as `GameFilterParams`; that naming discrepancy is *not* resolved here. What this task fixes is only the file placement: there is **no `frontend/types/filters.ts`**. Anything that appears in a JSON response goes in `frontend/types/index.ts`; anything that is a function goes in `frontend/src/lib/`, beside its own test file. `EMPTY_FILTERS` is a value rather than a wire shape, and it lives with the types because `paramsToFilters` returns it and v1.1.2's reducer compares against it.
 
   **Naming decision — the random-match client keeps its existing name.** The contract draft called this `getRandomMatch`, but `frontend/lib/api.ts` already exports `fetchRandomMatch` and every GET in that file follows the `fetchX` prefix (`fetchMatchById:48`, `fetchReveal:110`). Renaming it would churn three call sites in `frontend/app/missing-eleven/page.tsx` (`:91`, `:183`, `:198`) and break the file's own convention for no benefit. **This patch adds a `filters` parameter to the existing `fetchRandomMatch`; it does not rename it.** `fetchFilterOptions` is new, so it takes the `fetch` prefix to match its neighbours.
 
@@ -817,7 +818,7 @@
 - [ ] **Step 8.2: Run and confirm red.**
 
   ```bash
-  cd frontend && npx vitest run src/lib/filters.test.ts src/lib/filterParams.test.ts 2>&1 | tail -20
+  cd frontend && npx vitest run src/lib/filters.test.ts src/lib/filterParams.test.ts
   ```
 
 - [ ] **Step 8.3: Implement the pure helpers and the types.**
@@ -859,8 +860,8 @@
 - [ ] **Step 8.6: Verify green, plus the existing frontend suite.**
 
   ```bash
-  cd frontend && npx vitest run src/lib/filters.test.ts src/lib/filterParams.test.ts 2>&1 | tail -25
-  cd frontend && npm run test 2>&1 | tail -30
+  cd frontend && npx vitest run src/lib/filters.test.ts src/lib/filterParams.test.ts
+  cd frontend && npm run test
   ```
 
 - [ ] **Step 8.7: Commit.**
@@ -886,27 +887,43 @@
 - [ ] **Step 9.1: Run the full backend suite with coverage.**
 
   ```bash
-  cd backend && npm run test:coverage 2>&1 | tail -40
+  set -o pipefail; cd backend && npm run test:coverage 2>&1 | tail -40
   ```
 
   All four metrics must be ≥ 95% (`backend/vitest.config.ts:26-30`). Paste the actual table into the changelog; do not paraphrase it.
 
+  **The `set -o pipefail` is load-bearing, and it is there on purpose.** This is the
+  ratified form for a step that must trim its output
+  (`docs/v1/v1.3/plan-v1.3.2-streak-persistence.md`, Global Constraints): with it the
+  pipeline reports the first non-zero status in it, so the pass signal stays the
+  suite's own. Drop it and keep the pipe, and `| tail -40` reports `tail`'s status,
+  which is always 0 — a coverage run that failed the 95% gate then reads as a pass.
+  `pipefail` is chosen over the `… > /tmp/out.log 2>&1; status=$?; tail -20 /tmp/out.log;
+  exit $status` form because the trimmed output here is for reading only, and `exit`
+  would close the developer's shell mid-plan. Every other step in this task runs
+  unpiped for the same reason and needs no `pipefail`; do not re-introduce a bare pipe
+  on either form.
+
 - [ ] **Step 9.2: Run the full frontend suite and a production build.**
 
   ```bash
-  cd frontend && npm run test 2>&1 | tail -30
-  cd frontend && npm run build 2>&1 | tail -30
+  cd frontend && npm run test
+  set -o pipefail; cd frontend && npm run build 2>&1 | tail -30
   ```
 
   The build **must** be run even though this patch adds no page code, because Task 1 changed the vitest config and Task 8 added modules that the App Router will import in v1.1.2. A build failure here is a v1.1.1 defect, not a v1.1.2 one.
+
+  The suite runs unpiped and the build is trimmed under `set -o pipefail`, for the
+  reason Step 9.1 states: trimming is fine, discarding the suite's or build's own exit
+  status is not. A `next build` failure must not be able to read as a green step.
 
 - [ ] **Step 9.3: Live-smoke the endpoint.**
 
   With the app running, confirm by hand that `GET /api/matches/filter-options` returns five keys and that the counts are plausible:
 
   ```bash
-  curl -s 'http://localhost:3000/api/matches/filter-options' | head -c 400
-  curl -s 'http://localhost:3000/api/matches/filter-options?teamIds=<a real club id from the response>' | head -c 400
+  curl -s 'http://localhost:3000/api/matches/filter-options'
+  curl -s 'http://localhost:3000/api/matches/filter-options?teamIds=<a real club id from the response>'
   ```
 
   With a team selected, the `opponents` counts must change and the `teams` counts must **not** collapse to `0` for the selected team (that is R5 working). If they do collapse, the facet exclusion is inverted.
@@ -915,7 +932,7 @@
 
   ```bash
   # no option may come from an incomplete game
-  curl -s 'http://localhost:3000/api/matches/filter-options' | grep -o '"season":[0-9]*' | sort -u
+  set -o pipefail; curl -s 'http://localhost:3000/api/matches/filter-options' | grep -o '"season":[0-9]*' | sort -u
   ```
 
   Expected season keys: 2013 through 2025, and nothing else — no `null`, no 2026, per the Global Constraints.
@@ -926,3 +943,55 @@
   git add docs/v1/v1.1/CHANGELOG-v1.1.1.md
   git commit -m "docs: add v1.1.1 changelog and validation evidence"
   ```
+
+## Acceptance criteria
+
+1. `hasCompleteLineups(game)` is true only when **both** sides have 11 distinct players in state `starting_lineup`, each appearing under the game's own `homeClubId` / `awayClubId`. It returns `false` for 11-10, for 11-11 with a duplicate player, and for a substitute appearance.
+2. `completeLineupsWhere()` returns a `Prisma.Sql` fragment — **not** `Prisma.GameWhereInput` — and the same fragment is interpolated by `getRandomMatch` and by the filter-options query. There is one definition of the rule: `grep -c "11" backend/src/lib/lineupCompleteness.ts` finds the predicate, and neither `matchService.ts` nor `filterQuery.ts` re-states the count inline.
+3. The 530 incomplete games are unreachable through **every** query this patch adds or modifies. `getRandomMatch` still returns a complete game, and `filterService` derives all five numbers from the same predicate.
+4. `GET /api/matches/filter-options` is registered **before** `/:id` in `backend/src/routes/matches.ts`, and it answers with `teams`, `opponents`, `competitions`, `seasons`, and `total` — one row, one round trip. Two queries for one response would contradict the architecture note.
+5. `total` and every per-option `count` are **present and numeric on every request**, including an all-zero result. A missing or `null` count is R1 and a defect, not an empty-state.
+6. Selecting a dimension does not collapse its own facet to zero (R5). With `teamIds` set, the `teams` counts stay meaningful and the `opponents` counts change.
+7. Exactly one grouped statement produces all five numbers (R4). A per-option loop is a defect, and the 95% coverage gate plus Task 5's test hold the line.
+8. Season options are 2013–2025 with no `null` and no 2026, on live data and in the integration test.
+9. Player search matches `name` OR `displayName` and returns `name` as the search key with `displayName` as presentation only (R6). No field is renamed.
+10. `frontend/vitest.config.ts` enumerates all four test roots (`src/**`, `components/**`, `tests/**`, `app/**`), `frontend/vitest.config.mts` is deleted, and **no other v1 patch may re-narrow this include** (R7). A test file outside the include is a silently uncollected suite, which is the failure this task exists to remove.
+11. `frontend/components/Shirt.colors.test.tsx` contains real `describe`/`it` calls — a module-level type-check script reporting green while asserting nothing is a defect.
+12. The six filter types plus `EMPTY_FILTERS` live in `frontend/types/index.ts` (additive — nothing removed), and `filterParams.ts` / `filters.ts` are pure modules with no React and no network import.
+13. Every new frontend test file starts with `// @vitest-environment jsdom`. No `environmentMatchGlobs` and no second `environment` config is added.
+14. New complete-lineup fixtures start at `gameId: 5`. Games 1–4 are frozen and unchanged — a new fixture that reuses those ids is a defect, because `matchService.test.ts` asserts their exact appearance contents.
+15. `backend/prisma/schema.prisma` is not modified by this patch, and no index is added: `Appearance` already carries `@@index([gameId])`, which is all the correlated subqueries need.
+16. Both suites are green, the backend coverage gate passes on all four metrics, `tsc` and `lint` are clean, and the frontend production build succeeds. Neither suite is asserted against a fixed count — both are measured and recorded, per `docs/v1/v1.2/overview.md:209`.
+
+## Validation
+
+| Check | Command | Pass signal |
+|---|---|---|
+| Backend unit + integration | `cd backend && npm run test` | every file green; count measured and recorded, not asserted |
+| Backend coverage gate | `cd backend && npm run test:coverage` | no threshold failure on lines / statements / functions / branches |
+| Frontend suite | `cd frontend && npm run test` | every file green; count measured and recorded, not asserted |
+| Frontend production build | `cd frontend && npm run build` | no output — required even though this patch adds no page code, because Task 1 changed the vitest config |
+| The completeness predicate | `cd backend && npx vitest run src/__tests__/unit/lineupCompleteness.test.ts` | every case green, including the 11-10 and duplicate-player rejections |
+| The grouped query | `cd backend && npx vitest run src/__tests__/integration/filterService.test.ts` | all five keys present with numeric counts, and the facet-exclusion case green |
+| The route | `cd backend && npx vitest run src/__tests__/integration/routes/filterOptions.test.ts` | answers before `/:id`; no 400 |
+| The pure frontend helpers | `cd frontend && npx vitest run src/lib/filterParams.test.ts src/lib/filters.test.ts` | every case green |
+| Types | `cd frontend && npx tsc --noEmit` | no output |
+| Lint | `cd frontend && npm run lint` | no output |
+| The shadow config is gone | `ls frontend/vitest.config.mts` | `No such file or directory` |
+| The include is not re-narrowed | `grep -n "include:" frontend/vitest.config.ts` | all four roots present |
+| The rule is stated once | `grep -rn "lineupCompleteness" backend/src/lib backend/src/services` | `completeLineupsWhere` imported by both query paths, never re-implemented |
+| No schema drift | `git diff --stat -- backend/prisma/schema.prisma` | empty — this patch adds no migration |
+
+## Risks
+
+| Risk | Mitigation |
+|---|---|
+| **The raw-SQL deviation is unreviewed.** `hasCompleteLineups` returning `Prisma.Sql` instead of the frozen `Prisma.GameWhereInput` is a public-contract change, and the plan carries it as an explicit escalation rather than a decision. | Option (A) is recorded as recommended, with the whole v1.1 filter path already raw SQL, which the grouped counts require anyway. Option (B) is ruled out by §1.1 and the data. Do not begin Task 4 under (B) without a `lead` decision. |
+| **An incomplete game is filtered "in" and the UI renders a board with holes.** | The predicate is applied to every query this patch adds or modifies, not just the filtered path, so there is no code path that can return one of the 530. Asserted at the data layer (Task 4) and through the endpoint (Task 6). |
+| **A re-narrowed vitest include silently stops collecting a suite.** A file outside the include reports green while asserting nothing — the same false green that `Shirt.colors.test.tsx` produces today. | R7 assigns the widening to this patch and to no other; v1.1.2 and v1.3.1 may add exactly one `resolve.alias` entry each and must leave `include` byte-identical. Step 1.4 stops and escalates if the widening has not already happened. |
+| **The new test leaves the database dirty if it fails before `await seed()`.** | `fileParallelism: false` (`backend/vitest.config.ts:8`) runs integration files serially against one database, so a dirty fixture would cascade. Re-run `cd backend && npm run test`; the global setup's `seed()` restores it. Do not start the next file until green. |
+| **A new complete-lineup fixture reuses a frozen `gameId`.** | Complete fixtures start at `gameId: 5`; games 1–3 and 4 are frozen because `matchService.test.ts` asserts their exact appearance contents. |
+| **Facet exclusion inverted**, so selecting a team collapses the team list to zeros. | R5 is a named assertion in Task 5, plus the live smoke in Step 9.3, which checks that `teams` does not collapse while `opponents` does change. |
+| **The route ordering regresses** and `filter-options` is parsed as a game id. | Registered before `/:id` in Task 6, with a route integration test; Step 9.3 exercises it live. |
+
+**Escalate before proceeding if:** Task 4's `completeLineupsWhere` cannot be written as a `Prisma.Sql` fragment without changing a frozen contract beyond the escalation on record (option B), or if widening the vitest include in Task 1 turns out to be blocked by a config change owned by another patch. In either case the deviation is larger than the one already ratified, and a new decision is required rather than a local workaround.

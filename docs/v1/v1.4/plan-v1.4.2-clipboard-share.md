@@ -14,6 +14,8 @@
 
 - **v1.4.1 is the rollback point and its module is frozen.** `frontend/src/lib/shareGrid.ts` exports exactly `SlotOutcome`, `ShareSlot`, `ShareGridInput`, `ShareGrid`, `buildShareGrid`, `renderShareGrid`, `renderShareText`. This patch **adds, renames, reorders and retypes nothing** in that file. `renderShareText` is exactly what v1.4.1 shipped it for and is called for the first time here. If a change to `shareGrid.ts` seems necessary, that is a signal the logic belongs in the component instead — put it there.
 
+- **`renderShareText` shipped uncalled in v1.4.1, and that is the rollback boundary working as intended** (roadmap §9.1, RD8 — ratified, not an oversight). An uncalled export is not dead code when the next patch in the same line is contractually required to call it. v1.4.1 freezes the module and stops; v1.4.2's entire job is to hand that frozen function a `link`. The alternative — v1.4.2 first editing the module to take an argument, or trimming a payload the block does not need — would break v1.4.1's rollback point, which is the property the line's ordering exists to guarantee. **The diff proof is Step 5.2's job: `frontend/src/lib/shareGrid.ts` is byte-for-byte unchanged by this patch**, and Step 1.2 records the seven-export surface so Step 5.2 can prove it was not crossed. Do not "tidy" the module while you are in the file.
+
 - **No `document.execCommand('copy')` fallback, deliberately.** The obvious fallback is dead code, and shipping dead code as a "safety net" is how the next reader ends up maintaining two copy paths. The evidence:
 
   | Environment | Secure context? | Clipboard API |
@@ -42,6 +44,15 @@
 
 - **No `localStorage`, no `sessionStorage`, no new dependency.** All storage belongs to v1.3.2 (roadmap §11 rule 8). `navigator.clipboard` is a platform API; no package is added.
 
+- **The copy control is NOT gated behind `hasPlayed`, and the clipboard path reads no storage at all** (roadmap §9.1, RD7 — ratified, not an open reading). v1.3.2's handoff describes `hasPlayed(streak, todayKey)` as "the already-played-today gate the share affordance sits behind", and that sentence invites the wrong inference. It is wrong, and the reason is worth stating because an implementer looking for a gate will not find one and may conclude it was forgotten:
+
+  | Reading | Consequence |
+  |---|---|
+  | **Ratified: no gate.** `hasPlayed` gates *starting a second daily* in v1.3.2's `DailyEntry`. The copy control renders whenever the completion overlay does. | The clipboard path touches `navigator.clipboard` and `window.location` only. No storage read, so no hydration-order dependency and no SSR/client divergence to get wrong. |
+  | Rejected: gate the button on `hasPlayed`. | Puts a `localStorage` read into the click path, which §11 rule 8 assigns to v1.3.2 exclusively — and it would be the one place in v1.4 that could not ship without the storage surface. |
+
+  `hasPlayed` does not appear anywhere in this patch, and **that absence is the ratified design, not a gap**. Step 5.3 greps for it to prove the negative.
+
 - **No backend change.** No Prisma column, no migration, no endpoint. The backend's 95% coverage gate is unaffected and must still pass.
 
 - **No identifier is renamed.** Everything from v1.4.1 and upstream keeps its name and type.
@@ -55,7 +66,18 @@
   cd backend && npm test
   ```
 
-  Expected after this patch, in order: `Test Files 11 passed (11)` / `Tests 208 passed (208)` for the frontend (up from 11/198 — 10 new tests, no new files), and the backend unchanged at `13 passed` / `175 passed`.
+  Expected after this patch: both suites green, frontend growth equal to this patch's own `+14`, and **no new test files** — all three tasks append to the same `GameComplete.test.tsx`.
+
+  | Suite | Baseline (recorded in Task 1) | This patch adds | Verify |
+  |---|---|---|---|
+  | frontend `npm test` | *v1.4.1's final measured total* | `+14`, file count unchanged | observed == baseline + 14 |
+  | backend `npm test` | *your recorded baseline* | `0` | observed == baseline |
+
+  The `+14` is `6 + 4 + 4`: `6` in Task 1's `copy result` describe, `4` in Task 2's failure cases, `4` in Task 3's timer cases. Task 3 **rewrites** one of Task 2's four failure tests (a timer rather than a rejected write) and adds three alongside it, so Task 3's net contribution is `4`, not `3` — a rewritten test still occupies a slot.
+
+  **Do not assert a cumulative literal.** `GameComplete.test.tsx` is shared with v1.2.5 and v1.4.1, so its pre-existing count is not this patch's to assert. Record the baseline, then require baseline `+14`. A file count that *rises* is the signal that a task created a file it should have appended to instead.
+
+
 
 ---
 
@@ -73,7 +95,7 @@
   cd frontend && npm test
   ```
 
-  Expected: `Test Files 11 passed (11)` / `Tests 198 passed (198)` — the v1.4.1 target exactly. A lower number means a file stopped being collected, which is an R7 regression (roadmap §8); escalate rather than working around it.
+  Expected: `Test Files 11 passed (11)`, with the test total equal to whatever v1.4.1 last recorded — **read it off v1.4.1's own final run, do not assume it.** A lower number means a file stopped being collected, which is an R7 regression (roadmap §8); escalate rather than working around it.
 
 - [ ] **Step 1.2: Confirm the frozen export list is byte-for-byte the v1.4.1 one.**
 
@@ -393,7 +415,9 @@
   cd frontend && npm test -- src/components/GameComplete.test.tsx
   ```
 
-  Expected: `Test Files 1 passed (1)` / `Tests 32 passed (32)` — the 26 existing plus the 6 new ones. The `Copied` assertion and the `· 11000` literal in the copied payload are the two that would catch a wrong grid or a wrong score.
+  Expected: `Test Files 1 passed (1)`, and the observed total equal to the `GameComplete.test.tsx` count you recorded in Task 1 plus this task's `+6`. Do **not** decompose the pre-existing half as "v0 plus v1.4.1's" — that arithmetic was already wrong before this patch (v1.2.5 also appends to this file), and the recorded baseline is the only number that survives it. `Test Files 1` is the assertion that carries here, per R7.
+
+  The `Copied` assertion and the `· 11000` literal in the copied payload are the two that would catch a wrong grid or a wrong score — check them by name, not by count.
 
 - [ ] **Step 2.9: Type-check and lint.**
 
@@ -410,7 +434,7 @@
   cd ../backend && npm test
   ```
 
-  Expected: frontend `Test Files 11 passed (11)` / `Tests 204 passed (204)`; backend `13 passed` / `175 passed`.
+  Expected: frontend total equal to the recorded baseline `+6`, with the file count unchanged; backend identical to its recorded baseline.
 
 - [ ] **Step 2.11: Commit.**
 
@@ -539,7 +563,7 @@ The success path is the easy one. This task covers the two ways it can fail — 
   cd frontend && npm test -- src/components/GameComplete.test.tsx
   ```
 
-  Expected: `Test Files 1 passed (1)` / `Tests 36 passed (36)`.
+  Expected: `Test Files 1 passed (1)`, observed total equal to Task 1's recorded file total `+4` — the four failure cases appended here.
 
 - [ ] **Step 3.5: Prove the manual fallback is real, not just claimed.**
 
@@ -556,7 +580,7 @@ The success path is the easy one. This task covers the two ways it can fail — 
   cd ../backend && npm test
   ```
 
-  Expected: frontend `Test Files 11 passed (11)` / `Tests 208 passed (208)`; backend `13 passed` / `175 passed`.
+  Expected: frontend total equal to the recorded baseline `+6` `+4`; backend identical to its recorded baseline.
 
 - [ ] **Step 3.7: Commit.**
 
@@ -700,7 +724,7 @@ The success path is the easy one. This task covers the two ways it can fail — 
   cd frontend && npm test -- src/components/GameComplete.test.tsx
   ```
 
-  Expected: `Test Files 1 passed (1)` / `Tests 40 passed (40)`.
+  Expected: `Test Files 1 passed (1)`, observed total equal to Task 2's recorded file total `+4` — **not `+3`.** One of Task 2's four failure tests is rewritten as a timer test in place, so the file gains three and keeps the fourth slot.
 
 - [ ] **Step 4.5: Type-check and lint.**
 
@@ -717,7 +741,7 @@ The success path is the easy one. This task covers the two ways it can fail — 
   cd ../backend && npm test
   ```
 
-  Expected: frontend `Test Files 11 passed (11)` / `Tests 212 passed (212)`; backend `13 passed` / `175 passed`.
+  Expected: frontend total equal to the recorded baseline `+6` `+4` `+4`; backend identical to its recorded baseline. **This must be strictly greater than Task 2's total** — Task 3 adds four tests, so a total identical to Task 2's means Task 3's describe was appended to the wrong file or never collected. Treat that equality as a failure, not a pass.
 
 - [ ] **Step 4.7: Commit.**
 
@@ -744,7 +768,7 @@ The success path is the easy one. This task covers the two ways it can fail — 
   cd ../backend && npm run test:coverage
   ```
 
-  Expected: frontend `Test Files 11 passed (11)` / `Tests 212 passed (212)`; backend `13 passed` / `175 passed` with all four coverage metrics at or above 95% (`backend/vitest.config.ts:26-30`) — a gate this patch cannot move, because it touches no backend file.
+  Expected: frontend total equal to the recorded baseline `+14`, **not lower** than any intermediate step above; backend identical to its recorded baseline, with all four coverage metrics at or above 95% (`backend/vitest.config.ts:26-30`) — a gate this patch cannot move, because it touches no backend file.
 
 - [ ] **Step 5.2: Prove the frozen module was not touched.**
 
@@ -759,9 +783,12 @@ The success path is the easy one. This task covers the two ways it can fail — 
 
   ```bash
   cd frontend && grep -rnE "navigator\.clipboard|execCommand|localStorage|sessionStorage" src/ && grep -rn "renderShareText" src/
+  cd frontend && grep -rn "hasPlayed" src/
   ```
 
-  Expected: `navigator.clipboard` appears only in `writeToClipboard` inside `GameComplete.tsx`; **no `execCommand` anywhere**; **no `localStorage` or `sessionStorage` anywhere** (§11 rule 8 — that surface is v1.3.2's); and `renderShareText` called from exactly one place, the click handler.
+  Expected: `navigator.clipboard` appears only in `writeToClipboard` inside `GameComplete.tsx`; **no `execCommand` anywhere**; **no `localStorage` or `sessionStorage` anywhere** (§11 rule 8 — that surface is v1.3.2's); `hasPlayed` **appears nowhere in `src/`** (the ratified no-gate design, RD7 — a hit here means someone added the gate that §9.1 ruled out, and it must come back out); and `renderShareText` called from exactly one place, the click handler.
+
+  The `hasPlayed` grep returning **nothing is the pass signal**, not a skipped check. This is the one validation in the plan that asserts an absence, and the absence is the decision.
 
 - [ ] **Step 5.4: Build the frontend.**
 
@@ -809,11 +836,62 @@ The success path is the easy one. This task covers the two ways it can fail — 
 
 ---
 
+## Acceptance criteria
+
+1. A `Copy result` button and a `role="status"` line are rendered inside the share block v1.4.1 already produced. The block itself is unchanged: **the visible share block never leaves the screen** when copying happens.
+2. The copied payload contains the **title, the emoji block, and the current URL**, in that order.
+3. The URL is read from the address bar **at click time**, not from a hook, so the copied link always reflects where the player actually is.
+4. There is **no `document.execCommand('copy')` fallback**, deliberately: the deployment terminates TLS, so `navigator.clipboard` exists in every environment this app runs in, and a second copy path would be code that never executes.
+5. `shareGrid.ts` stays pure and its seven frozen exports are untouched — the clipboard write lives entirely in the component, so **v1.4.1 remains the rollback point**.
+6. Success is announced **politely** through `role="status"`, and feedback is transient: it returns to `idle` after two seconds.
+7. A copy that does not happen is reported as `failed` in plain language. It is never reported as success, and no error is thrown to the console as a substitute for telling the player.
+8. The pending feedback timer is **cleared on unmount**, so no state update lands after teardown.
+9. The dialog still ends on `Play Again`; copying does not add a fourth ending and does not trap the player in the dialog.
+10. The copy control is **not** gated behind `hasPlayed`, and the clipboard path reads **no storage at all**. The reason is recorded in the constraints: the value of copying is highest exactly when the player has not finished a game.
+11. `localStorage`, `sessionStorage`, and every new dependency are absent. `grep -rn "sessionStorage\|localStorage" frontend/src frontend/app` returns no output from this patch.
+12. No backend change, and **no identifier is renamed** anywhere.
+13. Failure cases are covered: a rejected clipboard permission, an absent `navigator.clipboard`, and a non-secure context each take a distinct, asserted path to `failed` rather than to a thrown error.
+14. Timer behaviour is covered with fake timers: the two-second reset is asserted, and the test is restored to real timers afterwards so it cannot leak into a neighbouring file.
+15. `npm run test`, `npm run build`, `npx tsc --noEmit`, and `npm run lint` are clean, and every new suite is collected. This patch's own contribution is `+14` (`6 + 4 + 4`) measured against a recorded baseline, with the file count unchanged; no suite is asserted against a fixed count, per `docs/v1/v1.2/overview.md:209`.
+
+## Validation
+
+| Check | Command | Pass signal |
+|---|---|---|
+| Frontend suite | `cd frontend && npm run test` | every file green; total equal to the recorded baseline `+14`, and **strictly greater than Task 2's and Task 3's** |
+| The copy path | `cd frontend && npx vitest run src/components/GameComplete.test.tsx` | every case green, including the three failure paths |
+| Production build | `cd frontend && npm run build` | no output |
+| Types | `cd frontend && npx tsc --noEmit` | no output |
+| Lint | `cd frontend && npm run lint` | no output |
+| **No `execCommand` path exists** | `grep -rn "execCommand" frontend/src frontend/app` | no output — the fallback is deliberately absent |
+| Storage is untouched | `grep -rn "sessionStorage\|localStorage" frontend/src frontend/app` | no output from this patch |
+| The module stays pure and frozen | `git diff --stat -- frontend/src/lib/shareGrid.ts` | empty — this patch touches no module export |
+| The URL is read at click time | `grep -n "window.location" frontend/src/components/GameComplete.tsx` | read inside the handler, not at render |
+| The timer is cleared on unmount | `grep -n "clearTimeout" frontend/src/components/GameComplete.tsx` | present, and asserted in the timer tests |
+| No new dependency | `git diff --stat -- frontend/package.json package.json` | empty |
+| No backend drift | `git diff --stat -- backend/ backend/prisma/` | empty — frontend-only, no migration |
+| **The include was not re-narrowed (R7)** | `grep -n "include:" frontend/vitest.config.ts` | unchanged from v1.1.1 |
+
+## Risks
+
+| Risk | Mitigation |
+|---|---|
+| **A second copy path creeps in** via `document.execCommand`, so the code that never executes is the code a browser actually takes. | The absence of the fallback is a stated decision with its evidence (TLS termination), enforced by a grep gate. Adding it back would need a new decision, not a convenience. |
+| **`shareGrid.ts` grows a clipboard import**, so the v1.4.1 rollback boundary stops holding. | The clipboard write lives entirely in the component; the module is diffed as empty in the Validation table. Making it impure would put v1.4.1's pure, seven-export contract at risk for no gain. |
+| **The copied URL is captured at render** and goes stale when the player changes filters before clicking. | The link is read from the address bar inside the handler (criterion 3), and a test clicks after a navigation to prove the payload is current. |
+| **A failed copy is reported as success**, or the failure is swallowed into a console error the player never sees. | `failed` is a distinct asserted state with plain language, and each failure mode — rejected permission, absent API, insecure context — has its own named test. |
+| **A pending timer fires after unmount**, producing a React state update on a torn-down component. | The timer is cleared on unmount (criterion 8) and asserted under fake timers, which are restored afterwards so the test cannot leak into a neighbouring file. |
+| **The confirmation never clears**, leaving "Copied" on screen indefinitely. | The two-second reset to `idle` is asserted with fake timers rather than left to inspection. |
+| **Gating the control behind `hasPlayed`** removes the one case where sharing is most valuable — a player who gave up and still wants to post the board. | The control is explicitly **not** gated, and the clipboard path reads no storage, so there is nothing to await and no state to race. |
+| **Copying becomes a second dialog ending**, so the player loses the `Play Again` path. | The dialog still ends on `Play Again` (criterion 9), and the visible block stays on screen; copying is an action, not a navigation. |
+
+---
+
 ## Handoff
 
 - **Rollback point:** `v1.4.1`. Reverting this patch leaves the share block on screen and selectable, with no copy control — a complete, useful feature.
 - **The line is complete.** §7's scope — "any completed game, not only the daily one" — is satisfied without a branch on `isDaily`, because v1.3.1 already keeps the daily key and the filters in the query string, and v1.4.2 copies the address bar verbatim rather than rebuilding it.
 - **What the next line should know:**
   - `shareGrid.ts` is pure and has three exported functions. A future format change (per-slot shirt numbers, a sparkline) belongs there with a test, and the button keeps working unchanged.
-  - The mode label in the tally line comes from `DIFFICULTY_CONFIG`, so roadmap §9 O1 (streak scope) can still flip to per-(day, difficulty) without touching this patch. When it does, the label stops being decorative and becomes the thing that disambiguates a streak.
+  - The mode label in the tally line comes from `DIFFICULTY_CONFIG`. Streak scope is **settled** (§9.1, RD3 — one streak per day, global across difficulties), so the label is not disambiguating anything streak-shaped; it is here because §6.2 makes a score meaningless across four multipliers without it. A fifth mode gets a correct label from the table with no change to this patch.
   - There is no analytics on copy, and adding it would be new scope. If it is ever wanted, it belongs in a patch of its own with its own decision about what a copy event means when the copy failed.

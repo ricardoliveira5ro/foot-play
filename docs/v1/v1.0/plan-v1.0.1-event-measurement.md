@@ -327,7 +327,7 @@ The whole test file is written before any production code, then the module is cr
 
   ```bash
   npm run data-pipeline
-  npm run measure-events -w backend | tee /tmp/game-events-measurement.txt
+  set -o pipefail; npm run measure-events -w backend | tee /tmp/game-events-measurement.txt
   ```
 
   Expected: six sections in order. Read section 5 in full. Confirm the `"red"` and `"2."` buckets together account for roughly 3,097 + ~2,300 rows (§3.3). **If they do not, stop and report the counts — the roadmap figure would be stale and the decision table in Step 3.8 must be built from what the tool printed, not from what §3.3 predicted.**
@@ -613,7 +613,7 @@ The whole test file is written before any production code, then the module is cr
 - [ ] **Step 3.6: Apply the measured vocabulary into the sentinel region.**
 
   ```bash
-  npm run measure-events -w backend -- --apply | tee /tmp/game-events-measurement.txt
+  set -o pipefail; npm run measure-events -w backend -- --apply | tee /tmp/game-events-measurement.txt
   ```
 
   Expected tail — the *shape* of the output, not the real values, which only
@@ -687,7 +687,7 @@ The whole test file is written before any production code, then the module is cr
   git commit -m "feat(backend): add measured game-event vocabulary matcher"
   ```
 
-**Verify:** `cd backend && npx vitest run --coverage src/__tests__/unit/eventMapping.test.ts 2>&1 | grep -A3 "eventMapping"` shows ≥95% on all four metrics for `src/lib/eventMapping.ts`.
+**Verify:** `cd backend && npx vitest run --coverage src/__tests__/unit/eventMapping.test.ts` shows ≥95% on all four metrics for `src/lib/eventMapping.ts`.
 
 ---
 
@@ -1005,7 +1005,7 @@ The whole test file is written before any production code, then the module is cr
   git commit -m "feat(backend): add streaming appearance-event join index"
   ```
 
-**Verify:** `cd backend && npx vitest run --coverage src/__tests__/unit/appearanceEventJoin.test.ts 2>&1 | grep -A3 "appearanceEventJoin"` shows ≥95% on all four metrics.
+**Verify:** `cd backend && npx vitest run --coverage src/__tests__/unit/appearanceEventJoin.test.ts` shows ≥95% on all four metrics.
 
 ---
 
@@ -1284,7 +1284,7 @@ No unit tests here: `backend/prisma/seed.ts` sits outside `src/`, so `backend/vi
   With `.env.development` pointing at a scratch database and the CSVs present:
 
   ```bash
-  npm run seed -w backend 2>&1 | tail -20
+  npm run seed -w backend
   ```
 
   Expected output includes:
@@ -1317,11 +1317,12 @@ No unit tests here: `backend/prisma/seed.ts` sits outside `src/`, so `backend/vi
 
   ```bash
   mv scripts/data/game_events.csv /tmp/game_events.csv.bak
-  npm run seed -w backend 2>&1 | grep -i "game_events.csv"
+  npm run seed -w backend > /tmp/seed-no-csv.log 2>&1; echo "seed exit: $?"
+  grep -i "game_events.csv" /tmp/seed-no-csv.log
   mv /tmp/game_events.csv.bak scripts/data/game_events.csv
   ```
 
-  Expected: `game_events.csv not found; goals/assists/redCards stay at 0.` and the seed still completes. This is §3.4's degradation path.
+  Expected: `seed exit: 0` **and** `game_events.csv not found; goals/assists/redCards stay at 0.` This is §3.4's degradation path, and it asserts **two** things — that the seed still completes and that it degraded — so it is written as two commands rather than `npm run seed | grep -i …`. In that single pipeline the pass signal would be `grep`'s exit code: the seed's own status is discarded, and a seed that failed while naming the CSV in its error text would still exit 0 through `grep` and read as a pass. Redirecting to a log and then searching the log keeps both signals visible.
 
 - [ ] **Step 6.5: Write the CHANGELOG section.**
 
@@ -1371,7 +1372,7 @@ No unit tests here: `backend/prisma/seed.ts` sits outside `src/`, so `backend/vi
 - [ ] **Step 6.6: Verify the changelog is parseable.**
 
   ```bash
-  npm run release -- --notes v1.0.1 | head -5
+  npm run release -- --notes v1.0.1
   ```
 
   Expected: the first body line of the v1.0.1 section, e.g.

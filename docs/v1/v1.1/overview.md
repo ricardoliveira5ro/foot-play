@@ -10,6 +10,10 @@
 
 ---
 
+> **Ratified decisions are not decided here.** Roadmap [§9.1](../roadmap-v1.md#91-ratified-decisions) is authoritative for every decision the owner has closed; a plan's preflight **verifies** the ratified answer and never re-decides it. Where a plan and that table disagree, the table wins and the plan is the defect. A question the table does not cover is still an escalation.
+
+---
+
 ## The four patches
 
 | Patch | What lands | Files it adds | Rollback to |
@@ -180,7 +184,7 @@ Run the gates in this order; each patch's own plan has the per-step detail.
 | 10 | **No recompute on toggle** | `grep -rn "setFilters\|onApply" frontend/src/components/ClubMultiSelect.tsx` | no output — the control cannot commit |
 | 11 | **Only one URL reader** | `grep -rln "useSearchParams" frontend/app/ frontend/src/` | `FilterUrlSync.tsx` only |
 | 12 | **Backend untouched by v1.1.3/v1.1.4** | `git diff --stat v1.1.1..HEAD -- backend/ backend/prisma/` | empty |
-| 13 | **Season bounds hold** | `curl -s localhost:3000/api/matches/filter-options \| grep -o '"season":[0-9]*' \| sort -u` | 2013–2025, no `null`, no 2026 |
+| 13 | **Season bounds hold** | `set -o pipefail; curl -s localhost:3000/api/matches/filter-options \| grep -o '"season":[0-9]*' \| sort -u` | 2013–2025, no `null`, no 2026 |
 | 14 | **Empty ≠ error** | live: stop the backend, retry a filtered load | the **error** state, not the empty state |
 | 15 | **Deep link survives load** | live: `?teamIds=<id>&seasonFrom=1999` | canonical URL settles; `seasonFrom` dropped; game loads |
 
@@ -194,7 +198,7 @@ Gates 6–12 are cheap greps that catch the ways this feature can silently viola
 - **A result filter** such as "only games I won" (§4.3, rejected: there is no "I").
 - **A minimum-goals filter** (§4.3, rejected: depends on event data that is currently 100% empty, per §1.1).
 - **Hardcoded or client-derived option lists.** §4.2 requires every option list to be read from the database at runtime, so an owner's dataset expansion flows through with no release.
-- **The `/missing-eleven` naming and rating work.** The v1.0 overview's "Out of scope" section assigns this to "v1.1.3", which contradicts §4.4, where v1.1.3 is the Team/Opponent multi-selects. §4.4 is authoritative and this line follows it; **the v1.0 overview is left unmodified and should be corrected in a separate docs-only change.**
+- **The `/missing-eleven` naming and rating work — and it is nobody's job in v1.x.** An earlier draft of the v1.0 overview's "Out of scope" section assigned this to "v1.1.3", which contradicted §4.4, where v1.1.3 is the Team/Opponent multi-selects. **This is now decided at the source**: the roadmap's **§10 Out of scope** table records it as excluded from v1.x, because no patch table (§3, §4.4, §5.6, §6.3, §7) assigns naming or rating to any patch. It is unowned by decision, not unowned by oversight — adopting it needs a **new patch with its own plan**, not a slot in an existing one, and a v1.1 implementer should not pick it up on the strength of a stale cross-reference.
 - **Any `Appearance` or `Game` index, and any migration.** v1.1.1 needs only the `@@index([gameId])` that already exists (`backend/prisma/schema.prisma:83`).
 - **Difficulty modes, multipliers, or clue scoring** (v1.2.x). v1.2 must render and score correctly with filters present but never applied.
 - **The shareable daily link** (v1.3). v1.1.2 builds the URL mechanism it reuses; v1.1 deliberately preserves unrelated query params so `?daily=` can coexist with the filter keys.
