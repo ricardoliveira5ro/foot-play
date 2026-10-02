@@ -38,13 +38,30 @@ describe('isSendingOffDescription', () => {
     expect(isSendingOffDescription('  RED CARD ')).toBe(true);
   });
 
-  // R2: every measured variant, not a sample.
+  // R2: every measured variant, not a sample. See the caveat in the
+  // "freezes exactly the measured dismissal vocabulary" test below: this
+  // iteration cannot fail on the list's *content*, only the other test guards it.
   it.each(MEASURED_SENDING_OFF_DESCRIPTIONS)(
     'matches the measured sending-off variant %j',
     (description) => {
       expect(isSendingOffDescription(description)).toBe(true);
     },
   );
+
+  // R2's real guard. `it.each` above is a tautology — the matcher builds its
+  // Set FROM this constant, so it cannot fail for any content of the list, and
+  // vitest collects zero cases from an empty table without failing. This test
+  // is what makes the constant's length and composition falsifiable, so a
+  // tool regression that injects ", Scored" or a truncated list fails here
+  // instead of silently inflating redCards.
+  it('freezes exactly the measured dismissal vocabulary (R2)', () => {
+    expect(MEASURED_SENDING_OFF_DESCRIPTIONS).toHaveLength(33);
+    for (const description of MEASURED_SENDING_OFF_DESCRIPTIONS) {
+      expect(description).toMatch(/^(Red card|Second yellow)(\b| {2}, )/);
+      expect(description).not.toContain('Scored');
+      expect(description.toLowerCase()).not.toContain('goal');
+    }
+  });
 
   it('does not match a plain yellow card', () => {
     expect(isSendingOffDescription('1. Yellow card  , Foul')).toBe(false);
@@ -176,6 +193,14 @@ describe('classifyEvent', () => {
 
   it('classifies a row whose type is a bare penalty token', () => {
     expect(classifyEvent(row('penalty', ''))).toBe('penalty');
+  });
+
+  it('tolerates the retired singular "goal" type token', () => {
+    // Defensive tolerance, not a real vocabulary: the measurement proves
+    // every Goals row carries the plural 'Goals'. This case exists so the
+    // branch is genuinely TAKEN rather than merely evaluated — under v8
+    // coverage a covered `||` operand only proves it was read.
+    expect(classifyEvent(row('goal', 'Goal'))).toBe('goal');
   });
 
   it('falls back to a red card for a Cards row with no recognised description', () => {

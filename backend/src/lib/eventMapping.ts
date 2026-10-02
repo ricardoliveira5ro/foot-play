@@ -142,11 +142,21 @@ function isSecondYellowDescription(description: string): boolean {
  * Anchored to the leading `", penalty"` slot: every non-Cards description is
  * prefixed with `", "`, and a goal's *assist reason* may also mention a
  * penalty ("… Assist: , Penalty: Fouled player"), which is not a penalty goal.
+ *
+ * `normalizedDescription` is the caller's already-normalized form, as
+ * classifyEvent produces it. Named explicitly so a future caller passing a
+ * raw description gets a type error rather than silently case-sensitive
+ * matching — this file's header rule is that every comparison normalizes.
+ *
+ * The `type === 'penalty'` disjunct is defensive tolerance for the retired
+ * singular token, not a real vocabulary: the measurement proves penalty goals
+ * arrive as `type = Goals` with a leading ", Penalty". It is safe because the
+ * failure direction for an unknown token is `'other'`, not a wrong count.
  */
 const PENALTY_GOAL = /^,\s*penalty\b/;
 
-function isPenaltyGoal(type: string, description: string): boolean {
-  return type === 'penalty' || PENALTY_GOAL.test(description);
+function isPenaltyGoal(type: string, normalizedDescription: string): boolean {
+  return type === 'penalty' || PENALTY_GOAL.test(normalizedDescription);
 }
 
 /**
