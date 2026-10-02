@@ -526,13 +526,30 @@ The whole test file is written before any production code, then the module is cr
       expect(isSendingOffDescription('  RED CARD ')).toBe(true);
     });
 
-    // R2: every measured variant, not a sample.
-    it.each(MEASURED_SENDING_OFF_DESCRIPTIONS)(
+// R2: every measured variant, not a sample. See the caveat in the
+  // "freezes exactly the measured dismissal vocabulary" test below: this
+  // iteration cannot fail on the list's *content*, only the other test guards it.
+  it.each(MEASURED_SENDING_OFF_DESCRIPTIONS)(
       'matches the measured sending-off variant %j',
       (description) => {
         expect(isSendingOffDescription(description)).toBe(true);
       },
     );
+
+    // R2's real guard. `it.each` above is a tautology — the matcher builds its
+    // Set FROM this constant, so it cannot fail for any content of the list, and
+    // vitest collects zero cases from an empty table without failing. This test
+    // is what makes the constant's length and composition falsifiable, so a
+    // tool regression that injects ", Scored" or a truncated list fails here
+    // instead of silently inflating redCards.
+    it('freezes exactly the measured dismissal vocabulary (R2)', () => {
+      expect(MEASURED_SENDING_OFF_DESCRIPTIONS).toHaveLength(33);
+      for (const description of MEASURED_SENDING_OFF_DESCRIPTIONS) {
+        expect(description).toMatch(/^(Red card|Second yellow)(\b| {2}, )/);
+        expect(description).not.toContain('Scored');
+        expect(description.toLowerCase()).not.toContain('goal');
+      }
+    });
 
     it('does not match a plain yellow card', () => {
       expect(isSendingOffDescription('1. Yellow card  , Foul')).toBe(false);
@@ -666,6 +683,14 @@ The whole test file is written before any production code, then the module is cr
       expect(classifyEvent(row('penalty', ''))).toBe('penalty');
     });
 
+    it('tolerates the retired singular "goal" type token', () => {
+      // Defensive tolerance, not a real vocabulary: the measurement proves
+      // every Goals row carries the plural 'Goals'. This case exists so the
+      // branch is genuinely TAKEN rather than merely evaluated — under v8
+      // coverage a covered `||` operand only proves it was read.
+      expect(classifyEvent(row('goal', 'Goal'))).toBe('goal');
+    });
+
     it('falls back to a red card for a Cards row with no recognised description', () => {
       expect(classifyEvent(row('Cards', ''))).toBe('red_card');
     });
@@ -681,15 +706,24 @@ The whole test file is written before any production code, then the module is cr
   ```bash
   cd backend && npx vitest run src/__tests__/unit/eventMapping.test.ts
   ```
-
-  Expected RED:
+Expected RED — a module-resolution failure. Vitest 5 ships both strings and
+  which one appears depends on which resolver handles the unresolvable relative
+  `.ts` import, so accept either:
 
   ```
   FAIL  src/__tests__/unit/eventMapping.test.ts
   Error: Failed to load url ../../lib/eventMapping
   ```
 
-  If it reports a *type* error inside the test file instead, fix the test file and re-run until the only failure is the missing module.
+  or
+
+  ```
+  Error: Cannot find module '../../lib/eventMapping' imported from …
+  ```
+
+  What matters: exit 1, **0 tests collected**, and no type error inside the test
+  file. If it reports a *type* error inside the test file instead, fix the test
+  file and re-run until the only failure is the missing module.
 
 - [ ] **Step 3.5: Create `backend/src/lib/eventMapping.ts`.**
 
@@ -804,11 +838,21 @@ The whole test file is written before any production code, then the module is cr
    * Anchored to the leading `", penalty"` slot: every non-Cards description is
    * prefixed with `", "`, and a goal's *assist reason* may also mention a
    * penalty ("… Assist: , Penalty: Fouled player"), which is not a penalty goal.
+   *
+   * `normalizedDescription` is the caller's already-normalized form, as
+   * classifyEvent produces it. Named explicitly so a future caller passing a
+   * raw description gets a type error rather than silently case-sensitive
+   * matching — this file's header rule is that every comparison normalizes.
+   *
+   * The `type === 'penalty'` disjunct is defensive tolerance for the retired
+   * singular token, not a real vocabulary: the measurement proves penalty goals
+   * arrive as `type = Goals` with a leading ", Penalty". It is safe because the
+   * failure direction for an unknown token is `'other'`, not a wrong count.
    */
   const PENALTY_GOAL = /^,\s*penalty\b/;
 
-  function isPenaltyGoal(type: string, description: string): boolean {
-    return type === 'penalty' || PENALTY_GOAL.test(description);
+  function isPenaltyGoal(type: string, normalizedDescription: string): boolean {
+    return type === 'penalty' || PENALTY_GOAL.test(normalizedDescription);
   }
 
   /**
@@ -894,8 +938,8 @@ The whole test file is written before any production code, then the module is cr
        Tests  N passed (N)
   ```
 
-  `N` is exactly **69** with the current dataset: 36 fixed cases (4 normalize +
-  5 sending-off + 5 shootout + 5 own-goal + 17 classify) plus the 33 measured
+  `N` is exactly **71** with the current dataset: 38 fixed cases (4 normalize +
+  6 sending-off + 5 shootout + 5 own-goal + 18 classify) plus the 33 measured
   variants driven through `it.each`.
 
 - [ ] **Step 3.8: Verify the decision table against the measurement.**
