@@ -25,6 +25,7 @@
 - **Or semantics.** Within one dimension, selected values are OR-ed; across dimensions, AND-ed. The UI must reflect that: toggling a second Team never deselects the first. The reducer and the backend already do this (v1.1.1 Tasks 5–6); the UI just must not get it wrong.
 - **The panel is closed by default and its state is not persisted.** A user landing on a deep-linked filtered URL sees a panel showing the active filter count, not an open panel they did not open.
 - **No new dependencies.** Tailwind and `@testing-library/user-event` are already present (`frontend/src/components/GameComplete.test.tsx:5`).
+- **`R1` and `R5` are v1.1-local constraint IDs, not roadmap §8 risks.** Both are declared in `plan-v1.1.1-filter-foundation.md`, whose Global Constraints carry the namespace note governing every `R#` in this line — read it before citing one. `R7`, cited below, is the exception: a roadmap §8 risk.
 - **TDD mode: advisory_active.** Test first for all testable logic; red → green → refactor; report the commands and results.
 - **No backend, schema, or API changes in this patch.** v1.1.1 owns the wire format; this patch consumes `FilterOptionsResponse` as-is.
 

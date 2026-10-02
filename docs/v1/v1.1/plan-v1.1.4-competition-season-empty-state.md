@@ -26,6 +26,7 @@
 - **New components go in `frontend/src/components/`.** Same reasoning as v1.1.3: `@/components/X` must resolve in Vitest without a per-file alias.
 - **Accessibility:** `<fieldset>`/`<legend>` for the competition group; the two season inputs each get a real `<label>` and `aria-label` stating which bound it is; the empty state is a `role="status"` region so it is announced when it replaces the board.
 - **No backend, schema, or API changes.** `FilterOptionsResponse` already carries `competitions`, `seasons`, and `total`. This patch is a consumer.
+- **`R5` is a v1.1-local constraint ID, not a roadmap §8 risk.** It is declared in `plan-v1.1.1-filter-foundation.md`, whose Global Constraints carry the namespace note governing every `R#` in this line — read it before citing one. `R7`, cited below, is the exception: a roadmap §8 risk.
 - **TDD mode: advisory_active.** Test first for all testable logic; red → green → refactor; report the commands and results.
 
 ---

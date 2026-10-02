@@ -93,6 +93,14 @@ been **ratified by the owner**. The authoritative record is roadmap **§9.1**; t
 table is a pointer, not a second source of truth. None was resolved by renaming
 anything.
 
+**`E1`–`E5` below are v1.4's escalation IDs.** They collide index for index with
+v1.3's separate `E1`–`E5` series — `GameFilters` / `GameFilterParams` naming, filter
+helper placement, client-side selection, absent `node_modules/next/dist/docs/`, and
+whether a surrendered daily counts — so a bare `E1` in this tree means one of two
+unrelated questions. Cite one as **v1.4 escalation `E#`**. The authoritative records
+are roadmap §9.1 `RD4`–`RD8`, which name this series row for row; §9.1 is where a
+reader settles these, and `RD#` / `R#` are the roadmap's own namespaces.
+
 | # | Question raised | Ratified answer | Where it lands |
 |---|---|---|---|
 | **E1** | Does the share grid's scope condition read `opponentRequired`, `opponentAttempted`, or both? | **`opponentAttempted` alone.** `opponentRequired` is **dropped** from the grid condition. When the opponent is required it was necessarily attempted, so the derived flag is sufficient — one flag, one meaning. | `plan-v1.4.1-share-grid.md`, Task 3 |

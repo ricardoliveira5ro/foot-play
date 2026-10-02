@@ -64,9 +64,18 @@ The constraint: **no storage read may render differently between server and clie
 
 Raised in the v1.3.1 plan's Escalations table; none was resolved by renaming anything.
 
+**`E1`–`E5` below are this line's escalation IDs**, carried by the v1.3 specifier
+handoff. They are **not** roadmap identifiers, and they collide index for index with
+v1.4's separate `E1`–`E5` series — share grid, position order, `vitest.config.mts`,
+`hasPlayed` gating, `renderShareText` — so a bare `E1` in this tree means one of two
+unrelated questions. Cite one as **v1.3 escalation `E#`**. The roadmap's ratified
+decisions are `RD#` (§9.1) and its cross-cutting risks are `R#` (§8); the
+`GameFilters` / `GameFilterParams` naming question answered here is settled by this
+table, **not** by §9.1, which has no naming row.
+
 | # | Discrepancy | What v1.3 does |
 |---|---|---|
-| **E1** | The frozen contract names `GameFilters` with non-null lists in `frontend/types/index.ts`; v1.1.x froze `GameFilterParams` with nullable lists in `frontend/types/filters.ts`. **Resolved** — not a decision, just two names for one type. | Consumes `GameFilterParams` as v1.1.x actually froze it. Nothing in v1.3 names `GameFilters`. |
+| **E1 (v1.3 escalation)** | The frozen contract names `GameFilters` with non-null lists in `frontend/types/index.ts`; v1.1.x froze `GameFilterParams` with nullable lists in `frontend/types/filters.ts`. **Resolved** — not a decision, just two names for one type. | Consumes `GameFilterParams` as v1.1.x actually froze it. Nothing in v1.3 names `GameFilters`. |
 | **E2** | The contract places filter helpers in `frontend/src/lib/filterParams.ts`; v1.1.1 Task 8 originally placed them in `frontend/types/filters.ts`, contradicting its own architecture line. | v1.1.1 now aligns to the contract, so `frontend/src/lib/filterParams.ts` **exists** by the time v1.3.1 runs. v1.3.1 **appends** `dailyToParams` / `paramsToDailyKey` to it and extends the existing test file; it does not move, re-export, or overwrite v1.1.1's filter helpers. |
 | **E3** | The contract puts selection on the client while the endpoint returns a resolved `GameResponse`. | A deliberate four-line duplicate, pinned by identical literal fixture tables in both suites. |
 | **E4** | `node_modules/next/dist/docs/` is absent in this working tree. | v1.3 adds no new `useSearchParams` surface; it extends v1.1.2's single reader with props. |

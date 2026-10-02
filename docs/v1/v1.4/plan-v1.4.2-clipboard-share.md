@@ -95,7 +95,7 @@
   cd frontend && npm test
   ```
 
-  Expected: `Test Files 11 passed (11)`, with the test total equal to whatever v1.4.1 last recorded — **read it off v1.4.1's own final run, do not assume it.** A lower number means a file stopped being collected, which is an R7 regression (roadmap §8); escalate rather than working around it.
+  Expected: `Test Files` equal to v1.4.1's recorded file count — **unchanged**, since this patch creates and deletes no test file — and the test total likewise unchanged. Record both from v1.4.1's final run; do not assume either. A lower number means a file stopped being collected, which is an R7 regression (roadmap §8); escalate rather than working around it.
 
 - [ ] **Step 1.2: Confirm the frozen export list is byte-for-byte the v1.4.1 one.**
 

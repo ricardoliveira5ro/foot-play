@@ -26,6 +26,7 @@
 - **`fetchRandomMatch` now returns `GameResponse | null`.** v1.1.1 changed the return type so that "no match for this filter set" is a value rather than an exception. Every call site must handle `null` distinctly from a thrown error, because v1.1.4 renders the two states completely differently. Collapsing them into one `catch` is the defect this constraint exists to prevent.
 - **Stale responses must be discarded.** A user changing filters faster than the network can answer will have several match requests in flight. Only the newest may write state. Use a monotonic sequence ref, matching the pattern already used at `frontend/app/missing-eleven/page.tsx:129-131` for the revealed-name fetch. An `AbortController` is the better tool if `requestJson` in `frontend/lib/api.ts` is extended to accept a `signal`; if it is not, the sequence ref is correct and sufficient.
 - **No new dependencies, and no Prisma or backend changes in this patch.** Backend work landed in v1.1.1.
+- **`R1` is a v1.1-local constraint ID, not a roadmap §8 risk.** It is declared in `plan-v1.1.1-filter-foundation.md`, whose Global Constraints carry the namespace note governing every `R#` in this line — read it before citing one. `R7`, cited below, is the exception: a roadmap §8 risk.
 - **TDD mode: advisory_active.** Test first for all testable logic; red → green → refactor; report the commands and results.
 - **Frontend coverage** is measured over `src/**` only (`frontend/vitest.config.ts` `coverage.include`). Every new module under `src/` needs a test, or it dilutes the numbers.
 

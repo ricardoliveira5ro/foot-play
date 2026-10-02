@@ -305,7 +305,7 @@ whether it exists.
       * inherits the right behaviour from its row.
       *
       * The emptiness guard returns false for an empty lineup, so an
-       * empty board can never read as "complete".
+      * empty board can never read as "complete".
       */
      export function checkGameComplete(
        target: ShirtGameData[],
