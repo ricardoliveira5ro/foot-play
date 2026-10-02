@@ -136,4 +136,19 @@ describe('AppearanceEventIndex', () => {
     index.finalize([row]);
     expect(row.goals).toBe(0);
   });
+
+  // Covers `finalize`'s `if (totals === undefined) return appearance;` arm —
+  // the one branch the other 19 cases leave untaken, which otherwise holds
+  // branches at 93.33% against a 95% gate. Task 5 finalizes exactly the rows
+  // the index was built from, so the arm is defensive; a row carrying
+  // NON-ZERO pre-existing totals is used so the assertion distinguishes
+  // "passed through unchanged" from "reset to zero".
+  it('passes through an appearance row the index never saw', () => {
+    const index = new AppearanceEventIndex([key(1, 101)]);
+    index.accumulate(key(1, 101), event('goal'));
+    const unindexed: FullAppearanceRow = { gameId: 9, playerId: 999, goals: 7, assists: 3, redCards: 2 };
+    expect(index.finalize([unindexed])).toEqual([
+      { gameId: 9, playerId: 999, goals: 7, assists: 3, redCards: 2 },
+    ]);
+  });
 });
