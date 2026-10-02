@@ -1122,9 +1122,12 @@ gate is Step 6.1's full-suite run.
     });
 
     it('separates the same player in two different games', () => {
+      // Both keys are indexed, so the second goal must land on key(2,101) and
+      // NOT continue key(1,101)'s total. Asserting 1 here is what proves the
+      // games are separate: a shared bucket would report 2.
       const index = new AppearanceEventIndex([key(1, 101), key(2, 101)]);
       index.accumulate(key(1, 101), event('goal'));
-      expect(index.accumulate(key(2, 101), event('goal'))).toEqual({ goals: 0, assists: 0, redCards: 0 });
+      expect(index.accumulate(key(2, 101), event('goal'))).toEqual({ goals: 1, assists: 0, redCards: 0 });
     });
 
     it('accumulates multiple events for the same appearance', () => {
@@ -1163,6 +1166,21 @@ gate is Step 6.1's full-suite run.
       const row: FullAppearanceRow = { gameId: 1, playerId: 101, goals: 0, assists: 0, redCards: 0 };
       index.finalize([row]);
       expect(row.goals).toBe(0);
+    });
+
+    // Covers `finalize`'s `if (totals === undefined) return appearance;` arm —
+    // the one branch the other 19 cases leave untaken, which otherwise holds
+    // branches at 93.33% against a 95% gate. Task 5 finalizes exactly the rows
+    // the index was built from, so the arm is defensive; a row carrying
+    // NON-ZERO pre-existing totals is used so the assertion distinguishes
+    // "passed through unchanged" from "reset to zero".
+    it('passes through an appearance row the index never saw', () => {
+      const index = new AppearanceEventIndex([key(1, 101)]);
+      index.accumulate(key(1, 101), event('goal'));
+      const unindexed: FullAppearanceRow = { gameId: 9, playerId: 999, goals: 7, assists: 3, redCards: 2 };
+      expect(index.finalize([unindexed])).toEqual([
+        { gameId: 9, playerId: 999, goals: 7, assists: 3, redCards: 2 },
+      ]);
     });
   });
   ```
@@ -1306,7 +1324,7 @@ gate is Step 6.1's full-suite run.
   cd backend && npx vitest run src/__tests__/unit/appearanceEventJoin.test.ts
   ```
 
-  Expected GREEN: `Test Files 1 passed (1)`, `Tests 19 passed (19)`.
+  Expected GREEN: `Test Files 1 passed (1)`, `Tests 20 passed (20)`.
 
   The own-goal case asserts **zero**, not one (O5). That single expectation is
   the whole of the deferral: flip it and add `case 'own_goal'` to the goals
@@ -1806,7 +1824,7 @@ Revert the patch to **v0.2.5**. `git revert` the six commits, or reset to the pr
 | What | Command | Expected |
 |---|---|---|
 | Matcher unit tests | `cd backend && npx vitest run src/__tests__/unit/eventMapping.test.ts` | all pass, incl. `it.each` over the measured list |
-| Join unit tests | `cd backend && npx vitest run src/__tests__/unit/appearanceEventJoin.test.ts` | `Tests 19 passed (19)` |
+| Join unit tests | `cd backend && npx vitest run src/__tests__/unit/appearanceEventJoin.test.ts` | `Tests 20 passed (20)` |
 | Full backend gate | `cd backend && npm run test:coverage` | 15 files pass, ≥95% on all four metrics |
 | Frontend untouched | `cd frontend && npm run test` | 9 files pass, no diff |
 | Backend type-check | `cd backend && npm run build` | exit 0 |
