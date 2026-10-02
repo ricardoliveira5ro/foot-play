@@ -981,7 +981,13 @@ Expected RED — a module-resolution failure. Vitest 5 ships both strings and
   git commit -m "feat(backend): add measured game-event vocabulary matcher"
   ```
 
-**Verify:** `cd backend && npx vitest run --coverage src/__tests__/unit/eventMapping.test.ts` shows ≥95% on all four metrics for `src/lib/eventMapping.ts`.
+**Verify:** read the per-file row for `src/lib/eventMapping.ts` out of
+`backend/coverage/coverage-summary.json` and confirm ≥95% on all four metrics.
+Do **not** use the process exit code as the signal: `backend/vitest.config.ts`
+sets `coverage.include: ['src/**/*.ts']` under the v8 provider, so a
+single-file run scores every untouched file at 0% and the four global
+thresholds fail by construction. Read the file's own numbers instead — the real
+gate is Step 6.1's full-suite run.
 
 ---
 
@@ -1324,7 +1330,10 @@ Expected RED — a module-resolution failure. Vitest 5 ships both strings and
   git commit -m "feat(backend): add streaming appearance-event join index"
   ```
 
-**Verify:** `cd backend && npx vitest run --coverage src/__tests__/unit/appearanceEventJoin.test.ts` shows ≥95% on all four metrics.
+**Verify:** read the per-file row for `src/lib/appearanceEventJoin.ts` out of
+`backend/coverage/coverage-summary.json` and confirm ≥95% on all four metrics,
+for the same reason as Task 3's Verify: a single-file run's exit code is not a
+pass signal.
 
 ---
 

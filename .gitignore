@@ -27,3 +27,6 @@ scripts/data/
 # OS
 .DS_Store
 Thumbs.db
+
+# SDD ledger / scratch (git-ignored)
+.superpowers/
