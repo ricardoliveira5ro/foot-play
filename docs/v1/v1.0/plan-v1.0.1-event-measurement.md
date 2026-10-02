@@ -449,7 +449,7 @@ The whole test file is written before any production code, then the module is cr
   export function isOwnGoalDescription(description: string): boolean;
   export type ParsedEventType = 'goal' | 'own_goal' | 'penalty' | 'shootout_goal' | 'yellow_card' | 'second_yellow' | 'red_card' | 'substitution' | 'other';
   export function classifyEvent(row: EventCsvRow): ParsedEventType;
-  export interface EventCsvRow { game_id: string; player_id: string; type: string; description: string; minute?: string; }
+  export interface EventCsvRow { game_id: string; player_id: string; type: string; description: string; minute?: string; player_assist_id?: string; }
   export const MEASURED_SENDING_OFF_DESCRIPTIONS: string[];
   ```
 
