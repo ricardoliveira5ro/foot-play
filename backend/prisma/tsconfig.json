@@ -3,5 +3,5 @@
   "compilerOptions": {
     "noEmit": true
   },
-  "include": ["seed.ts"]
+  "include": ["seed.ts", "measure-event-vocabulary.ts"]
 }
