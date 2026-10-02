@@ -426,7 +426,7 @@ The measured vocabulary is v1.0.1's deliverable, not a side effect (§3, §3.3).
   git commit -m "feat(backend): add game_events.csv vocabulary measurement tool"
   ```
 
-**Verify:** `npm run measure-events -w backend` on a machine without the CSV prints `[measure-events] ERROR: .../game_events.csv not found. Run: npm run data-pipeline` and exits 1. On a machine with it, it prints sections `=== 1. COLUMNS ===` through `=== 7. ASSIST COLUMN (player_assist_id) ===` in that order, plus `=== 8. UNCLASSIFIED Cards rows (must be empty) ===` only when that set is non-empty. Section 8 must be **absent** against the current dataset. With `-- --apply` it ends with `[measure-events] wrote .../backend/src/lib/eventMapping.ts`.
+**Verify:** `npm run measure-events -w backend` on a machine without the CSV prints `.../game_events.csv not found. Run: npm run data-pipeline` and exits 1 — note the message carries **no** `[measure-events] ERROR:` prefix, because it is written directly before `process.exit(1)`; the prefix belongs only to the `main().catch()` handler. On a machine with it, it prints sections `=== 1. COLUMNS ===` through `=== 7. ASSIST COLUMN (player_assist_id) ===` in that order, plus `=== 8. UNCLASSIFIED Cards rows (must be empty) ===` only when that set is non-empty. Section 8 must be **absent** against the current dataset. With `-- --apply` it ends with `[measure-events] wrote .../backend/src/lib/eventMapping.ts`.
 
 ---
 
