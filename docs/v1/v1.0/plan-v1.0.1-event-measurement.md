@@ -1522,9 +1522,19 @@ No unit tests here: `backend/prisma/seed.ts` sits outside `src/`, so `backend/vi
   /**
    * Classifications that can carry an assist.
    *
-   * Measured: every row with a non-empty `player_assist_id` is a `Goals` row,
-   * so this guard is belt-and-braces rather than a filter. It exists so a
-   * future dataset with an assister on a card row cannot inflate `assists`.
+   * Measured: every row with a non-empty `player_assist_id` has raw
+   * `type = Goals`, so no card row can inflate `assists` today. But this guard
+   * is **not** the no-op that fact suggests — it tests the CLASSIFIED type, and
+   * `own_goal` is absent, so it deliberately drops the **3,351** own-goal rows
+   * that carry an assister.
+   *
+   * That exclusion is intentional and is the coherent companion to O5: O5
+   * already declines to trust own-goal rows because attribution is unverifiable
+   * from this dataset, so crediting an assist out of them would take a stat from
+   * a row we have refused to trust. The assist itself is arguably unambiguous,
+   * which is why the exclusion is written down here rather than left implicit.
+   * Admitting those assists later is the one-token change
+   * `SCORING_TYPES.add('own_goal')` and must be paired with an O4 ruling.
    */
   const SCORING_TYPES = new Set(['goal', 'penalty']);
   ```
@@ -1808,9 +1818,53 @@ files unrelated to this feature. Record it as a follow-up instead.
     unrecognised and those rows are being credited as ordinary goals — stop.
   - `other=` must be **exactly 0**. Anything else means the decision table
     missed a family of rows — stop and revisit Task 3 Step 3.8.
-  - `assists credited` must be in the low hundreds of thousands (~188k minus the
-    ~2,537 self-assists minus unjoinable rows). A tiny number means the
+  - `assists credited` has an exact measured ceiling of **182,390**:
+
+    | term | rows |
+    |---|---|
+    | rows with a non-empty `player_assist_id` | 188,278 |
+    | less self-assists (`player_assist_id === player_id`) | −2,537 |
+    | less assisted **own-goal** rows, excluded by `SCORING_TYPES` | −3,351 |
+    | **ceiling** | **182,390** |
+
+    The result is **below** that by however many rows are unjoinable, so any
+    figure in 182,390 downwards is expected. A tiny number means the
     `player_assist_id` path is not firing.
+
+    Two non-obvious facts about this number, both deliberate:
+    - **`assists` is NOT a subset of `matched`.** A goal by a substitute absent
+      from the filtered appearance set still names a real assister, so a row can
+      increment `assists` without incrementing `matched`. Do not assert
+      `assists <= matched`.
+    - **The 3,351 assisted own-goal rows contribute nothing.** `own_goal` is not
+      in `SCORING_TYPES`, so they credit neither a goal (O5) nor an assist. That
+      is intentional: O5 already declares own-goal rows untrustworthy because
+      attribution is unverifiable, and crediting an assist out of a row we have
+      declined to trust would be incoherent. Admitting them later is the
+      one-token change `SCORING_TYPES.add('own_goal')`, and it must be paired
+      with an O4 ruling.
+  - **`1274469 rows read` is a literal assertion, not a shape check.** A truncated
+    or partially downloaded CSV ends the stream *without error*, and the
+    breakdown still prints all eight buckets with `other=0` — a proportionally
+    shrunken but structurally healthy-looking distribution. Only the row count
+    reveals it. If this number is anything but 1,274,469, **stop** and re-run
+    `npm run data-pipeline` before investigating anything else.
+  - **Confirm the file was found.** A missing `game_events.csv` is a `warn`, not
+    an error: the seed proceeds, wipes every table, and inserts zeros for all
+    three columns while still exiting 0. `scripts/data/` is gitignored, so a
+    fresh clone takes this path. Assert the events line is present in the output
+    rather than inferring success from exit 0.
+
+  **Verify by exit code and row counts, not by log text.** `console.log('Batch
+  done')` sits in `main()`'s `finally` block, so it prints even when the
+  transaction or an insert threw — a failed seed reads as a successful one. That
+  is pre-existing seed behaviour and out of v1.0.1's scope to change. Instead:
+  require exit code 0, require the `game_events.csv` lines above to be present,
+  and require the `Appearance` counts below to be non-zero and self-consistent.
+  The five `deleteMany` calls share a 120 s transaction timeout, but the ~440
+  `createMany` batches sit outside it on Prisma's per-call default — a failure
+  there leaves the database **wiped and partially repopulated** while still
+  exiting 0 and printing `Batch done`. Row counts are the only reliable check.
 
   Then verify the join landed:
 
