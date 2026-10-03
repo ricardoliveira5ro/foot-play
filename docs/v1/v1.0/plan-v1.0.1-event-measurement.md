@@ -1748,6 +1748,21 @@ No unit tests here: `backend/prisma/seed.ts` sits outside `src/`, so `backend/vi
 - Consumes: everything above.
 - Produces: the `## v1.0.1` CHANGELOG section that `scripts/src/release.ts:8` `VERSION_PATTERN` and `findSection` require. No code symbol.
 
+**Gate posture — read before starting.** Task 5 could not observe any of its own
+numbers. It performs no database write, and the seed run is this task's job, so
+the eight-bucket breakdown, `matched`, `unjoinable` and `assists` are **all still
+unverified against the real dataset**. Every number below is a hard gate, not a
+sanity check: an unexplained difference is a stop-and-investigate, never a
+tolerance to be accepted. Nothing here may be waved through as "close enough".
+
+**Validation coverage gap to state in the report.** `backend/prisma/` is not
+linted by any gate — the repo's `lint` script is `eslint backend/src/`, and
+`seed.ts` and `measure-event-vocabulary.ts` have never been in scope. So
+"lint passed" says nothing about the seed. Its only automated gate is
+`tsc --noEmit -p prisma/tsconfig.json`, which *does* include `seed.ts`. Do not
+widen the lint target inside v1.0.1: it would surface pre-existing warnings in
+files unrelated to this feature. Record it as a follow-up instead.
+
 **Steps:**
 
 - [ ] **Step 6.1: Run the whole backend suite with the coverage gate.**
