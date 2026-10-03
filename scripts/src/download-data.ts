@@ -6,14 +6,14 @@ import * as zlib from 'zlib';
 
 const DATA_URL = 'https://pub-e682421888d945d684bcae8890b0ec20.r2.dev/data/transfermarkt-datasets.zip';
 const TARGET_DIR = path.resolve(__dirname, '..', 'data');
-const REQUIRED_FILES = ['players.csv','clubs.csv','games.csv','game_lineups.csv','competitions.csv','national_teams.csv'];
+const REQUIRED_FILES = ['players.csv','clubs.csv','games.csv','game_lineups.csv','game_events.csv','competitions.csv','national_teams.csv'];
 
 async function downloadZip(): Promise<Buffer> {
   console.log('[download-data] Downloading...');
 
   const response = await axios.get(DATA_URL, {
     responseType: 'arraybuffer',
-    timeout: 120000,
+    timeout: 600000,
   });
 
   console.log('[download-data] Downloaded', response.data.length, 'bytes');

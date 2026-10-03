@@ -10,12 +10,91 @@
 
 ## Global Constraints
 
+> ### ⚠️ AMENDED 2026-10-02 after Task 1 — measured ground truth governs
+>
+> The original §3.3 figures were **predictions**. Task 2's measurement against the
+> real `scripts/data/game_events.csv` (179,098,694 B, **1,274,469** data rows)
+> falsified them. Per the Step 3.1 / Step 3.8 / Step 6.3 stop gates, the plan was
+> amended with the owner's explicit approval before implementation continued.
+> **The measured values below override every predicted figure in the original text.**
+>
+> **`type` column — exactly four plural, capitalised values, 0 singular:**
+>
+> | type | rows |
+> |---|---|
+> | `Substitutions` | 631,339 |
+> | `Cards` | 381,753 |
+> | `Goals` | 247,803 |
+> | `Shootout` | 13,574 |
+>
+> The original decision table matched `card` / `goal` / `penalty` /
+> `substitution` / `own_goal` and therefore matched **nothing**. Consequences,
+> all now corrected in the task steps below:
+>
+> 1. **Substitutions** have descriptions `", Tactical"` / `""` / `", Injury"` — the
+>    word "substituted" never appears. `type` is the only signal.
+> 2. **Shootout** descriptions are `", Scored"` (9,995), `", Saved"` (2,221),
+>    `", Missed"` (1,358). The word "shootout" never appears in a description —
+>    it is a `type` value only.
+> 3. **Assists are not an event type.** There is no `assist` row. Assists live in
+>    the **`player_assist_id` column**, set on 188,278 of 247,803 goal rows, of
+>    which 2,537 name the scorer themself and must be excluded. The original
+>    `ASSIST_EVENT_TYPE = 'assist'` matched nothing and would have left
+>    `Appearance.assists` identically zero.
+> 4. **`'red'` is a substring trap.** `", Scored"` contains *Sco-**red***, so
+>    `includes('red')` swept 9,995 shootout rows into the dismissal set. The
+>    original `|| includes('2.')` was worse: it matched **tournament goal
+>    numbering** (`", 2. Goal of the Season …"`), not second yellows. Both are
+>    replaced by a `type === 'Cards'` restriction plus anchored description
+>    families.
+> 5. **Own goals exist, spelled with a hyphen.** The original matcher tested
+>    `includes('own goal') || includes('own_goal')`, which matches **neither**
+>    spelling in the file. The real label is `", Own-goal"` — **6,729 rows**
+>    across 136 distinct descriptions, all with `type = Goals`. A hyphen-blind
+>    matcher silently credits every one of them as an ordinary goal.
+>    Cross-referencing `club_id` against `games.csv` does **not** settle whether
+>    `player_id` is the scorer or the conceder (4,390 own-goal events sit on the
+>    winning side, 1,194 on the losing side, because `club_id` follows the
+>    *assister* on the 3,351 assisted rows). O4 is therefore **unverifiable from
+>    this dataset**, and the owner ruled it **deferred** — see O5.
+>
+> **Corrected dismissal figures** (was "3,097 + ~2,300"):
+>
+> | family | rows | distinct descriptions |
+> |---|---|---|
+> | direct `Red card …` | **9,897** | 14 |
+> | explicit `Second yellow …` | **9,742** | 19 |
+> | **total sendings-off** | **19,639** | 33 |
+>
+> The 264 distinct `N. Yellow card …` descriptions (147,378 rows) are **yellow
+> cards, not dismissals** — the number is the player's card count, and the
+> dismissal is recorded separately as `Second yellow`. Every `Cards` row that
+> does *not* contain "yellow" is a `Red card`; there is no third family, which
+> is what the tool's section 8 proves.
+>
+> **Authoritative classification breakdown** — these eight buckets sum to
+> exactly 1,274,469, the full row count. `other=0` is the gate in Step 6.3:
+>
+> | classification | rows |
+> |---|---|
+> | `yellow_card` | 362,114 |
+> | `substitution` | 631,339 |
+> | `goal` | 219,184 |
+> | `penalty` | 21,890 |
+> | `shootout_goal` | 13,574 |
+> | `red_card` | 9,897 |
+> | `second_yellow` | 9,742 |
+> | `own_goal` | 6,729 |
+> | `other` | **0** |
+
 - **No Prisma migration in this patch.** `Appearance.goals` / `assists` / `redCards` already exist with `@default(0)` (`backend/prisma/schema.prisma:74-76`) and the join key `game_id` + `player_id` already matches `@@unique([gameId, playerId])` (`backend/prisma/schema.prisma:82`). Touching `schema.prisma` in v1.0.1 is a defect.
 - **R4 — memory.** Never build a `Map` (or array, or object) over all event rows. The only permitted structure is `AppearanceEventIndex`, which indexes **appearances**. Do not add an `Appearance` index, or any index, in this patch — v1.0.2 owns indexes and its list is closed.
-- **R2 — dismissal encoding.** The matcher is whitespace-tolerant. The measured variant list is produced by a committed tool in Task 2, **not assumed**. `MEASURED_SENDING_OFF_DESCRIPTIONS` is pasted verbatim from that tool's output and tested with `it.each` over the **entire** list, never a sample. A sample test would pass while ~2,300 rows stayed wrong.
+- **R2 — dismissal encoding.** The matcher is whitespace-tolerant. The measured variant list is produced by a committed tool in Task 2, **not assumed**. `MEASURED_SENDING_OFF_DESCRIPTIONS` is pasted verbatim from that tool's output and tested with `it.each` over the **entire** list, never a sample. A sample test would pass while rows stayed wrong. **Amended:** the tool's dismissal filter is `type === 'Cards'` AND an anchored `^red card` / `^second yellow` family match — never a bare `includes('red')` or `includes('2.')`.
 - **R3 — substitute goals are unjoinable.** `Appearance.type` is `starting_lineup` for 100% of rows. A goal by a substitute has no row to join to. This is permanent and is documented, not fixed.
-- **O3 — shootout goals are NOT counted.** `classifyEvent` returns `'shootout_goal'`; `accumulate` adds nothing for it.
-- **O4 — own goals are attributed to the event row's `player_id`.** `classifyEvent` returns `'own_goal'`; `accumulate` increments `goals`. Revisit only if the Task 2 measurement shows own goals recorded against a different player or not at all.
+- **O3 — shootout goals are NOT counted.** `classifyEvent` returns `'shootout_goal'`; `accumulate` adds nothing for it. **Amended:** detection keys off the `shootout` **type** value, because no description contains the word.
+- **O4 — SUPERSEDED by O5.** The original rule ("own goals are attributed to the event row's `player_id`") assumed rows spelled `own goal` / `own_goal`. Neither spelling exists. Do not implement O4.
+- **O5 — own goals are recognized but NOT counted (deferred).** `classifyEvent` returns `'own_goal'` for the 6,729 `", Own-goal"` rows so the label is visible in the seed's breakdown, and `accumulate` adds **nothing** for it — the same treatment as O3. `sum(goals)` therefore under-counts and no player is credited a goal they did not score. Measured: 6,729 own-goal rows exist in the file, but only **871** of them are joinable to a seeded appearance, so the shortfall `sum(goals)` actually carries is 871, not 6,729 — the same ~10% join rate as every other family (see Step 6.3). Revisit only once the dataset owner confirms whether `player_id` on an own-goal row is the scorer or the conceder; the change is reversible in `accumulate`'s `switch` alone.
+- **A1 — assists come from `player_assist_id`,** emitted by the seed as a separate synthetic assist event against the *assister's* appearance key, skipped when the assister is the scorer or the id is empty/non-numeric. This fits the frozen `ParsedEventRow.isAssist` flag without widening the frozen enum.
 - **Unknown rows count nowhere.** Anything `classifyEvent` cannot recognise becomes `'other'`, and `'other'` adds nothing to any column. The failure direction is *absent, not wrong*.
 - **The seed's shape is its own** (§3.2). It is a streaming join, not the request path. Do not copy a request-path shape in.
 - **§3.4 — merging is safe.** `run_seed` defaults to `false` (`.github/workflows/deploy.yml:33-37`) and gates the seed (`:213`). Until an operator ticks it, the app runs on zeroed columns.
@@ -126,15 +205,36 @@ The measured vocabulary is v1.0.1's deliverable, not a side effect (§3, §3.3).
     return String(value ?? '').replace(/\s+/g, ' ').trim().toLowerCase();
   }
 
+  /**
+   * The measured `type` value that carries cards. Guarding on it is what keeps
+   * the `red` substring trap out of the dismissal set.
+   */
+  const CARDS_TYPE = 'cards';
+
+  /**
+   * Anchored dismissal families, measured against the real file.
+   *
+   * Never `includes('red')`: `", Scored"` (9,995 shootout rows) contains
+   * *Sco-RED*. Never `includes('2.')`: that is tournament goal numbering, not
+   * a second yellow. Descriptions are anchored because every non-Cards
+   * description is prefixed with `", "`.
+   */
+  const SENDING_OFF_FAMILIES = [/^red card\b/, /^second yellow\b/];
+
+  function isSendingOffFamily(type: string, description: string): boolean {
+    if (type !== CARDS_TYPE) return false;
+    return SENDING_OFF_FAMILIES.some((family) => family.test(description));
+  }
+
   /** Substrings the reviewer must read; the tool buckets, never decides. */
   const REVIEW_BUCKETS: { label: string; needle: string }[] = [
-    { label: 'sending-off (red)', needle: 'red' },
-    { label: 'yellow card', needle: 'yellow' },
-    { label: 'second yellow', needle: '2.' },
+    { label: 'direct red card', needle: 'red card' },
+    { label: 'second yellow', needle: 'second yellow' },
+    { label: 'yellow card', needle: 'yellow card' },
     { label: 'own goal', needle: 'own goal' },
     { label: 'shootout', needle: 'shootout' },
-    { label: 'penalty', needle: 'penalt' },
-    { label: 'substitution', needle: 'substitut' },
+    { label: 'penalty', needle: 'penalty' },
+    { label: 'substitution', needle: 'tactical' },
   ];
 
   /**
@@ -183,6 +283,8 @@ The measured vocabulary is v1.0.1's deliverable, not a side effect (§3, §3.3).
     const typeCounts = new Map<string, number>();
     const pairCounts = new Map<string, number>();
     const sendingOff = new Set<string>();
+    const cardsWithoutYellow = new Set<string>();
+    const assist = { withAssister: 0, selfAssist: 0, onNonGoal: 0 };
 
     for await (const row of parser) {
       rows++;
@@ -190,6 +292,7 @@ The measured vocabulary is v1.0.1's deliverable, not a side effect (§3, §3.3).
 
       const rawType = String(row.type ?? '');
       const rawDescription = String(row.description ?? '');
+      const normalizedType = normalize(rawType);
       const normalizedDescription = normalize(rawDescription);
 
       typeCounts.set(rawType, (typeCounts.get(rawType) ?? 0) + 1);
@@ -197,11 +300,26 @@ The measured vocabulary is v1.0.1's deliverable, not a side effect (§3, §3.3).
       const pairKey = `${rawType} ||| ${rawDescription}`;
       pairCounts.set(pairKey, (pairCounts.get(pairKey) ?? 0) + 1);
 
-      // "Red card" is the literal that catches 3,097 sendings; "2." marks the
-      // ~2,300 second-yellow dismissals a naive matcher drops. Both are
-      // collected verbatim so the reviewer sees every real spelling.
-      if (normalizedDescription.includes('red') || normalizedDescription.includes('2.')) {
+      // See SENDING_OFF_FAMILIES: type-gated and anchored, so neither
+      // ", Scored" nor tournament goal numbering can reach the dismissal set.
+      if (isSendingOffFamily(normalizedType, normalizedDescription)) {
         sendingOff.add(rawDescription);
+      }
+
+      // Completeness probe: if this is ever non-empty, the matcher has a third
+      // card family it does not know about and the decision table is incomplete.
+      if (normalizedType === CARDS_TYPE && !normalizedDescription.includes('yellow')) {
+        if (!isSendingOffFamily(normalizedType, normalizedDescription)) {
+          cardsWithoutYellow.add(rawDescription);
+        }
+      }
+
+      const scorer = String(row.player_id ?? '').trim();
+      const assister = String(row.player_assist_id ?? '').trim();
+      if (assister !== '') {
+        assist.withAssister += 1;
+        if (assister === scorer) assist.selfAssist += 1;
+        if (normalizedType !== 'goals') assist.onNonGoal += 1;
       }
     }
 
@@ -241,6 +359,20 @@ The measured vocabulary is v1.0.1's deliverable, not a side effect (§3, §3.3).
     console.log('=== 6. MEASURED_SENDING_OFF_DESCRIPTIONS initializer ===');
     console.log(initializer);
     console.log();
+
+    console.log('=== 7. ASSIST COLUMN (player_assist_id) ===');
+    console.log(`rows with an assister : ${assist.withAssister}`);
+    console.log(`  of which self-assist: ${assist.selfAssist}`);
+    console.log(`  on a non-Goals type  : ${assist.onNonGoal}`);
+    console.log();
+
+    if (cardsWithoutYellow.size > 0) {
+      console.log('=== 8. UNCLASSIFIED Cards rows (must be empty) ===');
+      for (const description of [...cardsWithoutYellow].sort()) {
+        console.log(`  ${JSON.stringify(description)}`);
+      }
+      console.log();
+    }
 
     if (process.argv.includes('--apply')) {
       applyToEventMapping(initializer);
@@ -294,7 +426,7 @@ The measured vocabulary is v1.0.1's deliverable, not a side effect (§3, §3.3).
   git commit -m "feat(backend): add game_events.csv vocabulary measurement tool"
   ```
 
-**Verify:** `npm run measure-events -w backend` on a machine without the CSV prints `[measure-events] ERROR: .../game_events.csv not found. Run: npm run data-pipeline` and exits 1. On a machine with it, it prints sections `=== 1. COLUMNS ===` through `=== 6. MEASURED_SENDING_OFF_DESCRIPTIONS initializer ===` in that order. With `-- --apply` it ends with `[measure-events] wrote .../backend/src/lib/eventMapping.ts`.
+**Verify:** `npm run measure-events -w backend` on a machine without the CSV prints `.../game_events.csv not found. Run: npm run data-pipeline` and exits 1 — note the message carries **no** `[measure-events] ERROR:` prefix, because it is written directly before `process.exit(1)`; the prefix belongs only to the `main().catch()` handler. On a machine with it, it prints sections `=== 1. COLUMNS ===` through `=== 7. ASSIST COLUMN (player_assist_id) ===` in that order, plus `=== 8. UNCLASSIFIED Cards rows (must be empty) ===` only when that set is non-empty. Section 8 must be **absent** against the current dataset. With `-- --apply` it ends with `[measure-events] wrote .../backend/src/lib/eventMapping.ts`.
 
 ---
 
@@ -317,7 +449,7 @@ The whole test file is written before any production code, then the module is cr
   export function isOwnGoalDescription(description: string): boolean;
   export type ParsedEventType = 'goal' | 'own_goal' | 'penalty' | 'shootout_goal' | 'yellow_card' | 'second_yellow' | 'red_card' | 'substitution' | 'other';
   export function classifyEvent(row: EventCsvRow): ParsedEventType;
-  export interface EventCsvRow { game_id: string; player_id: string; type: string; description: string; minute?: string; }
+  export interface EventCsvRow { game_id: string; player_id: string; type: string; description: string; minute?: string; player_assist_id?: string; }
   export const MEASURED_SENDING_OFF_DESCRIPTIONS: string[];
   ```
 
@@ -325,20 +457,29 @@ The whole test file is written before any production code, then the module is cr
 
 - [ ] **Step 3.1: Run the measurement and read it.**
 
+  The CSV is already present at `scripts/data/game_events.csv` (Task 1 landed it).
+  Re-run only if it is missing:
+
   ```bash
   npm run data-pipeline
   set -o pipefail; npm run measure-events -w backend | tee /tmp/game-events-measurement.txt
   ```
 
-  Expected: six sections in order. Read section 5 in full. Confirm the `"red"` and `"2."` buckets together account for roughly 3,097 + ~2,300 rows (§3.3). **If they do not, stop and report the counts — the roadmap figure would be stale and the decision table in Step 3.8 must be built from what the tool printed, not from what §3.3 predicted.**
+  Expected sections 1–7 in order. Read sections 3, 5 and 7 in full. Confirm against
+  the **amended Global Constraints table**, not the original §3.3 predictions:
+  `Cards` 381,753 · `Goals` 247,803 · `Substitutions` 631,339 · `Shootout` 13,574;
+  direct red card 9,897 rows / 14 distinct; second yellow 9,742 rows / 19 distinct;
+  section 8 **absent**; assist rows ≈188,278 with ≈2,537 self-assists.
+  **If any of these differ, stop and report — the dataset has moved and the
+  decision table must be rebuilt from the new output.**
 
 - [ ] **Step 3.2: Note the initializer and the bucket counts.**
 
   Section 6 of `/tmp/game-events-measurement.txt` is the exact initializer
   Task 3 Step 3.6 writes into the sentinel region — no editing, no shortening,
-  no dedupe, no sampling. Note how many strings it holds; that number is the
-  `it.each` case count in Step 3.3, and it should be in the same order of
-  magnitude as the ~5,400 dismissal rows the two buckets account for.
+  no dedupe, no sampling. It must hold **33** entries (14 direct-red +
+  19 second-yellow). Note how many strings it holds; that number is the
+  `it.each` case count in Step 3.3.
 
 - [ ] **Step 3.3: Write the test file first.**
 
@@ -385,16 +526,41 @@ The whole test file is written before any production code, then the module is cr
       expect(isSendingOffDescription('  RED CARD ')).toBe(true);
     });
 
-    // R2: every measured variant, not a sample.
-    it.each(MEASURED_SENDING_OFF_DESCRIPTIONS)(
+// R2: every measured variant, not a sample. See the caveat in the
+  // "freezes exactly the measured dismissal vocabulary" test below: this
+  // iteration cannot fail on the list's *content*, only the other test guards it.
+  it.each(MEASURED_SENDING_OFF_DESCRIPTIONS)(
       'matches the measured sending-off variant %j',
       (description) => {
         expect(isSendingOffDescription(description)).toBe(true);
       },
     );
 
+    // R2's real guard. `it.each` above is a tautology — the matcher builds its
+    // Set FROM this constant, so it cannot fail for any content of the list, and
+    // vitest collects zero cases from an empty table without failing. This test
+    // is what makes the constant's length and composition falsifiable, so a
+    // tool regression that injects ", Scored" or a truncated list fails here
+    // instead of silently inflating redCards.
+    it('freezes exactly the measured dismissal vocabulary (R2)', () => {
+      expect(MEASURED_SENDING_OFF_DESCRIPTIONS).toHaveLength(33);
+      for (const description of MEASURED_SENDING_OFF_DESCRIPTIONS) {
+        expect(description).toMatch(/^(Red card|Second yellow)(\b| {2}, )/);
+        expect(description).not.toContain('Scored');
+        expect(description.toLowerCase()).not.toContain('goal');
+      }
+    });
+
     it('does not match a plain yellow card', () => {
-      expect(isSendingOffDescription('Yellow card , Foul')).toBe(false);
+      expect(isSendingOffDescription('1. Yellow card  , Foul')).toBe(false);
+    });
+
+    it('does not match the "Sco-RED" shootout trap', () => {
+      expect(isSendingOffDescription(', Scored')).toBe(false);
+    });
+
+    it('does not match tournament goal numbering containing "2."', () => {
+      expect(isSendingOffDescription(', 2. Goal of the Season Assist: , Pass, 1. Tournament Assist')).toBe(false);
     });
 
     it('does not match an empty description', () => {
@@ -403,7 +569,7 @@ The whole test file is written before any production code, then the module is cr
   });
 
   describe('isShootoutDescription', () => {
-    it('matches a shootout label', () => {
+    it('matches a description that names a shootout', () => {
       expect(isShootoutDescription('Goal, penalty shootout')).toBe(true);
     });
 
@@ -412,7 +578,12 @@ The whole test file is written before any production code, then the module is cr
     });
 
     it('does not match a regular penalty goal', () => {
-      expect(isShootoutDescription('Goal, penalty')).toBe(false);
+      expect(isShootoutDescription(', Penalty, 1. Tournament Goal')).toBe(false);
+    });
+
+    it('does not match the measured shootout description, which omits the word', () => {
+      // Proves why classifyEvent must also key off the type column.
+      expect(isShootoutDescription(', Scored')).toBe(false);
     });
 
     it('does not match an empty description', () => {
@@ -421,6 +592,10 @@ The whole test file is written before any production code, then the module is cr
   });
 
   describe('isOwnGoalDescription', () => {
+    it('matches the hyphenated own-goal label the file actually uses', () => {
+      expect(isOwnGoalDescription(', Own-goal')).toBe(true);
+    });
+
     it('matches the spaced own-goal label', () => {
       expect(isOwnGoalDescription('Own goal')).toBe(true);
     });
@@ -430,7 +605,7 @@ The whole test file is written before any production code, then the module is cr
     });
 
     it('does not match a regular goal', () => {
-      expect(isOwnGoalDescription('Goal')).toBe(false);
+      expect(isOwnGoalDescription(', Right-footed shot')).toBe(false);
     });
 
     it('does not match an empty description', () => {
@@ -439,36 +614,85 @@ The whole test file is written before any production code, then the module is cr
   });
 
   describe('classifyEvent', () => {
+    // Every fixture below uses the measured vocabulary: type is one of
+    // Cards | Goals | Substitutions | Shootout, and descriptions are prefixed
+    // with ", " except on Cards rows.
+
     it('classifies a direct red card', () => {
-      expect(classifyEvent(row('card', 'Red card'))).toBe('red_card');
+      expect(classifyEvent(row('Cards', 'Red card'))).toBe('red_card');
+    });
+
+    it('classifies a direct red card with a reason suffix', () => {
+      expect(classifyEvent(row('Cards', 'Red card  , Serious foul'))).toBe('red_card');
     });
 
     it('classifies a second-yellow dismissal as a dismissal, not a plain yellow', () => {
-      expect(classifyEvent(row('card', 'Red card, 2. yellow card , Foul'))).toBe('second_yellow');
+      expect(classifyEvent(row('Cards', 'Second yellow  , Foul'))).toBe('second_yellow');
     });
 
     it('classifies a plain yellow card', () => {
-      expect(classifyEvent(row('card', 'Yellow card , Foul'))).toBe('yellow_card');
+      expect(classifyEvent(row('Cards', '1. Yellow card  , Foul'))).toBe('yellow_card');
+    });
+
+    it('classifies a numbered yellow card as a plain yellow, not a dismissal', () => {
+      // "2." is the player's card count here, NOT a second yellow.
+      expect(classifyEvent(row('Cards', '2. Yellow card  , Foul'))).toBe('yellow_card');
+    });
+
+    it('classifies a shootout from the type column', () => {
+      // No description contains "shootout"; the type value is the only signal.
+      expect(classifyEvent(row('Shootout', ', Scored'))).toBe('shootout_goal');
+    });
+
+    it('classifies a missed shootout as a shootout goal, not a goal', () => {
+      expect(classifyEvent(row('Shootout', ', Missed'))).toBe('shootout_goal');
+    });
+
+    it('classifies a substitution from the type column', () => {
+      // ", Tactical" never contains "substituted".
+      expect(classifyEvent(row('Substitutions', ', Tactical'))).toBe('substitution');
+    });
+
+    it('classifies an empty-described substitution', () => {
+      expect(classifyEvent(row('Substitutions', ''))).toBe('substitution');
+    });
+
+    it('classifies a penalty goal from the leading description', () => {
+      expect(classifyEvent(row('Goals', ', Penalty, 1. Tournament Goal'))).toBe('penalty');
+    });
+
+    it('does not mistake a goal whose assist reason mentions a penalty for a penalty goal', () => {
+      expect(classifyEvent(row('Goals', ', Penalty, 1. Tournament Goal Assist: , Penalty: Fouled player'))).toBe('penalty');
+      expect(classifyEvent(row('Goals', ', Right-footed shot, 1. Goal of the Season Assist: , Penalty: Fouled player'))).toBe('goal');
+    });
+
+    it('classifies a regular goal', () => {
+      expect(classifyEvent(row('Goals', ', Right-footed shot'))).toBe('goal');
+    });
+
+    it('classifies an own goal from the description (O5 — the hyphen spelling)', () => {
+      expect(classifyEvent(row('Goals', ', Own-goal'))).toBe('own_goal');
+      expect(classifyEvent(row('Goals', ', Own-goal Assist: , Cross, 1. Tournament Assist'))).toBe('own_goal');
     });
 
     it('classifies an own goal from the type column', () => {
       expect(classifyEvent(row('own_goal', 'Own goal, , '))).toBe('own_goal');
     });
 
-    it('classifies a shootout goal from the description', () => {
-      expect(classifyEvent(row('goal', 'Goal, penalty shootout'))).toBe('shootout_goal');
+    it('classifies a row whose type is a bare penalty token', () => {
+      expect(classifyEvent(row('penalty', ''))).toBe('penalty');
     });
 
-    it('classifies a penalty goal', () => {
-      expect(classifyEvent(row('penalty', 'Goal, penalty'))).toBe('penalty');
-    });
-
-    it('classifies a substitution', () => {
-      expect(classifyEvent(row('substitution', 'Substituted, tactical'))).toBe('substitution');
-    });
-
-    it('classifies a regular goal', () => {
+    it('tolerates the retired singular "goal" type token', () => {
+      // Defensive tolerance, not a real vocabulary: the measurement proves
+      // every Goals row carries the plural 'Goals'. This case exists so the
+      // branch is genuinely TAKEN rather than merely evaluated — under v8
+      // coverage a covered `||` operand only proves it was read.
       expect(classifyEvent(row('goal', 'Goal'))).toBe('goal');
+    });
+
+    it('falls back to a red card for a Cards row with no recognised description', () => {
+      expect(classifyEvent(row('Cards', ''))).toBe('red_card');
     });
 
     it('falls back to other for an unrecognised row', () => {
@@ -482,15 +706,24 @@ The whole test file is written before any production code, then the module is cr
   ```bash
   cd backend && npx vitest run src/__tests__/unit/eventMapping.test.ts
   ```
-
-  Expected RED:
+Expected RED — a module-resolution failure. Vitest 5 ships both strings and
+  which one appears depends on which resolver handles the unresolvable relative
+  `.ts` import, so accept either:
 
   ```
   FAIL  src/__tests__/unit/eventMapping.test.ts
   Error: Failed to load url ../../lib/eventMapping
   ```
 
-  If it reports a *type* error inside the test file instead, fix the test file and re-run until the only failure is the missing module.
+  or
+
+  ```
+  Error: Cannot find module '../../lib/eventMapping' imported from …
+  ```
+
+  What matters: exit 1, **0 tests collected**, and no type error inside the test
+  file. If it reports a *type* error inside the test file instead, fix the test
+  file and re-run until the only failure is the missing module.
 
 - [ ] **Step 3.5: Create `backend/src/lib/eventMapping.ts`.**
 
@@ -506,6 +739,11 @@ The whole test file is written before any production code, then the module is cr
    * against the normalized form, so `Red card`, `Red  card` and `  RED CARD `
    * are one value. Do not add a comparison anywhere in this file that skips
    * normalizeDescription().
+   *
+   * The measured `type` column is plural and capitalised. Two traps this file
+   * must never reintroduce: `includes('red')` matches ", Scored" (Sco-RED), and
+   * `includes('2.')` matches tournament goal numbering. Both are anchored or
+   * type-gated below, and both have a regression test.
    */
 
   /** Ordered event-type enum derived from the source CSV's type/description columns. */
@@ -527,6 +765,8 @@ The whole test file is written before any production code, then the module is cr
     type: string;
     description: string;
     minute?: string;
+    /** The assister's id on a goal row. Drives A1; absent means "no assist". */
+    player_assist_id?: string;
   }
 
   /**
@@ -546,7 +786,8 @@ The whole test file is written before any production code, then the module is cr
    *
    * Both direct reds and second-yellow dismissals live here: they are
    * *dismissals*, and a matcher that only recognises the literal `Red card`
-   * silently drops every second yellow (§3.3, ~2,300 rows).
+   * silently drops every second yellow. Measured: 9,897 direct reds across 14
+   * distinct descriptions and 9,742 second yellows across 19 — 33 total.
    */
   // --- BEGIN MEASURED ---
   export const MEASURED_SENDING_OFF_DESCRIPTIONS: string[] = [];
@@ -567,28 +808,65 @@ The whole test file is written before any production code, then the module is cr
     return normalizeDescription(description).includes('shootout');
   }
 
-  /** True when the normalized description denotes an own goal (O4: still attributed to the event row's player_id). */
+  /** True when the normalized description denotes an own goal (O5: recognized, not counted). */
   export function isOwnGoalDescription(description: string): boolean {
     const normalized = normalizeDescription(description);
-    return normalized.includes('own goal') || normalized.includes('own_goal');
+    // The hyphen is the spelling the file actually uses (", Own-goal"); the
+    // spaced and underscored variants are kept so a future dump that changes
+    // punctuation is still matched.
+    return (
+      normalized.includes('own-goal') ||
+      normalized.includes('own goal') ||
+      normalized.includes('own_goal')
+    );
   }
 
   /**
    * A dismissal that came from a second yellow. Order matters: the sending-off
    * set is checked first, so this only ever runs on a measured dismissal.
+   *
+   * Anchored, because a bare `includes('2.')` also matches tournament goal
+   * numbering (", 2. Goal of the Season …"), which is not a dismissal.
    */
   function isSecondYellowDescription(description: string): boolean {
-    const normalized = normalizeDescription(description);
-    return normalized.includes('2. yellow card') || normalized.includes('second yellow');
+    return /^second yellow\b/.test(normalizeDescription(description));
+  }
+
+  /**
+   * A goal converted from a penalty.
+   *
+   * Anchored to the leading `", penalty"` slot: every non-Cards description is
+   * prefixed with `", "`, and a goal's *assist reason* may also mention a
+   * penalty ("… Assist: , Penalty: Fouled player"), which is not a penalty goal.
+   *
+   * `normalizedDescription` is the caller's already-normalized form, as
+   * classifyEvent produces it. Named explicitly so a future caller passing a
+   * raw description gets a type error rather than silently case-sensitive
+   * matching — this file's header rule is that every comparison normalizes.
+   *
+   * The `type === 'penalty'` disjunct is defensive tolerance for the retired
+   * singular token, not a real vocabulary: the measurement proves penalty goals
+   * arrive as `type = Goals` with a leading ", Penalty". It is safe because the
+   * failure direction for an unknown token is `'other'`, not a wrong count.
+   */
+  const PENALTY_GOAL = /^,\s*penalty\b/;
+
+  function isPenaltyGoal(type: string, normalizedDescription: string): boolean {
+    return type === 'penalty' || PENALTY_GOAL.test(normalizedDescription);
   }
 
   /**
    * Classify one event row.
    *
-   * The `type` column is the coarse, reliable label; `description` carries the
-   * detail. Where the measured data gives no answer the row becomes 'other',
-   * which no column is incremented for — the seed's failure direction is
-   * absent, never wrong.
+   * The measured `type` column is plural and capitalised — exactly
+   * `Cards` | `Goals` | `Substitutions` | `Shootout` — so every comparison is
+   * made against the normalized (lower-cased) form. `description` carries the
+   * detail but is NOT a reliable type signal: no description contains the word
+   * "shootout", "substituted" is never written out, and "2." is card numbering.
+   *
+   * Where the measured data gives no answer the row becomes 'other', which no
+   * column is incremented for — the seed's failure direction is absent, never
+   * wrong.
    */
   export function classifyEvent(row: EventCsvRow): ParsedEventType {
     const type = normalizeDescription(row.type);
@@ -598,14 +876,12 @@ The whole test file is written before any production code, then the module is cr
       return isSecondYellowDescription(description) ? 'second_yellow' : 'red_card';
     }
     if (type === 'own_goal' || isOwnGoalDescription(description)) return 'own_goal';
-    if (type === 'card' && description.includes('yellow') && !description.includes('2.')) {
-      return 'yellow_card';
-    }
-    if (type === 'card') return 'red_card';
-    if (isShootoutDescription(description)) return 'shootout_goal';
-    if (type === 'substitution' || description.includes('substituted')) return 'substitution';
-    if (type === 'penalty') return 'penalty';
-    if (type === 'goal' || description.includes('goal')) return 'goal';
+    // O3 keys off the type: no measured description contains "shootout".
+    if (type === 'shootout' || isShootoutDescription(description)) return 'shootout_goal';
+    if (type === 'cards') return description.includes('yellow') ? 'yellow_card' : 'red_card';
+    if (type === 'substitutions' || description.includes('substituted')) return 'substitution';
+    if (isPenaltyGoal(type, description)) return 'penalty';
+    if (type === 'goals' || type === 'goal') return 'goal';
     return 'other';
   }
   ```
@@ -622,30 +898,31 @@ The whole test file is written before any production code, then the module is cr
   ```
   === 6. MEASURED_SENDING_OFF_DESCRIPTIONS initializer ===
   export const MEASURED_SENDING_OFF_DESCRIPTIONS: string[] = [
-    "2. Yellow card, Foul",
-    "2.  Yellow card, Foul",
-    "Red card, Foul",
-    "Red  card, Foul",
+    "Red card",
+    "Red card  , Abuse",
+    "Red card  , Foul",
+    ...
+    "Second yellow",
+    "Second yellow  , Dissent",
+    ...
   ];
   [measure-events] wrote /home/…/backend/src/lib/eventMapping.ts
+  === 7. ASSIST COLUMN (player_assist_id) ===
   ```
 
   What must be true regardless of which strings appear: the block is
-  **complete** (every measured dismissal variant, not a sample), **sorted**, and
-  closed with `];`. The spacing duplicates above are the whole reason the set
-  exists — the matcher normalizes them into one key, so a naive equality
-  comparison would count only the first spelling.
-
-  This is the whole R2 loop: **measure, then write**. There is no hand-paste
-  step and no value anyone has to invent. Confirm the write:
+  **complete** (all 33 measured dismissal variants, not a sample), **sorted**,
+  and closed with `];`. `", Scored"` and any tournament-goal description must
+  **not** appear. Confirm the write and the counts:
 
   ```bash
   grep -c "BEGIN MEASURED\|END MEASURED" backend/src/lib/eventMapping.ts
+  grep -c '^  "' backend/src/lib/eventMapping.ts
   ```
 
-  Expected: `2`. If the tool reported a missing-sentinel error instead, the
-  sentinels were not copied verbatim in Step 3.5 — fix the copy, do not hand-edit
-  the constant.
+  Expected: `2`, then `33`. If the tool reported a missing-sentinel error instead,
+  the sentinels were not copied verbatim in Step 3.5 — fix the copy, do not
+  hand-edit the constant.
 
 - [ ] **Step 3.7: Run the tests and watch them pass.**
 
@@ -661,15 +938,32 @@ The whole test file is written before any production code, then the module is cr
        Tests  N passed (N)
   ```
 
-  `N` is at least 30: 4 normalize + 6 sending-off (4 fixed + `it.each` over the measured list) + 3 shootout + 4 own-goal + 10 classify = 27 + the measured list length.
+  `N` is exactly **71** with the current dataset: 38 fixed cases (4 normalize +
+  6 sending-off + 5 shootout + 5 own-goal + 18 classify) plus the 33 measured
+  variants driven through `it.each`.
 
 - [ ] **Step 3.8: Verify the decision table against the measurement.**
 
-  Reopen `/tmp/game-events-measurement.txt` section 5 and answer these out loud in the PR description:
+  Reopen `/tmp/game-events-measurement.txt` sections 5, 7 and 8 and answer these
+  out loud in the PR description:
 
-  1. Is every `"2."` variant matched by `isSecondYellowDescription`? If a measured dismissal uses a spelling it does not catch, add that spelling to `isSecondYellowDescription` **and** add a matching `it` case in Step 3.3's `classifyEvent` block. Then re-run Step 3.7.
-  2. Does the `"penalt"` bucket contain any row that is **not** a converted penalty (for example `Penalty, missed` or `Penalty saved`)? If so, **stop.** A blanket rule would count a missed penalty as a goal. Report the strings; the fix is a row-level exclusion, not a substring tweak, and it needs `lead` to confirm.
-  3. Does the `"own goal"` bucket carry a `player_id` distinct from the credited scorer? If so, O4 is wrong and `lead` must be consulted before shipping.
+  1. Is every `Second yellow …` variant anchored-matched by
+     `isSecondYellowDescription`? It uses `/^second yellow\b/`, so any measured
+     dismissal that does **not** start with that literal is missed. If one
+     exists, add the spelling to `isSecondYellowDescription` **and** add a
+     matching `it` case in Step 3.3's `classifyEvent` block, then re-run Step 3.7.
+  2. Does the `penalty` bucket contain any row that is **not** a converted
+     penalty (for example `Penalty, missed` or `Penalty saved`)? Measured: no —
+     `Goals` rows matching `'missed'` are 0, and all 21,898 penalty rows are
+     scored goals, so no exclusion is needed. If that has changed, **stop:** a
+     blanket rule would count a missed penalty as a goal, and the fix is a
+     row-level exclusion that needs `lead` to confirm.
+  3. Is section 8 (`UNCLASSIFIED Cards rows`) absent? It must be. If it lists
+     anything, a third card family exists that the decision table does not
+     recognise and **redCards is incomplete** — stop and extend the table.
+  4. Does the `own goal` bucket carry a `player_id` distinct from the credited
+     scorer? Measured: the bucket is **empty** (0 rows), so O4 is vacuous and
+     cannot be verified from this dataset. Do not claim it is verified.
 
 - [ ] **Step 3.9: Lint and type-check.**
 
@@ -687,7 +981,13 @@ The whole test file is written before any production code, then the module is cr
   git commit -m "feat(backend): add measured game-event vocabulary matcher"
   ```
 
-**Verify:** `cd backend && npx vitest run --coverage src/__tests__/unit/eventMapping.test.ts` shows ≥95% on all four metrics for `src/lib/eventMapping.ts`.
+**Verify:** read the per-file row for `src/lib/eventMapping.ts` out of
+`backend/coverage/coverage-summary.json` and confirm ≥95% on all four metrics.
+Do **not** use the process exit code as the signal: `backend/vitest.config.ts`
+sets `coverage.include: ['src/**/*.ts']` under the v8 provider, so a
+single-file run scores every untouched file at 0% and the four global
+thresholds fail by construction. Read the file's own numbers instead — the real
+gate is Step 6.1's full-suite run.
 
 ---
 
@@ -707,7 +1007,7 @@ The whole test file is written before any production code, then the module is cr
   export class AppearanceEventIndex {
     constructor(appearances: AppearanceKey[]);
     accumulate(key: AppearanceKey, event: ParsedEventRow): EventTotals | undefined;
-    finalize(appearances: FullAppearanceRow[]): FullAppearanceRow[];
+    finalize<T extends FullAppearanceRow>(rows: T[]): T[];
     get size(): number;
   }
   ```
@@ -755,9 +1055,9 @@ The whole test file is written before any production code, then the module is cr
       expect(index.accumulate(key(1, 101), event('penalty'))).toEqual({ goals: 2, assists: 0, redCards: 0 });
     });
 
-    it('accumulates an own goal against the event row player (O4)', () => {
+    it('does not count an own goal (O5 — recognized, deliberately deferred)', () => {
       const index = new AppearanceEventIndex([key(1, 101)]);
-      expect(index.accumulate(key(1, 101), event('own_goal'))).toEqual({ goals: 1, assists: 0, redCards: 0 });
+      expect(index.accumulate(key(1, 101), event('own_goal'))).toEqual({ goals: 0, assists: 0, redCards: 0 });
     });
 
     it('does not count a shootout goal (O3)', () => {
@@ -790,9 +1090,23 @@ The whole test file is written before any production code, then the module is cr
       expect(index.accumulate(key(1, 101), event('other'))).toEqual({ goals: 0, assists: 0, redCards: 0 });
     });
 
-    it('accumulates an assist', () => {
+    it('accumulates an assist carried on its own event row (A1)', () => {
+      // The measured dataset has no `assist` event type: assists arrive as a
+      // player_assist_id on a goal row, and the seed emits a SEPARATE event
+      // with type 'other' against the assister's own appearance key.
+      const index = new AppearanceEventIndex([key(1, 101), key(1, 202)]);
+      index.accumulate(key(1, 101), event('goal'));
+      expect(index.accumulate(key(1, 202), event('other', true))).toEqual({
+        goals: 0,
+        assists: 1,
+        redCards: 0,
+      });
+    });
+
+    it('drops an assist whose appearance row does not exist', () => {
       const index = new AppearanceEventIndex([key(1, 101)]);
-      expect(index.accumulate(key(1, 101), event('goal', true))).toEqual({ goals: 1, assists: 1, redCards: 0 });
+      expect(index.accumulate(key(1, 999), event('other', true))).toBeUndefined();
+      expect(index.size).toBe(1);
     });
 
     it('returns undefined for an event with no matching appearance row', () => {
@@ -808,17 +1122,19 @@ The whole test file is written before any production code, then the module is cr
     });
 
     it('separates the same player in two different games', () => {
+      // Both keys are indexed, so the second goal must land on key(2,101) and
+      // NOT continue key(1,101)'s total. Asserting 1 here is what proves the
+      // games are separate: a shared bucket would report 2.
       const index = new AppearanceEventIndex([key(1, 101), key(2, 101)]);
       index.accumulate(key(1, 101), event('goal'));
-      expect(index.accumulate(key(2, 101), event('goal'))).toEqual({ goals: 0, assists: 0, redCards: 0 });
+      expect(index.accumulate(key(2, 101), event('goal'))).toEqual({ goals: 1, assists: 0, redCards: 0 });
     });
 
     it('accumulates multiple events for the same appearance', () => {
       const index = new AppearanceEventIndex([key(1, 101)]);
       index.accumulate(key(1, 101), event('goal'));
-      index.accumulate(key(1, 101), event('goal', true));
       index.accumulate(key(1, 101), event('second_yellow'));
-      expect(index.accumulate(key(1, 101), event('goal', true))).toEqual({ goals: 2, assists: 2, redCards: 1 });
+      expect(index.accumulate(key(1, 101), event('goal'))).toEqual({ goals: 2, assists: 0, redCards: 1 });
     });
 
     it('leaves a game whose every event row is unjoinable at zero', () => {
@@ -850,6 +1166,61 @@ The whole test file is written before any production code, then the module is cr
       const row: FullAppearanceRow = { gameId: 1, playerId: 101, goals: 0, assists: 0, redCards: 0 };
       index.finalize([row]);
       expect(row.goals).toBe(0);
+    });
+
+    // Covers `finalize`'s `if (totals === undefined) return appearance;` arm —
+    // the one branch the other 19 cases leave untaken, which otherwise holds
+    // branches at 93.33% against a 95% gate. Task 5 finalizes exactly the rows
+    // the index was built from, so the arm is defensive; a row carrying
+    // NON-ZERO pre-existing totals is used so the assertion distinguishes
+    // "passed through unchanged" from "reset to zero".
+    it('passes through an appearance row the index never saw', () => {
+      const index = new AppearanceEventIndex([key(1, 101)]);
+      index.accumulate(key(1, 101), event('goal'));
+      const unindexed: FullAppearanceRow = { gameId: 9, playerId: 999, goals: 7, assists: 3, redCards: 2 };
+      expect(index.finalize([unindexed])).toEqual([
+        { gameId: 9, playerId: 999, goals: 7, assists: 3, redCards: 2 },
+      ]);
+    });
+
+    // The generic signature on `finalize` exists for exactly this shape: Task 5
+    // hands it rows carrying clubId/number/type/position/isCaptain and feeds the
+    // result to `toAppearanceData`, which reads all five. A `FullAppearanceRow[]`
+    // return type would drop them at compile time (TS2322). Asserting they
+    // survive makes the spread's column preservation falsifiable rather than
+    // incidental.
+    it("preserves the caller's extra columns while writing the totals", () => {
+      const index = new AppearanceEventIndex([key(1, 101)]);
+      index.accumulate(key(1, 101), event('goal'));
+      expect(
+        index.finalize([
+          {
+            gameId: 1,
+            playerId: 101,
+            clubId: 55,
+            number: 10,
+            type: 'starter',
+            position: 'GK',
+            isCaptain: true,
+            goals: 0,
+            assists: 0,
+            redCards: 0,
+          },
+        ]),
+      ).toEqual([
+        {
+          gameId: 1,
+          playerId: 101,
+          clubId: 55,
+          number: 10,
+          type: 'starter',
+          position: 'GK',
+          isCaptain: true,
+          goals: 1,
+          assists: 0,
+          redCards: 0,
+        },
+      ]);
     });
   });
   ```
@@ -885,9 +1256,11 @@ The whole test file is written before any production code, then the module is cr
     /** Classification from classifyEvent(). 'other' means "not recognised". */
     type: ParsedEventType;
     /**
-     * True when the CSV `type` column marks this row as an assist. ParsedEventType
-     * has no 'assist' member, so this flag is carried separately rather than
-     * widening the frozen event-type enum.
+     * True when this row contributes an assist. Measured: the dataset has no
+     * `assist` event type, so the seed emits a separate row carrying
+     * `type: 'other', isAssist: true` against the ASSISTER's appearance key
+     * (A1). That is why the flag exists separately rather than as an enum
+     * member — and why the scorer and the assister are indexed independently.
      */
     isAssist: boolean;
   }
@@ -937,13 +1310,19 @@ The whole test file is written before any production code, then the module is cr
       switch (event.type) {
         case 'goal':
         case 'penalty':
-        case 'own_goal':
-          // O4: an own goal is attributed to the player_id on the event row.
           totals.goals += 1;
           break;
         case 'red_card':
         case 'second_yellow':
           totals.redCards += 1;
+          break;
+        case 'own_goal':
+          // O5: recognized so the label shows up in the seed's breakdown, but
+          // deliberately NOT counted. 6,729 measured rows; whether player_id is
+          // the scorer or the conceder is unverifiable from this dataset, so no
+          // player is credited a goal they may not have scored. Revisit with
+          // O4 once the dataset owner confirms the semantics — this switch is
+          // the only place that changes.
           break;
         case 'shootout_goal':
           // O3: penalty-shootout goals are deliberately NOT counted.
@@ -961,18 +1340,26 @@ The whole test file is written before any production code, then the module is cr
     }
 
     /** Merge accumulated totals back onto the appearance rows for the DB write. */
-    finalize(appearances: FullAppearanceRow[]): FullAppearanceRow[] {
-      return appearances.map((appearance) => {
+    finalize<T extends FullAppearanceRow>(rows: T[]): T[] {
+      return rows.map((appearance) => {
         const totals = this.totals.get(compositeKey(appearance.gameId, appearance.playerId));
         if (totals === undefined) return appearance;
-        return { ...appearance, goals: totals.goals, assists: totals.assists, redCards: totals.redCards };
+        return { ...appearance, ...totals };
       });
     }
   }
 
   /**
-   * Both ids are non-negative integers with no separator characters, so a colon
-   * cannot collide across (gameId, playerId) pairs.
+   * Both ids are assumed to be non-negative integers with no separator
+   * characters, so a colon cannot collide across (gameId, playerId) pairs.
+   *
+   * "Assumed", not checked: the ids arrive from `Number(...)` over CSV text, so
+   * a malformed cell would yield NaN and merge every such row into one bucket.
+   * That failure is absent-or-crash rather than silent — a NaN appearance
+   * reaches `prisma.appearance.createMany` and throws on an Int column, and a
+   * NaN-only event row simply misses every appearance and is dropped — but the
+   * caller is responsible for the invariant, and Task 5 guards it with
+   * `Number.isInteger` before accumulating.
    */
   function compositeKey(gameId: number, playerId: number): string {
     return `${gameId}:${playerId}`;
@@ -985,7 +1372,11 @@ The whole test file is written before any production code, then the module is cr
   cd backend && npx vitest run src/__tests__/unit/appearanceEventJoin.test.ts
   ```
 
-  Expected GREEN: `Test Files 1 passed (1)`, `Tests 18 passed (18)`.
+  Expected GREEN: `Test Files 1 passed (1)`, `Tests 21 passed (21)`.
+
+  The own-goal case asserts **zero**, not one (O5). That single expectation is
+  the whole of the deferral: flip it and add `case 'own_goal'` to the goals
+  branch when the semantics are confirmed.
 
 - [ ] **Step 4.5: Refactor check — prove the map cannot grow.**
 
@@ -1005,7 +1396,10 @@ The whole test file is written before any production code, then the module is cr
   git commit -m "feat(backend): add streaming appearance-event join index"
   ```
 
-**Verify:** `cd backend && npx vitest run --coverage src/__tests__/unit/appearanceEventJoin.test.ts` shows ≥95% on all four metrics.
+**Verify:** read the per-file row for `src/lib/appearanceEventJoin.ts` out of
+`backend/coverage/coverage-summary.json` and confirm ≥95% on all four metrics,
+for the same reason as Task 3's Verify: a single-file run's exit code is not a
+pass signal.
 
 ---
 
@@ -1014,7 +1408,7 @@ The whole test file is written before any production code, then the module is cr
 No unit tests here: `backend/prisma/seed.ts` sits outside `src/`, so `backend/vitest.config.ts:18` does not cover it and there is no seed test harness. The logic is already tested in Task 4; what is left is I/O wiring, which is validated by type-check, lint, and the dry run in Task 6.
 
 **Files:**
-- Modify: `backend/prisma/seed.ts` — imports (`:3`), `Appearance` interface (`:42-50`), `toAppearanceData` (`:340-350`), new `processGameEventsDataset` function, new `ASSIST_EVENT_TYPE` constant, `main()` (`:400-403`, `:473-496`)
+- Modify: `backend/prisma/seed.ts` — imports (`:3`), `Appearance` interface (`:42-50`), `toAppearanceData` (`:340-350`), new `processGameEventsDataset` function, new `SCORING_TYPES` constant, `main()` (`:400-403`, `:473-496`)
 
 **Interfaces:**
 - Consumes: `AppearanceEventIndex` and `classifyEvent` / `EventCsvRow` from `../src/lib/eventMapping` and `../src/lib/appearanceEventJoin`.
@@ -1046,10 +1440,30 @@ No unit tests here: `backend/prisma/seed.ts` sits outside `src/`, so `backend/vi
   In `processGameLineupsDataset`, the `appearances.push({ … })` call at lines 171-179, add three fields:
 
   ```ts
+        // A lineup row with an unparseable game_id/player_id must be dropped,
+        // not pushed: `Number('')` is 0 and a malformed cell is NaN, and a NaN
+        // key would be indexed by AppearanceEventIndex and could silently
+        // absorb malformed event rows into one bucket. Every measured lineup
+        // row has positive integer ids, so this drops nothing in practice.
+        //
+        // Counted, not warned per row: a corrupt file would emit one warning per
+        // bad line and bury the game_events.csv breakdown further down, which is
+        // the operator's only diagnostic. Five is the point at which per-row
+        // detail is worth the noise; past that the count is what matters.
+        const gameId = Number(row.game_id);
+        const playerId = Number(row.player_id);
+        if (!Number.isInteger(gameId) || gameId <= 0 || !Number.isInteger(playerId) || playerId <= 0) {
+            unusableLineupIds++;
+            if (unusableLineupIds <= 5) {
+                console.warn(`lineups: skipping row with unusable ids (game_id=${row.game_id}, player_id=${row.player_id})`);
+            }
+            continue;
+        }
+
         appearances.push({
-            gameId: Number(row.game_id),
+            gameId,
             clubId: Number(row.club_id),
-            playerId: Number(row.player_id),
+            playerId,
             number: Number(row.number),
             type: row.type,
             position: row.position,
@@ -1059,6 +1473,24 @@ No unit tests here: `backend/prisma/seed.ts` sits outside `src/`, so `backend/vi
             redCards: 0,
         });
   ```
+
+  Declare the counter alongside the other `processGameLineupsDataset` locals, next
+  to `appearances`:
+
+  ```ts
+      let unusableLineupIds = 0;
+  ```
+
+  and report the total after the loop, so a suppressed flood is still visible:
+
+  ```ts
+      if (unusableLineupIds > 0) {
+          console.warn(`lineups: skipped ${unusableLineupIds} row(s) with unusable game_id/player_id.`);
+      }
+  ```
+
+  Use `console.warn` throughout, never `console.error`: one bad lineup row must
+  not fail the seed, and the operator needs to see that rows were dropped.
 
   These are placeholders. `AppearanceEventIndex.finalize` replaces them before the insert.
 
@@ -1077,20 +1509,34 @@ No unit tests here: `backend/prisma/seed.ts` sits outside `src/`, so `backend/vi
   import { AppearanceEventIndex } from '../src/lib/appearanceEventJoin';
   ```
 
-- [ ] **Step 5.4: Add the assist constant.**
+- [ ] **Step 5.4: Add the scoring-type guard.**
+
+  There is **no** `assist` event type in the measured dataset — the original
+  `ASSIST_EVENT_TYPE = 'assist'` constant matched zero rows and would have left
+  `Appearance.assists` identically zero. Assists arrive as a `player_assist_id`
+  on a goal row (188,278 of 247,803 goal rows).
 
   Add immediately above `processGameEventsDataset`:
 
   ```ts
   /**
-   * The raw `type` value in game_events.csv that marks an assist row.
+   * Classifications that can carry an assist.
    *
-   * Measured, not assumed — `ParsedEventType` has no 'assist' member, so the
-   * seed matches this literal instead. Regenerate with
-   * `npm run measure-events -w backend` and correct this constant if the
-   * measured `type` vocabulary says otherwise.
+   * Measured: every row with a non-empty `player_assist_id` has raw
+   * `type = Goals`, so no card row can inflate `assists` today. But this guard
+   * is **not** the no-op that fact suggests — it tests the CLASSIFIED type, and
+   * `own_goal` is absent, so it deliberately drops the **3,351** own-goal rows
+   * that carry an assister.
+   *
+   * That exclusion is intentional and is the coherent companion to O5: O5
+   * already declines to trust own-goal rows because attribution is unverifiable
+   * from this dataset, so crediting an assist out of them would take a stat from
+   * a row we have refused to trust. The assist itself is arguably unambiguous,
+   * which is why the exclusion is written down here rather than left implicit.
+   * Admitting those assists later is the one-token change
+   * `SCORING_TYPES.add('own_goal')` and must be paired with an O4 ruling.
    */
-  const ASSIST_EVENT_TYPE = 'assist';
+  const SCORING_TYPES = new Set(['goal', 'penalty']);
   ```
 
 - [ ] **Step 5.5: Add the streaming reader.**
@@ -1125,6 +1571,7 @@ No unit tests here: `backend/prisma/seed.ts` sits outside `src/`, so `backend/vi
       const byType = new Map<string, number>();
       let read = 0;
       let matched = 0;
+      let assists = 0;
 
       for await (const row of parser) {
           read++;
@@ -1137,28 +1584,86 @@ No unit tests here: `backend/prisma/seed.ts` sits outside `src/`, so `backend/vi
               type: String(row.type ?? ''),
               description: String(row.description ?? ''),
               minute: row.minute === undefined ? undefined : String(row.minute),
+              player_assist_id: String(row.player_assist_id ?? ''),
           };
 
           const type = classifyEvent(event);
           byType.set(type, (byType.get(type) ?? 0) + 1);
 
-          const totals = index.accumulate(
-              { gameId: Number(event.game_id), playerId: Number(event.player_id) },
-              { type, isAssist: event.type.trim().toLowerCase() === ASSIST_EVENT_TYPE },
-          );
+          const gameId = Number(event.game_id);
+          const playerId = Number(event.player_id);
+
+          // `compositeKey` assumes two positive integers and cannot verify that.
+          // `Number('')` is 0, `Number('0x10')` is 16, and a malformed cell yields NaN —
+          // any of which would collide every such row into a single composite-key bucket.
+          // The `> 0` half matters: `Number.isInteger(0)` is true, so an empty cell would
+          // otherwise key as "0:<playerId>". Skipping the row is the honest outcome: an
+          // unjoinable row is a normal, counted drop, whereas a collision would silently
+          // merge two appearances. Both values are positive integers for all 1,274,469
+          // measured rows, so this changes no measured count. `read++` and `byType.set()`
+          // have already run above, so the breakdown still counts these rows and they
+          // land in the `read - matched` unjoinable total rather than vanishing.
+          if (!Number.isInteger(gameId) || gameId <= 0 || !Number.isInteger(playerId) || playerId <= 0) {
+              continue;
+          }
+
+          const totals = index.accumulate({ gameId, playerId }, { type, isAssist: false });
 
           if (totals !== undefined) matched++;
+
+          // A1: the assist belongs to a DIFFERENT player's appearance row, so it
+          // is a second, synthetic event. Skipped when the assister is the
+          // scorer (2,537 measured rows) and when either id is not numeric —
+          // an unjoinable key is dropped by accumulate(), which returns
+          // undefined without touching the map (R4).
+          //
+          // Deliberately NOT gated on the scorer's join succeeding: a goal by a
+          // substitute absent from the filtered appearance set (R3) still names a
+          // real assister, and that assist genuinely happened. Gating it would
+          // silently discard a verifiable fact. Consequence: `assists` is NOT a
+          // subset of `matched` — a row can increment `assists` without
+          // incrementing `matched`, and that is correct, not a leak.
+          const assisterId = String(row.player_assist_id ?? '').trim();
+          if (assisterId !== '' && SCORING_TYPES.has(type)) {
+              const assisterPlayerId = Number(assisterId);
+              if (
+                  Number.isInteger(assisterPlayerId)
+                  && assisterPlayerId > 0
+                  && assisterPlayerId !== playerId
+                  && index.accumulate({ gameId, playerId: assisterPlayerId }, { type: 'other', isAssist: true }) !== undefined
+              ) {
+                  assists++;
+              }
+          }
       }
 
       const breakdown = [...byType.entries()].sort((a, b) => b[1] - a[1]);
-      console.log(`game_events.csv: ${read} rows read, ${matched} joined to an appearance, ${read - matched} unjoinable.`);
+      console.log(`game_events.csv: ${read} rows read, ${matched} joined to an appearance, ${read - matched} unjoinable, ${assists} assists credited.`);
       console.log(`game_events.csv classified as: ${breakdown.map(([type, n]) => `${type}=${n}`).join(' ')}`);
   }
   ```
 
   The `byType` breakdown is the operator's only view of what the vocabulary
-  produced. A large `other=` count means the decision table missed a family of
-  rows — stop and revisit Task 3 Step 3.8 before shipping.
+  produced. Measured against the current dataset it must show the eight
+  authoritative buckets from Global Constraints:
+
+  ```
+  game_events.csv classified as: substitution=631339 yellow_card=362114 goal=219184 penalty=21890 shootout_goal=13574 red_card=9897 second_yellow=9742 own_goal=6729
+  ```
+
+  **The order is descending by count, not the Global Constraints table order.**
+  The code in Step 5.5 sorts with `.sort((a, b) => b[1] - a[1])`, so
+  `substitution` (631,339) precedes `yellow_card` (362,114). An earlier draft
+  of this section listed the buckets in table order, which this code cannot
+  print; the values were right and only the sequence was wrong. Assert the
+  eight `type=count` **pairs**, in whichever order the sort produces.
+
+  Those eight sum to exactly 1,274,469, the full row count, and the same eight
+  pairs are asserted in Task 6 — this section and that one must agree. In
+  particular `own_goal` **must appear**; an earlier draft of this section
+  omitted it and showed a 1,273,469-row total. A non-zero `other=` means the
+  decision table missed a family of rows — stop and revisit Task 3 Step 3.8
+  before shipping.
 
 - [ ] **Step 5.6: Write the columns in `toAppearanceData`.**
 
@@ -1232,10 +1737,14 @@ No unit tests here: `backend/prisma/seed.ts` sits outside `src/`, so `backend/vi
 - [ ] **Step 5.9: Confirm the schema was not touched.**
 
   ```bash
-  git diff --stat HEAD~3 -- backend/prisma/schema.prisma backend/prisma/migrations
+  git diff --stat origin/main -- backend/prisma/schema.prisma backend/prisma/migrations
   ```
 
-  Expected: empty output. If a migration appeared, v1.0.1 has overstepped into v1.0.2's budget.
+  Expected: empty output. Use **`origin/main`**, not `main` — there is no local
+  `main` ref in this clone, so `git diff main` fails outright. The merge base is
+  `7f2ebf7`, so this checks the whole v1.0.1 branch; `HEAD~N` would drift as fix
+  waves land. If a migration appeared, v1.0.1 has overstepped into v1.0.2's
+  budget.
 
 - [ ] **Step 5.10: Commit.**
 
@@ -1256,6 +1765,21 @@ No unit tests here: `backend/prisma/seed.ts` sits outside `src/`, so `backend/vi
 **Interfaces:**
 - Consumes: everything above.
 - Produces: the `## v1.0.1` CHANGELOG section that `scripts/src/release.ts:8` `VERSION_PATTERN` and `findSection` require. No code symbol.
+
+**Gate posture — read before starting.** Task 5 could not observe any of its own
+numbers. It performs no database write, and the seed run is this task's job, so
+the eight-bucket breakdown, `matched`, `unjoinable` and `assists` are **all still
+unverified against the real dataset**. Every number below is a hard gate, not a
+sanity check: an unexplained difference is a stop-and-investigate, never a
+tolerance to be accepted. Nothing here may be waved through as "close enough".
+
+**Validation coverage gap to state in the report.** `backend/prisma/` is not
+linted by any gate — the repo's `lint` script is `eslint backend/src/`, and
+`seed.ts` and `measure-event-vocabulary.ts` have never been in scope. So
+"lint passed" says nothing about the seed. Its only automated gate is
+`tsc --noEmit -p prisma/tsconfig.json`, which *does* include `seed.ts`. Do not
+widen the lint target inside v1.0.1: it would surface pre-existing warnings in
+files unrelated to this feature. Record it as a follow-up instead.
 
 **Steps:**
 
@@ -1290,15 +1814,88 @@ No unit tests here: `backend/prisma/seed.ts` sits outside `src/`, so `backend/vi
   Expected output includes:
 
   ```
-  game_events.csv: <n> rows read, <m> joined to an appearance, <u> unjoinable.
-  game_events.csv classified as: red_card=<n> second_yellow=<n> goal=<n> …
+  game_events.csv: 1274469 rows read, <m> joined to an appearance, <u> unjoinable, <a> assists credited.
+  game_events.csv classified as: substitution=631339 yellow_card=362114 goal=219184 penalty=21890 shootout_goal=13574 red_card=9897 second_yellow=9742 own_goal=6729
   ```
 
-  **Check the numbers against the §3.3 baseline before accepting them:**
-  - `red_card` + `second_yellow` combined should be ≈ 3,097 + ~2,300 ≈ 5,400.
-    A number near 3,097 means the second-yellow matcher is not firing — stop.
-  - `other=` should be a small fraction of the total. A large `other=` means
-    Task 3 Step 3.8 was not satisfied — stop and revisit the decision table.
+  The eight buckets print in **descending count** order (Step 5.5 sorts with
+  `.sort((a, b) => b[1] - a[1])`), so `substitution` precedes `yellow_card`.
+  Assert the eight `type=count` pairs, not a fixed sequence.
+
+  **Check the numbers against the breakdown table in Global Constraints before
+  accepting them:**
+  - `red_card` + `second_yellow` must be **19,639** (9,897 + 9,742). A number
+    near 3,097 means the original un-anchored matcher is still in place — stop.
+  - `own_goal` must be **6,729**, not 0. Zero means the hyphen spelling is
+    unrecognised and those rows are being credited as ordinary goals — stop.
+  - `other=` must be **exactly 0**. Anything else means the decision table
+    missed a family of rows — stop and revisit Task 3 Step 3.8.
+  - `assists credited` has an exact measured ceiling of **182,390**:
+
+    | term | rows |
+    |---|---|
+    | rows with a non-empty `player_assist_id` | 188,278 |
+    | less self-assists (`player_assist_id === player_id`) | −2,537 |
+    | less assisted **own-goal** rows, excluded by `SCORING_TYPES` | −3,351 |
+    | **ceiling** | **182,390** |
+
+    The two subtrahends were confirmed **disjoint** by direct scan, not assumed:
+    of the 3,351 assisted own-goal rows, **0** have
+    `player_assist_id === player_id`. Had any overlapped, the subtraction would
+    have double-counted and the true ceiling would have been higher. An own
+    goal's assister is the opponent, never the conceder, which is why this is
+    the expected answer.
+
+    The ceiling is a **whole-file** figure: it bounds assists over all
+    1,274,469 rows, but the index only holds the ~10% of events whose
+    `game_id` is one of the ~10,200 seeded games. Measured on this dataset the
+    seed credited **20,618** — 11.3% of the ceiling, consistent with the
+    10.45% overall join rate (`133,241 / 1,274,469`). So "below 182,390" is
+    necessary but nowhere near sufficient: an earlier draft of this step called
+    any downward figure acceptable and described a *small* number as the
+    "not firing" signal, which 20,618 would have tripped while being correct.
+    The real "not firing" signal is **exactly 0**.
+
+    Two non-obvious facts about this number, both deliberate:
+    - **`assists` is NOT a subset of `matched`.** A goal by a substitute absent
+      from the filtered appearance set still names a real assister, so a row can
+      increment `assists` without incrementing `matched`. Do not assert
+      `assists <= matched`.
+    - **The 3,351 assisted own-goal rows contribute nothing.** `own_goal` is not
+      in `SCORING_TYPES`, so they credit neither a goal (O5) nor an assist. That
+      is intentional: O5 already declares own-goal rows untrustworthy because
+      attribution is unverifiable, and crediting an assist out of a row we have
+      declined to trust would be incoherent. Admitting them later is the
+      one-token change `SCORING_TYPES.add('own_goal')`, and it must be paired
+      with an O4 ruling.
+  - **`1274469 rows read` is a literal assertion, not a shape check.** A truncated
+    or partially downloaded CSV ends the stream *without error*, and the
+    breakdown still prints all eight buckets with `other=0` — a proportionally
+    shrunken but structurally healthy-looking distribution. Only the row count
+    reveals it. If this number is anything but 1,274,469, **stop** and re-run
+    `npm run data-pipeline` before investigating anything else.
+  - **Confirm the file was found.** A missing `game_events.csv` is a `warn`, not
+    an error: the seed proceeds, wipes every table, and inserts zeros for all
+    three columns while still exiting 0. `scripts/data/` is gitignored, so a
+    fresh clone takes this path. Assert the events line is present in the output
+    rather than inferring success from exit 0.
+
+  **Verify by exit code and row counts, not by log text.** `console.log('Batch
+  done')` sits in `main()`'s `finally` block, so it prints even when the
+  transaction or an insert threw — a failed seed *reads* as a successful one in
+  the log. Do not grep for it as a success signal. (The exit code is trustworthy
+  in the other direction: `main()` is invoked bare with no `.catch()`, so Node's
+  default `--unhandled-rejections=throw` makes a rejected promise fatal and the
+  process exits non-zero. There is therefore no behavioural defect to fix here —
+  only a cosmetically misleading line in pre-existing v0.2.5 `try/finally`
+  structure, which is out of v1.0.1's scope.)
+
+  Still require row counts, because two failure modes *do* exit 0: a missing
+  events CSV (warn, then wipe and insert zeros) and a truncated one (silent EOF,
+  shrunken counts). The five `deleteMany` calls share a 120 s transaction
+  timeout, but the ~440 `createMany` batches sit **outside** that transaction
+  entirely, so a batch failure mid-insert can leave the database wiped and only
+  partially repopulated. Row counts are the only reliable check.
 
   Then verify the join landed:
 
@@ -1306,12 +1903,47 @@ No unit tests here: `backend/prisma/seed.ts` sits outside `src/`, so `backend/vi
   psql "$DATABASE_URL" -c "SELECT count(*) FILTER (WHERE goals > 0)      AS scorers,
                                   count(*) FILTER (WHERE assists > 0)    AS assisters,
                                   count(*) FILTER (WHERE redCards > 0)  AS sendings,
-                                  sum(goals)                              AS total_goals
+                                  sum(goals)                              AS total_goals,
+                                  sum(assists)                            AS total_assists
                            FROM \"Appearance\";"
   ```
 
-  Expected: `total_goals` is in the hundreds of thousands, `sendings` is
-  thousands, `scorers` is tens of thousands, and no column is zero.
+  Expected, as measured against a scratch database:
+
+  | column | expected | why |
+  |---|---|---|
+  | `scorers` | 22,336 | tens of thousands |
+  | `assisters` | 18,832 | tens of thousands |
+  | `sendings` | 1,630 | **not** the 19,639 whole-file figure — see below |
+  | `total_goals` | 25,871 | **not** "low hundreds of thousands" — see below |
+  | `total_assists` | 20,618 | equals the seed's `assists credited` exactly |
+
+  **These columns cannot approach the whole-file bucket counts, and an earlier
+  draft of this step expecting `total_goals`/`total_assists` in the "low
+  hundreds of thousands" and `sendings` in the "tens of thousands" was
+  unattainable by construction.** The breakdown counts all 1,274,469 event
+  rows; `Appearance` can only receive the rows whose `(game_id, player_id)`
+  lands on one of the 218,988 seeded **starting-lineup** appearances across
+  10,219 curated-team games. Measured join rates:
+
+  | family | whole file | joinable | landed |
+  |---|---|---|---|
+  | goals + penalties | 241,074 | 25,871 (10.7%) | `sum(goals)` 25,871 |
+  | sendings-off | 19,639 | 1,630 (8.3%) | `sum(redCards)` 1,630 |
+  | assists | ≤182,390 | 20,618 (11.3%) | `sum(assists)` 20,618 |
+  | all events | 1,274,469 | 133,241 (10.45%) | — |
+
+  Only **146,341 of 1,274,469** event rows (11.5%) even name a seeded game.
+  So the honest assertions are: **no column is zero**, `sum(goals)` and
+  `sum(assists)` are tens of thousands, `sendings` is in the low thousands,
+  and `sum(assists)` equals the seed's own `assists credited`. Do **not**
+  assert `sum(redCards) ≈ 19,639`; that is the whole-file total and it exceeds
+  the number of appearances that can hold one.
+
+  Verify by recomputation, not by eyeballing magnitudes: re-running the
+  classifier over `game_events.csv` against the `(game_id, player_id)` keys
+  read back out of `Appearance` must reproduce `sum(goals)`, `sum(assists)` and
+  `sum(redCards)` **exactly**. That is a real check; a range is not.
 
 - [ ] **Step 6.4: Confirm the safety property — no CSV, no change.**
 
@@ -1341,11 +1973,15 @@ No unit tests here: `backend/prisma/seed.ts` sits outside `src/`, so `backend/vi
     raised from 120s to 600s to cover the larger archive.
   - **`backend/prisma/measure-event-vocabulary.ts`** — re-runnable measurement
     of the real `type` / `description` vocabulary, run via
-    `npm run measure-events -w backend`. Prints the complete distinct inventory
-    plus a copy-pasteable `MEASURED_SENDING_OFF_DESCRIPTIONS` constant.
+    `npm run measure-events -w backend`. Prints the complete distinct inventory,
+    a completeness probe for unrecognised `Cards` rows, the `player_assist_id`
+    report, and a copy-pasteable `MEASURED_SENDING_OFF_DESCRIPTIONS` constant.
   - **`backend/src/lib/eventMapping.ts`** — pure, unit-tested mapping from CSV
-    vocabulary to `ParsedEventType`. Whitespace-tolerant, so the ~2,300
-    second-yellow dismissals a literal `Red card` match misses are counted.
+    vocabulary to `ParsedEventType`, built against the measured vocabulary: the
+    `type` column is plural and capitalised (`Cards` / `Goals` /
+    `Substitutions` / `Shootout`) and `description` is not a reliable type
+    signal. Whitespace-tolerant, and anchored so the `"Sco-RED"` and tournament
+    `"2."` substring traps cannot enter the dismissal set.
   - **`backend/src/lib/appearanceEventJoin.ts`** — `AppearanceEventIndex`, a
     streaming join bounded by the ~219k appearances rather than the ~1.27M
     event rows.
@@ -1363,8 +1999,19 @@ No unit tests here: `backend/prisma/seed.ts` sits outside `src/`, so `backend/vi
   - **Re-seed is a manual operator step.** `run_seed` defaults to `false`, so
     merging this patch changes nothing in production until the box is ticked.
     Until then the app runs on zeroed columns and renders no icons.
-  - **Shootout goals are not counted; own goals are attributed to the
-    `player_id` on the event row.** Both revisable against the measurement.
+  - **Measured, not predicted.** Against the 1,274,469-row file the eight
+    classifications are `yellow_card` 362,114 · `substitution` 631,339 ·
+    `goal` 219,184 · `penalty` 21,890 · `shootout_goal` 13,574 · `red_card`
+    9,897 · `second_yellow` 9,742 · `own_goal` 6,729 · `other` **0**.
+  - **Shootout goals are not counted** (13,574 rows).
+  - **Own goals are recognized but not counted** (6,729 rows) — deferred. Whether
+    `player_id` on an own-goal row is the scorer or the conceder cannot be
+determined from this dataset, so `sum(goals)` under-counts rather than credit
+  anyone a goal they may not have scored: 6,729 rows in the file, of which 871
+  are joinable to an appearance. Revisable in one `switch` branch.
+  - **Assists come from the `player_assist_id` column**, not from an event type;
+    there is no `assist` row in the file. Each is credited to the *assister's*
+    own appearance, and self-assists are skipped.
   - **Substitute goals remain unjoinable** — `Appearance.type` is
     `starting_lineup` for every row, so a substitute has no row to join to.
   ```
@@ -1408,35 +2055,37 @@ Revert the patch to **v0.2.5**. `git revert` the six commits, or reset to the pr
 ## Acceptance criteria
 
 1. `REQUIRED_FILES` contains `'game_events.csv'` and `scripts/data/game_events.csv` exists after `npm run data-pipeline`.
-2. `npm run measure-events -w backend` prints sections 1-6 and exits 0.
-3. `MEASURED_SENDING_OFF_DESCRIPTIONS` equals the tool's section-6 block verbatim, and `it.each` covers every entry.
+2. `npm run measure-events -w backend` prints sections 1-7 and exits 0.
+3. `MEASURED_SENDING_OFF_DESCRIPTIONS` equals the tool's section-6 block verbatim, holds exactly 33 entries, excludes `", Scored"` and every tournament-goal description, and `it.each` covers every entry.
 4. `isSendingOffDescription` is true for every entry in that list and for `'Red card'` under any spacing or case.
-5. `classifyEvent` returns `'shootout_goal'` for shootout rows and `accumulate` adds nothing for them (O3).
-6. `classifyEvent` returns `'own_goal'` for own-goal rows and `accumulate` increments `goals` for them (O4).
-7. `accumulate` returns `undefined` for a key that is not an appearance, and `index.size` is unchanged afterwards.
-8. `seed.ts` builds exactly one `AppearanceEventIndex` and never a structure over event rows.
-9. `git diff` shows no change to `backend/prisma/schema.prisma` and no new directory under `backend/prisma/migrations`.
-10. After a seed with the CSV present, `sum(goals)` over `Appearance` is non-zero and `redCards > 0` on some rows.
-11. After a seed with the CSV absent, the seed completes and all three columns are `0`.
-12. `cd backend && npm run test:coverage` passes the 95% global gate on all four metrics.
-13. `cd frontend && npm run test` passes unchanged.
-14. `npm run release -- --notes v1.0.1` prints the section body.
+5. `classifyEvent` returns `'shootout_goal'` for every `type = Shootout` row and `accumulate` adds nothing for them (O3).
+6. `classifyEvent` returns `'own_goal'` for the 6,729 `", Own-goal"` rows and `accumulate` increments **nothing** for them (O5).
+7. `classifyEvent` never returns `'other'` for any of the 1,274,469 measured rows.
+8. The eight classifications sum to exactly 1,274,469 with `other = 0`.
+9. `accumulate` returns `undefined` for a key that is not an appearance, and `index.size` is unchanged afterwards.
+10. `seed.ts` builds exactly one `AppearanceEventIndex` and never a structure over event rows.
+11. `git diff` shows no change to `backend/prisma/schema.prisma` and no new directory under `backend/prisma/migrations`.
+12. After a seed with the CSV present, `sum(goals)` over `Appearance` is non-zero, `sum(assists)` is non-zero, and `redCards > 0` on some rows.
+13. After a seed with the CSV absent, the seed completes and all three columns are `0`.
+14. `cd backend && npm run test:coverage` passes the 95% global gate on all four metrics.
+15. `cd frontend && npm run test` passes unchanged.
+16. `npm run release -- --notes v1.0.1` prints the section body.
 
 ## Validation plan
 
 | What | Command | Expected |
 |---|---|---|
 | Matcher unit tests | `cd backend && npx vitest run src/__tests__/unit/eventMapping.test.ts` | all pass, incl. `it.each` over the measured list |
-| Join unit tests | `cd backend && npx vitest run src/__tests__/unit/appearanceEventJoin.test.ts` | `Tests 18 passed (18)` |
-| Full backend gate | `cd backend && npm run test:coverage` | 13 files pass, ≥95% on all four metrics |
+| Join unit tests | `cd backend && npx vitest run src/__tests__/unit/appearanceEventJoin.test.ts` | `Tests 21 passed (21)` |
+| Full backend gate | `cd backend && npm run test:coverage` | 15 files pass, ≥95% on all four metrics |
 | Frontend untouched | `cd frontend && npm run test` | 9 files pass, no diff |
 | Backend type-check | `cd backend && npm run build` | exit 0 |
 | Seed type-check | `cd backend && npx tsc --noEmit -p prisma/tsconfig.json` | exit 0 |
 | Lint | `ESLINT_USE_FLAT_CONFIG=false npx eslint backend/src/` | no output |
-| Measurement | `npm run measure-events -w backend` | sections 1-6 |
-| Seed, CSV present | `npm run seed -w backend` | `… rows read, … joined … unjoinable.` + classification breakdown |
+| Measurement | `npm run measure-events -w backend` | sections 1-7, section 8 absent |
+| Seed, CSV present | `npm run seed -w backend` | `1274469 rows read`, the eight-bucket pairs above, no `other=`, `assists credited` = 20,618 |
 | Seed, CSV absent | `mv scripts/data/game_events.csv /tmp/ && npm run seed -w backend` | `game_events.csv not found; …` then a clean exit |
-| Data landed | `psql "$DATABASE_URL" -c "SELECT sum(goals) FROM \"Appearance\";"` | non-zero |
+| Data landed | `psql "$DATABASE_URL" -c "SELECT sum(goals), sum(assists) FROM \"Appearance\";"` | both non-zero |
 | No migration | `git diff --stat HEAD~3 -- backend/prisma/migrations` | empty |
 | Release note | `npm run release -- --notes v1.0.1` | section body |
 
@@ -1447,10 +2096,11 @@ Revert the patch to **v0.2.5**. `git revert` the six commits, or reset to the pr
 | R2 — second-yellow trap | Wrong data, no error | Whitespace-normalized comparison, `MEASURED_SENDING_OFF_DESCRIPTIONS` from the real file, `it.each` over the whole list, plus Task 3 Step 3.8's three explicit review questions |
 | R4 — OOM | Seed dies on a 4 GB box | One `Map` sized by appearances; Task 4 Step 4.5 asserts no `.set(` outside the constructor; `accumulate` returns `undefined` before any mutation |
 | R3 — substitute goals | Under-counted scorers | Documented in Global Constraints, the CHANGELOG and Out of scope. Not fixed |
-| Measurement disagrees with §3.3's ~2,300 | The roadmap figure is stale | Task 3 Step 3.1 and Task 6 Step 6.3 both make the count a gate, not an assumption |
-| `other=` large after seeding | Silent under-count | The seed prints the classification breakdown (Step 5.5) and Task 6 Step 6.3 says stop |
+| Measurement disagrees with the amended tables | The decision table is stale again | Task 3 Step 3.1 and Task 6 Step 6.3 both make the counts a gate; section 8 of the tool must be empty |
+| `other=` non-zero after seeding | Silent under-count | The seed prints the classification breakdown (Step 5.5) and Task 6 Step 6.3 says stop; acceptance criterion 8 requires `other = 0` |
 | Single-zip download timeout | Seed step fails at 120s | Step 1.2 raises it to 600s. Beyond the frozen `REQUIRED_FILES` contract — flagged for `lead` |
-| O3/O4 wrong | Wrong goals | Reversible in `accumulate`'s `switch` alone; `eventMapping.ts` needs no change |
+| O3/O5 wrong | Wrong goals | Reversible in `accumulate`'s `switch` alone; `eventMapping.ts` needs no change |
+| Own-goal semantics resolved differently later | 6,729 goals either over- or under-counted | Deferred by O5. Flipping `case 'own_goal'` into the goals branch plus one test assertion is the entire change |
 
 ## Handoff to v1.0.2
 
