@@ -10,56 +10,49 @@ const key = (gameId: number, playerId: number): AppearanceKey => ({ gameId, play
 
 const event = (type: ParsedEventType, isAssist = false) => ({ type, isAssist });
 
+/**
+ * One row per event type a single event row can carry, with the totals that
+ * type must contribute to its appearance: every row is the same assertion, so
+ * the mapping is table-driven (and each case keeps its own test name) instead
+ * of eight near-identical bodies. The zero rows are the meaningful ones — the
+ * event types that must NOT be credited.
+ */
+const SINGLE_EVENT_CASES: ReadonlyArray<
+  readonly [
+    label: string,
+    type: ParsedEventType,
+    expected: { goals: number; assists: number; redCards: number },
+  ]
+> = [
+  ['a goal', 'goal', { goals: 1, assists: 0, redCards: 0 }],
+  // O5: an own goal is a recognised event type but deliberately deferred — it
+  // is not credited to anyone, in either direction.
+  ['an own goal (O5 — recognized, deliberately deferred)', 'own_goal', { goals: 0, assists: 0, redCards: 0 }],
+  // O3: shootout goals are outside this competition's goal tally.
+  ['a shootout goal (O3)', 'shootout_goal', { goals: 0, assists: 0, redCards: 0 }],
+  ['a direct red card', 'red_card', { goals: 0, assists: 0, redCards: 1 }],
+  // A second yellow is a sending-off, so it counts as a red card.
+  ['a second-yellow dismissal', 'second_yellow', { goals: 0, assists: 0, redCards: 1 }],
+  ['a yellow card', 'yellow_card', { goals: 0, assists: 0, redCards: 0 }],
+  ['a substitution', 'substitution', { goals: 0, assists: 0, redCards: 0 }],
+  ['an unrecognised row', 'other', { goals: 0, assists: 0, redCards: 0 }],
+];
+
 describe('AppearanceEventIndex', () => {
   it('reports the number of distinct indexed appearances', () => {
     const index = new AppearanceEventIndex([key(1, 101), key(1, 101), key(1, 102)]);
     expect(index.size).toBe(2);
   });
 
-  it('accumulates a goal', () => {
+  it.each(SINGLE_EVENT_CASES)('counts %s', (_label, type, expected) => {
     const index = new AppearanceEventIndex([key(1, 101)]);
-    expect(index.accumulate(key(1, 101), event('goal'))).toEqual({ goals: 1, assists: 0, redCards: 0 });
+    expect(index.accumulate(key(1, 101), event(type))).toEqual(expected);
   });
 
   it('accumulates a penalty goal', () => {
     const index = new AppearanceEventIndex([key(1, 101)]);
     index.accumulate(key(1, 101), event('penalty'));
     expect(index.accumulate(key(1, 101), event('penalty'))).toEqual({ goals: 2, assists: 0, redCards: 0 });
-  });
-
-  it('does not count an own goal (O5 — recognized, deliberately deferred)', () => {
-    const index = new AppearanceEventIndex([key(1, 101)]);
-    expect(index.accumulate(key(1, 101), event('own_goal'))).toEqual({ goals: 0, assists: 0, redCards: 0 });
-  });
-
-  it('does not count a shootout goal (O3)', () => {
-    const index = new AppearanceEventIndex([key(1, 101)]);
-    expect(index.accumulate(key(1, 101), event('shootout_goal'))).toEqual({ goals: 0, assists: 0, redCards: 0 });
-  });
-
-  it('counts a direct red card', () => {
-    const index = new AppearanceEventIndex([key(1, 101)]);
-    expect(index.accumulate(key(1, 101), event('red_card'))).toEqual({ goals: 0, assists: 0, redCards: 1 });
-  });
-
-  it('counts a second-yellow dismissal as a red card', () => {
-    const index = new AppearanceEventIndex([key(1, 101)]);
-    expect(index.accumulate(key(1, 101), event('second_yellow'))).toEqual({ goals: 0, assists: 0, redCards: 1 });
-  });
-
-  it('ignores a yellow card', () => {
-    const index = new AppearanceEventIndex([key(1, 101)]);
-    expect(index.accumulate(key(1, 101), event('yellow_card'))).toEqual({ goals: 0, assists: 0, redCards: 0 });
-  });
-
-  it('ignores a substitution', () => {
-    const index = new AppearanceEventIndex([key(1, 101)]);
-    expect(index.accumulate(key(1, 101), event('substitution'))).toEqual({ goals: 0, assists: 0, redCards: 0 });
-  });
-
-  it('ignores an unrecognised row', () => {
-    const index = new AppearanceEventIndex([key(1, 101)]);
-    expect(index.accumulate(key(1, 101), event('other'))).toEqual({ goals: 0, assists: 0, redCards: 0 });
   });
 
   it('accumulates an assist carried on its own event row (A1)', () => {
