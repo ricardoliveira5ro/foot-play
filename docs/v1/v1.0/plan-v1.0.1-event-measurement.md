@@ -1440,10 +1440,22 @@ No unit tests here: `backend/prisma/seed.ts` sits outside `src/`, so `backend/vi
   In `processGameLineupsDataset`, the `appearances.push({ … })` call at lines 171-179, add three fields:
 
   ```ts
+        // A lineup row with an unparseable game_id/player_id must be dropped,
+        // not pushed: `Number('')` is 0 and a malformed cell is NaN, and a NaN
+        // key would be indexed by AppearanceEventIndex and could silently
+        // absorb malformed event rows into one bucket. Every measured lineup
+        // row has positive integer ids, so this drops nothing in practice.
+        const gameId = Number(row.game_id);
+        const playerId = Number(row.player_id);
+        if (!Number.isInteger(gameId) || gameId <= 0 || !Number.isInteger(playerId) || playerId <= 0) {
+            console.warn(`lineups: skipping row with unusable ids (game_id=${row.game_id}, player_id=${row.player_id})`);
+            continue;
+        }
+
         appearances.push({
-            gameId: Number(row.game_id),
+            gameId,
             clubId: Number(row.club_id),
-            playerId: Number(row.player_id),
+            playerId,
             number: Number(row.number),
             type: row.type,
             position: row.position,
@@ -1453,6 +1465,9 @@ No unit tests here: `backend/prisma/seed.ts` sits outside `src/`, so `backend/vi
             redCards: 0,
         });
   ```
+
+  Keep `console.warn` rather than `console.error`: one bad lineup row must not
+  fail the seed, and the operator needs to see that a row was dropped.
 
   These are placeholders. `AppearanceEventIndex.finalize` replaces them before the insert.
 
@@ -1545,14 +1560,17 @@ No unit tests here: `backend/prisma/seed.ts` sits outside `src/`, so `backend/vi
           const gameId = Number(event.game_id);
           const playerId = Number(event.player_id);
 
-          // `compositeKey` assumes two non-negative integers and cannot verify
-          // that. `Number('')` is 0 and `Number('12.5')` / `Number('abc')` yield
-          // a fractional id or NaN, either of which would collide every such row
-          // into a single bucket. Skipping the row is the honest outcome: an
-          // unjoinable row is a normal, counted drop, whereas a collision would
-          // silently merge two appearances. Both values are integers for all
-          // 1,274,469 measured rows, so this changes no measured count.
-          if (!Number.isInteger(gameId) || !Number.isInteger(playerId)) {
+          // `compositeKey` assumes two positive integers and cannot verify that.
+// `Number('')` is 0, `Number('0x10')` is 16, and a malformed cell yields NaN —
+// any of which would collide every such row into a single composite-key bucket.
+// The `> 0` half matters: `Number.isInteger(0)` is true, so an empty cell would
+// otherwise key as "0:<playerId>". Skipping the row is the honest outcome: an
+// unjoinable row is a normal, counted drop, whereas a collision would silently
+// merge two appearances. Both values are positive integers for all 1,274,469
+// measured rows, so this changes no measured count. `read++` and `byType.set()`
+// have already run above, so the breakdown still counts these rows and they
+// land in the `read - matched` unjoinable total rather than vanishing.
+          if (!Number.isInteger(gameId) || gameId <= 0 || !Number.isInteger(playerId) || playerId <= 0) {
               continue;
           }
 
@@ -1570,6 +1588,7 @@ No unit tests here: `backend/prisma/seed.ts` sits outside `src/`, so `backend/vi
               const assisterPlayerId = Number(assisterId);
               if (
                   Number.isInteger(assisterPlayerId)
+                  && assisterPlayerId > 0
                   && assisterPlayerId !== playerId
                   && index.accumulate({ gameId, playerId: assisterPlayerId }, { type: 'other', isAssist: true }) !== undefined
               ) {
@@ -1585,11 +1604,18 @@ No unit tests here: `backend/prisma/seed.ts` sits outside `src/`, so `backend/vi
   ```
 
   The `byType` breakdown is the operator's only view of what the vocabulary
-  produced. Measured against the current dataset it must show
-  `yellow_card=361114 red_card=9897 second_yellow=9742 goal=225905
-  penalty=21898 shootout_goal=13574 substitution=631339` with **`other=0`**.
-  A non-zero `other=` means the decision table missed a family of rows — stop
-  and revisit Task 3 Step 3.8 before shipping.
+  produced. Measured against the current dataset it must show the eight
+  authoritative buckets from Global Constraints, in this order:
+
+  ```
+  game_events.csv classified as: yellow_card=362114 substitution=631339 goal=219184 penalty=21890 shootout_goal=13574 red_card=9897 second_yellow=9742 own_goal=6729
+  ```
+
+  Those eight sum to exactly 1,274,469, the full row count, and the same string
+  is asserted in Task 6 — this section and that one must agree. In particular
+  `own_goal` **must appear**; an earlier draft of this section omitted it and
+  showed a 1,273,469-row total. A non-zero `other=` means the decision table
+  missed a family of rows — stop and revisit Task 3 Step 3.8 before shipping.
 
 - [ ] **Step 5.6: Write the columns in `toAppearanceData`.**
 
