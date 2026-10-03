@@ -1445,10 +1445,18 @@ No unit tests here: `backend/prisma/seed.ts` sits outside `src/`, so `backend/vi
         // key would be indexed by AppearanceEventIndex and could silently
         // absorb malformed event rows into one bucket. Every measured lineup
         // row has positive integer ids, so this drops nothing in practice.
+        //
+        // Counted, not warned per row: a corrupt file would emit one warning per
+        // bad line and bury the game_events.csv breakdown further down, which is
+        // the operator's only diagnostic. Five is the point at which per-row
+        // detail is worth the noise; past that the count is what matters.
         const gameId = Number(row.game_id);
         const playerId = Number(row.player_id);
         if (!Number.isInteger(gameId) || gameId <= 0 || !Number.isInteger(playerId) || playerId <= 0) {
-            console.warn(`lineups: skipping row with unusable ids (game_id=${row.game_id}, player_id=${row.player_id})`);
+            unusableLineupIds++;
+            if (unusableLineupIds <= 5) {
+                console.warn(`lineups: skipping row with unusable ids (game_id=${row.game_id}, player_id=${row.player_id})`);
+            }
             continue;
         }
 
@@ -1466,8 +1474,23 @@ No unit tests here: `backend/prisma/seed.ts` sits outside `src/`, so `backend/vi
         });
   ```
 
-  Keep `console.warn` rather than `console.error`: one bad lineup row must not
-  fail the seed, and the operator needs to see that a row was dropped.
+  Declare the counter alongside the other `processGameLineupsDataset` locals, next
+  to `appearances`:
+
+  ```ts
+      let unusableLineupIds = 0;
+  ```
+
+  and report the total after the loop, so a suppressed flood is still visible:
+
+  ```ts
+      if (unusableLineupIds > 0) {
+          console.warn(`lineups: skipped ${unusableLineupIds} row(s) with unusable game_id/player_id.`);
+      }
+  ```
+
+  Use `console.warn` throughout, never `console.error`: one bad lineup row must
+  not fail the seed, and the operator needs to see that rows were dropped.
 
   These are placeholders. `AppearanceEventIndex.finalize` replaces them before the insert.
 
@@ -1583,6 +1606,13 @@ No unit tests here: `backend/prisma/seed.ts` sits outside `src/`, so `backend/vi
           // scorer (2,537 measured rows) and when either id is not numeric —
           // an unjoinable key is dropped by accumulate(), which returns
           // undefined without touching the map (R4).
+          //
+          // Deliberately NOT gated on the scorer's join succeeding: a goal by a
+          // substitute absent from the filtered appearance set (R3) still names a
+          // real assister, and that assist genuinely happened. Gating it would
+          // silently discard a verifiable fact. Consequence: `assists` is NOT a
+          // subset of `matched` — a row can increment `assists` without
+          // incrementing `matched`, and that is correct, not a leak.
           const assisterId = String(row.player_assist_id ?? '').trim();
           if (assisterId !== '' && SCORING_TYPES.has(type)) {
               const assisterPlayerId = Number(assisterId);
@@ -1689,13 +1719,14 @@ No unit tests here: `backend/prisma/seed.ts` sits outside `src/`, so `backend/vi
 - [ ] **Step 5.9: Confirm the schema was not touched.**
 
   ```bash
-  git diff --stat main -- backend/prisma/schema.prisma backend/prisma/migrations
+  git diff --stat origin/main -- backend/prisma/schema.prisma backend/prisma/migrations
   ```
 
-  Expected: empty output. `main` is this branch's merge base (`4e096f4`), so this
-  checks the whole v1.0.1 branch rather than a fixed number of commits back —
-  `HEAD~N` would drift as fix waves land. If a migration appeared, v1.0.1 has
-  overstepped into v1.0.2's budget.
+  Expected: empty output. Use **`origin/main`**, not `main` — there is no local
+  `main` ref in this clone, so `git diff main` fails outright. The merge base is
+  `7f2ebf7`, so this checks the whole v1.0.1 branch; `HEAD~N` would drift as fix
+  waves land. If a migration appeared, v1.0.1 has overstepped into v1.0.2's
+  budget.
 
 - [ ] **Step 5.10: Commit.**
 
