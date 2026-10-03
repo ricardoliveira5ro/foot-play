@@ -1561,15 +1561,15 @@ No unit tests here: `backend/prisma/seed.ts` sits outside `src/`, so `backend/vi
           const playerId = Number(event.player_id);
 
           // `compositeKey` assumes two positive integers and cannot verify that.
-// `Number('')` is 0, `Number('0x10')` is 16, and a malformed cell yields NaN —
-// any of which would collide every such row into a single composite-key bucket.
-// The `> 0` half matters: `Number.isInteger(0)` is true, so an empty cell would
-// otherwise key as "0:<playerId>". Skipping the row is the honest outcome: an
-// unjoinable row is a normal, counted drop, whereas a collision would silently
-// merge two appearances. Both values are positive integers for all 1,274,469
-// measured rows, so this changes no measured count. `read++` and `byType.set()`
-// have already run above, so the breakdown still counts these rows and they
-// land in the `read - matched` unjoinable total rather than vanishing.
+          // `Number('')` is 0, `Number('0x10')` is 16, and a malformed cell yields NaN —
+          // any of which would collide every such row into a single composite-key bucket.
+          // The `> 0` half matters: `Number.isInteger(0)` is true, so an empty cell would
+          // otherwise key as "0:<playerId>". Skipping the row is the honest outcome: an
+          // unjoinable row is a normal, counted drop, whereas a collision would silently
+          // merge two appearances. Both values are positive integers for all 1,274,469
+          // measured rows, so this changes no measured count. `read++` and `byType.set()`
+          // have already run above, so the breakdown still counts these rows and they
+          // land in the `read - matched` unjoinable total rather than vanishing.
           if (!Number.isInteger(gameId) || gameId <= 0 || !Number.isInteger(playerId) || playerId <= 0) {
               continue;
           }
@@ -1689,10 +1689,13 @@ No unit tests here: `backend/prisma/seed.ts` sits outside `src/`, so `backend/vi
 - [ ] **Step 5.9: Confirm the schema was not touched.**
 
   ```bash
-  git diff --stat HEAD~3 -- backend/prisma/schema.prisma backend/prisma/migrations
+  git diff --stat main -- backend/prisma/schema.prisma backend/prisma/migrations
   ```
 
-  Expected: empty output. If a migration appeared, v1.0.1 has overstepped into v1.0.2's budget.
+  Expected: empty output. `main` is this branch's merge base (`4e096f4`), so this
+  checks the whole v1.0.1 branch rather than a fixed number of commits back —
+  `HEAD~N` would drift as fix waves land. If a migration appeared, v1.0.1 has
+  overstepped into v1.0.2's budget.
 
 - [ ] **Step 5.10: Commit.**
 
