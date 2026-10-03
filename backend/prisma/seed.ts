@@ -216,9 +216,19 @@ async function processGameLineupsDataset(candidateGames: Game[], candidateGameId
 /**
  * Classifications that can carry an assist.
  *
- * Measured: every row with a non-empty `player_assist_id` is a `Goals` row,
- * so this guard is belt-and-braces rather than a filter. It exists so a
- * future dataset with an assister on a card row cannot inflate `assists`.
+ * Measured: every row with a non-empty `player_assist_id` has raw
+ * `type = Goals`, so no card row can inflate `assists` today. But this guard
+ * is **not** the no-op that fact suggests — it tests the CLASSIFIED type, and
+ * `own_goal` is absent, so it deliberately drops the **3,351** own-goal rows
+ * that carry an assister.
+ *
+ * That exclusion is intentional and is the coherent companion to O5: O5
+ * already declines to trust own-goal rows because attribution is unverifiable
+ * from this dataset, so crediting an assist out of them would take a stat from
+ * a row we have refused to trust. The assist itself is arguably unambiguous,
+ * which is why the exclusion is written down here rather than left implicit.
+ * Admitting those assists later is the one-token change
+ * `SCORING_TYPES.add('own_goal')` and must be paired with an O4 ruling.
  */
 const SCORING_TYPES = new Set(['goal', 'penalty']);
 
