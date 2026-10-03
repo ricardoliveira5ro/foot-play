@@ -139,6 +139,7 @@ async function processGamesDataset(allowedTeamIds: Set<Number>, candidateGames: 
 
 async function processGameLineupsDataset(candidateGames: Game[], candidateGameIds: Set<number>, appearances: Appearance[], games: Game[]) {
     const counts = new Map<string, number>();            
+    let unusableLineupIds = 0;
     
     const parser = createReadStream(path.join(__dirname, '../../scripts/data/game_lineups.csv')).pipe(
         parse({ columns: true, relax_column_count: true })
@@ -178,10 +179,18 @@ async function processGameLineupsDataset(candidateGames: Game[], candidateGameId
         // key would be indexed by AppearanceEventIndex and could silently
         // absorb malformed event rows into one bucket. Every measured lineup
         // row has positive integer ids, so this drops nothing in practice.
+        //
+        // Counted, not warned per row: a corrupt file would emit one warning per
+        // bad line and bury the game_events.csv breakdown further down, which is
+        // the operator's only diagnostic. Five is the point at which per-row
+        // detail is worth the noise; past that the count is what matters.
         const gameId = Number(row.game_id);
         const playerId = Number(row.player_id);
         if (!Number.isInteger(gameId) || gameId <= 0 || !Number.isInteger(playerId) || playerId <= 0) {
-            console.warn(`lineups: skipping row with unusable ids (game_id=${row.game_id}, player_id=${row.player_id})`);
+            unusableLineupIds++;
+            if (unusableLineupIds <= 5) {
+                console.warn(`lineups: skipping row with unusable ids (game_id=${row.game_id}, player_id=${row.player_id})`);
+            }
             continue;
         }
 
@@ -197,6 +206,10 @@ async function processGameLineupsDataset(candidateGames: Game[], candidateGameId
             assists: 0,
             redCards: 0,
         });
+    }
+
+    if (unusableLineupIds > 0) {
+        console.warn(`lineups: skipped ${unusableLineupIds} row(s) with unusable game_id/player_id.`);
     }
 }
 
@@ -281,6 +294,13 @@ async function processGameEventsDataset(index: AppearanceEventIndex): Promise<vo
         // scorer (2,537 measured rows) and when either id is not numeric —
         // an unjoinable key is dropped by accumulate(), which returns
         // undefined without touching the map (R4).
+        //
+        // Deliberately NOT gated on the scorer's join succeeding: a goal by a
+        // substitute absent from the filtered appearance set (R3) still names a
+        // real assister, and that assist genuinely happened. Gating it would
+        // silently discard a verifiable fact. Consequence: `assists` is NOT a
+        // subset of `matched` — a row can increment `assists` without
+        // incrementing `matched`, and that is correct, not a leak.
         const assisterId = String(row.player_assist_id ?? '').trim();
         if (assisterId !== '' && SCORING_TYPES.has(type)) {
             const assisterPlayerId = Number(assisterId);
