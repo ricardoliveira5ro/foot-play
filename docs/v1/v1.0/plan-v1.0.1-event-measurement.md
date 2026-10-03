@@ -1007,7 +1007,7 @@ gate is Step 6.1's full-suite run.
   export class AppearanceEventIndex {
     constructor(appearances: AppearanceKey[]);
     accumulate(key: AppearanceKey, event: ParsedEventRow): EventTotals | undefined;
-    finalize(appearances: FullAppearanceRow[]): FullAppearanceRow[];
+    finalize<T extends FullAppearanceRow>(rows: T[]): T[];
     get size(): number;
   }
   ```
@@ -1182,6 +1182,46 @@ gate is Step 6.1's full-suite run.
         { gameId: 9, playerId: 999, goals: 7, assists: 3, redCards: 2 },
       ]);
     });
+
+    // The generic signature on `finalize` exists for exactly this shape: Task 5
+    // hands it rows carrying clubId/number/type/position/isCaptain and feeds the
+    // result to `toAppearanceData`, which reads all five. A `FullAppearanceRow[]`
+    // return type would drop them at compile time (TS2322). Asserting they
+    // survive makes the spread's column preservation falsifiable rather than
+    // incidental.
+    it("preserves the caller's extra columns while writing the totals", () => {
+      const index = new AppearanceEventIndex([key(1, 101)]);
+      index.accumulate(key(1, 101), event('goal'));
+      expect(
+        index.finalize([
+          {
+            gameId: 1,
+            playerId: 101,
+            clubId: 55,
+            number: 10,
+            type: 'starter',
+            position: 'GK',
+            isCaptain: true,
+            goals: 0,
+            assists: 0,
+            redCards: 0,
+          },
+        ]),
+      ).toEqual([
+        {
+          gameId: 1,
+          playerId: 101,
+          clubId: 55,
+          number: 10,
+          type: 'starter',
+          position: 'GK',
+          isCaptain: true,
+          goals: 1,
+          assists: 0,
+          redCards: 0,
+        },
+      ]);
+    });
   });
   ```
 
@@ -1300,18 +1340,26 @@ gate is Step 6.1's full-suite run.
     }
 
     /** Merge accumulated totals back onto the appearance rows for the DB write. */
-    finalize(appearances: FullAppearanceRow[]): FullAppearanceRow[] {
-      return appearances.map((appearance) => {
+    finalize<T extends FullAppearanceRow>(rows: T[]): T[] {
+      return rows.map((appearance) => {
         const totals = this.totals.get(compositeKey(appearance.gameId, appearance.playerId));
         if (totals === undefined) return appearance;
-        return { ...appearance, goals: totals.goals, assists: totals.assists, redCards: totals.redCards };
+        return { ...appearance, ...totals };
       });
     }
   }
 
   /**
-   * Both ids are non-negative integers with no separator characters, so a colon
-   * cannot collide across (gameId, playerId) pairs.
+   * Both ids are assumed to be non-negative integers with no separator
+   * characters, so a colon cannot collide across (gameId, playerId) pairs.
+   *
+   * "Assumed", not checked: the ids arrive from `Number(...)` over CSV text, so
+   * a malformed cell would yield NaN and merge every such row into one bucket.
+   * That failure is absent-or-crash rather than silent — a NaN appearance
+   * reaches `prisma.appearance.createMany` and throws on an Int column, and a
+   * NaN-only event row simply misses every appearance and is dropped — but the
+   * caller is responsible for the invariant, and Task 5 guards it with
+   * `Number.isInteger` before accumulating.
    */
   function compositeKey(gameId: number, playerId: number): string {
     return `${gameId}:${playerId}`;
@@ -1324,7 +1372,7 @@ gate is Step 6.1's full-suite run.
   cd backend && npx vitest run src/__tests__/unit/appearanceEventJoin.test.ts
   ```
 
-  Expected GREEN: `Test Files 1 passed (1)`, `Tests 20 passed (20)`.
+  Expected GREEN: `Test Files 1 passed (1)`, `Tests 21 passed (21)`.
 
   The own-goal case asserts **zero**, not one (O5). That single expectation is
   the whole of the deferral: flip it and add `case 'own_goal'` to the goals
@@ -1496,6 +1544,17 @@ No unit tests here: `backend/prisma/seed.ts` sits outside `src/`, so `backend/vi
 
           const gameId = Number(event.game_id);
           const playerId = Number(event.player_id);
+
+          // `compositeKey` assumes two non-negative integers and cannot verify
+          // that. `Number('')` is 0 and `Number('12.5')` / `Number('abc')` yield
+          // a fractional id or NaN, either of which would collide every such row
+          // into a single bucket. Skipping the row is the honest outcome: an
+          // unjoinable row is a normal, counted drop, whereas a collision would
+          // silently merge two appearances. Both values are integers for all
+          // 1,274,469 measured rows, so this changes no measured count.
+          if (!Number.isInteger(gameId) || !Number.isInteger(playerId)) {
+              continue;
+          }
 
           const totals = index.accumulate({ gameId, playerId }, { type, isAssist: false });
 
@@ -1824,7 +1883,7 @@ Revert the patch to **v0.2.5**. `git revert` the six commits, or reset to the pr
 | What | Command | Expected |
 |---|---|---|
 | Matcher unit tests | `cd backend && npx vitest run src/__tests__/unit/eventMapping.test.ts` | all pass, incl. `it.each` over the measured list |
-| Join unit tests | `cd backend && npx vitest run src/__tests__/unit/appearanceEventJoin.test.ts` | `Tests 20 passed (20)` |
+| Join unit tests | `cd backend && npx vitest run src/__tests__/unit/appearanceEventJoin.test.ts` | `Tests 21 passed (21)` |
 | Full backend gate | `cd backend && npm run test:coverage` | 15 files pass, ≥95% on all four metrics |
 | Frontend untouched | `cd frontend && npm run test` | 9 files pass, no diff |
 | Backend type-check | `cd backend && npm run build` | exit 0 |
