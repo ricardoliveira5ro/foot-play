@@ -1827,7 +1827,14 @@ files unrelated to this feature. Record it as a follow-up instead.
     | less assisted **own-goal** rows, excluded by `SCORING_TYPES` | −3,351 |
     | **ceiling** | **182,390** |
 
-    The result is **below** that by however many rows are unjoinable, so any
+    The two subtrahends were confirmed **disjoint** by direct scan, not assumed:
+    of the 3,351 assisted own-goal rows, **0** have
+    `player_assist_id === player_id`. Had any overlapped, the subtraction would
+    have double-counted and the true ceiling would have been higher. An own
+    goal's assister is the opponent, never the conceder, which is why this is
+    the expected answer.
+
+    The result is **below** 182,390 by however many rows are unjoinable, so any
     figure in 182,390 downwards is expected. A tiny number means the
     `player_assist_id` path is not firing.
 
@@ -1857,14 +1864,20 @@ files unrelated to this feature. Record it as a follow-up instead.
 
   **Verify by exit code and row counts, not by log text.** `console.log('Batch
   done')` sits in `main()`'s `finally` block, so it prints even when the
-  transaction or an insert threw — a failed seed reads as a successful one. That
-  is pre-existing seed behaviour and out of v1.0.1's scope to change. Instead:
-  require exit code 0, require the `game_events.csv` lines above to be present,
-  and require the `Appearance` counts below to be non-zero and self-consistent.
-  The five `deleteMany` calls share a 120 s transaction timeout, but the ~440
-  `createMany` batches sit outside it on Prisma's per-call default — a failure
-  there leaves the database **wiped and partially repopulated** while still
-  exiting 0 and printing `Batch done`. Row counts are the only reliable check.
+  transaction or an insert threw — a failed seed *reads* as a successful one in
+  the log. Do not grep for it as a success signal. (The exit code is trustworthy
+  in the other direction: `main()` is invoked bare with no `.catch()`, so Node's
+  default `--unhandled-rejections=throw` makes a rejected promise fatal and the
+  process exits non-zero. There is therefore no behavioural defect to fix here —
+  only a cosmetically misleading line in pre-existing v0.2.5 `try/finally`
+  structure, which is out of v1.0.1's scope.)
+
+  Still require row counts, because two failure modes *do* exit 0: a missing
+  events CSV (warn, then wipe and insert zeros) and a truncated one (silent EOF,
+  shrunken counts). The five `deleteMany` calls share a 120 s transaction
+  timeout, but the ~440 `createMany` batches sit **outside** that transaction
+  entirely, so a batch failure mid-insert can leave the database wiped and only
+  partially repopulated. Row counts are the only reliable check.
 
   Then verify the join landed:
 
