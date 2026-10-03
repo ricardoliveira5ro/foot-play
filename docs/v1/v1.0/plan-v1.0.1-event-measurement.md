@@ -93,7 +93,7 @@
 - **R3 — substitute goals are unjoinable.** `Appearance.type` is `starting_lineup` for 100% of rows. A goal by a substitute has no row to join to. This is permanent and is documented, not fixed.
 - **O3 — shootout goals are NOT counted.** `classifyEvent` returns `'shootout_goal'`; `accumulate` adds nothing for it. **Amended:** detection keys off the `shootout` **type** value, because no description contains the word.
 - **O4 — SUPERSEDED by O5.** The original rule ("own goals are attributed to the event row's `player_id`") assumed rows spelled `own goal` / `own_goal`. Neither spelling exists. Do not implement O4.
-- **O5 — own goals are recognized but NOT counted (deferred).** `classifyEvent` returns `'own_goal'` for the 6,729 `", Own-goal"` rows so the label is visible in the seed's breakdown, and `accumulate` adds **nothing** for it — the same treatment as O3. `sum(goals)` therefore under-counts by 6,729 and no player is credited a goal they did not score. Revisit only once the dataset owner confirms whether `player_id` on an own-goal row is the scorer or the conceder; the change is reversible in `accumulate`'s `switch` alone.
+- **O5 — own goals are recognized but NOT counted (deferred).** `classifyEvent` returns `'own_goal'` for the 6,729 `", Own-goal"` rows so the label is visible in the seed's breakdown, and `accumulate` adds **nothing** for it — the same treatment as O3. `sum(goals)` therefore under-counts and no player is credited a goal they did not score. Measured: 6,729 own-goal rows exist in the file, but only **871** of them are joinable to a seeded appearance, so the shortfall `sum(goals)` actually carries is 871, not 6,729 — the same ~10% join rate as every other family (see Step 6.3). Revisit only once the dataset owner confirms whether `player_id` on an own-goal row is the scorer or the conceder; the change is reversible in `accumulate`'s `switch` alone.
 - **A1 — assists come from `player_assist_id`,** emitted by the seed as a separate synthetic assist event against the *assister's* appearance key, skipped when the assister is the scorer or the id is empty/non-numeric. This fits the frozen `ParsedEventRow.isAssist` flag without widening the frozen enum.
 - **Unknown rows count nowhere.** Anything `classifyEvent` cannot recognise becomes `'other'`, and `'other'` adds nothing to any column. The failure direction is *absent, not wrong*.
 - **The seed's shape is its own** (§3.2). It is a streaming join, not the request path. Do not copy a request-path shape in.
@@ -1645,17 +1645,25 @@ No unit tests here: `backend/prisma/seed.ts` sits outside `src/`, so `backend/vi
 
   The `byType` breakdown is the operator's only view of what the vocabulary
   produced. Measured against the current dataset it must show the eight
-  authoritative buckets from Global Constraints, in this order:
+  authoritative buckets from Global Constraints:
 
   ```
-  game_events.csv classified as: yellow_card=362114 substitution=631339 goal=219184 penalty=21890 shootout_goal=13574 red_card=9897 second_yellow=9742 own_goal=6729
+  game_events.csv classified as: substitution=631339 yellow_card=362114 goal=219184 penalty=21890 shootout_goal=13574 red_card=9897 second_yellow=9742 own_goal=6729
   ```
 
-  Those eight sum to exactly 1,274,469, the full row count, and the same string
-  is asserted in Task 6 — this section and that one must agree. In particular
-  `own_goal` **must appear**; an earlier draft of this section omitted it and
-  showed a 1,273,469-row total. A non-zero `other=` means the decision table
-  missed a family of rows — stop and revisit Task 3 Step 3.8 before shipping.
+  **The order is descending by count, not the Global Constraints table order.**
+  The code in Step 5.5 sorts with `.sort((a, b) => b[1] - a[1])`, so
+  `substitution` (631,339) precedes `yellow_card` (362,114). An earlier draft
+  of this section listed the buckets in table order, which this code cannot
+  print; the values were right and only the sequence was wrong. Assert the
+  eight `type=count` **pairs**, in whichever order the sort produces.
+
+  Those eight sum to exactly 1,274,469, the full row count, and the same eight
+  pairs are asserted in Task 6 — this section and that one must agree. In
+  particular `own_goal` **must appear**; an earlier draft of this section
+  omitted it and showed a 1,273,469-row total. A non-zero `other=` means the
+  decision table missed a family of rows — stop and revisit Task 3 Step 3.8
+  before shipping.
 
 - [ ] **Step 5.6: Write the columns in `toAppearanceData`.**
 
@@ -1807,8 +1815,12 @@ files unrelated to this feature. Record it as a follow-up instead.
 
   ```
   game_events.csv: 1274469 rows read, <m> joined to an appearance, <u> unjoinable, <a> assists credited.
-  game_events.csv classified as: yellow_card=362114 substitution=631339 goal=219184 penalty=21890 shootout_goal=13574 red_card=9897 second_yellow=9742 own_goal=6729
+  game_events.csv classified as: substitution=631339 yellow_card=362114 goal=219184 penalty=21890 shootout_goal=13574 red_card=9897 second_yellow=9742 own_goal=6729
   ```
+
+  The eight buckets print in **descending count** order (Step 5.5 sorts with
+  `.sort((a, b) => b[1] - a[1])`), so `substitution` precedes `yellow_card`.
+  Assert the eight `type=count` pairs, not a fixed sequence.
 
   **Check the numbers against the breakdown table in Global Constraints before
   accepting them:**
@@ -1834,9 +1846,15 @@ files unrelated to this feature. Record it as a follow-up instead.
     goal's assister is the opponent, never the conceder, which is why this is
     the expected answer.
 
-    The result is **below** 182,390 by however many rows are unjoinable, so any
-    figure in 182,390 downwards is expected. A tiny number means the
-    `player_assist_id` path is not firing.
+    The ceiling is a **whole-file** figure: it bounds assists over all
+    1,274,469 rows, but the index only holds the ~10% of events whose
+    `game_id` is one of the ~10,200 seeded games. Measured on this dataset the
+    seed credited **20,618** — 11.3% of the ceiling, consistent with the
+    10.45% overall join rate (`133,241 / 1,274,469`). So "below 182,390" is
+    necessary but nowhere near sufficient: an earlier draft of this step called
+    any downward figure acceptable and described a *small* number as the
+    "not firing" signal, which 20,618 would have tripped while being correct.
+    The real "not firing" signal is **exactly 0**.
 
     Two non-obvious facts about this number, both deliberate:
     - **`assists` is NOT a subset of `matched`.** A goal by a substitute absent
@@ -1890,9 +1908,42 @@ files unrelated to this feature. Record it as a follow-up instead.
                            FROM \"Appearance\";"
   ```
 
-  Expected: `total_goals` in the low hundreds of thousands, `total_assists` in
-  the low hundreds of thousands, `sendings` in the tens of thousands, `scorers`
-  and `assisters` in the tens of thousands, and no column is zero.
+  Expected, as measured against a scratch database:
+
+  | column | expected | why |
+  |---|---|---|
+  | `scorers` | 22,336 | tens of thousands |
+  | `assisters` | 18,832 | tens of thousands |
+  | `sendings` | 1,630 | **not** the 19,639 whole-file figure — see below |
+  | `total_goals` | 25,871 | **not** "low hundreds of thousands" — see below |
+  | `total_assists` | 20,618 | equals the seed's `assists credited` exactly |
+
+  **These columns cannot approach the whole-file bucket counts, and an earlier
+  draft of this step expecting `total_goals`/`total_assists` in the "low
+  hundreds of thousands" and `sendings` in the "tens of thousands" was
+  unattainable by construction.** The breakdown counts all 1,274,469 event
+  rows; `Appearance` can only receive the rows whose `(game_id, player_id)`
+  lands on one of the 218,988 seeded **starting-lineup** appearances across
+  10,219 curated-team games. Measured join rates:
+
+  | family | whole file | joinable | landed |
+  |---|---|---|---|
+  | goals + penalties | 241,074 | 25,871 (10.7%) | `sum(goals)` 25,871 |
+  | sendings-off | 19,639 | 1,630 (8.3%) | `sum(redCards)` 1,630 |
+  | assists | ≤182,390 | 20,618 (11.3%) | `sum(assists)` 20,618 |
+  | all events | 1,274,469 | 133,241 (10.45%) | — |
+
+  Only **146,341 of 1,274,469** event rows (11.5%) even name a seeded game.
+  So the honest assertions are: **no column is zero**, `sum(goals)` and
+  `sum(assists)` are tens of thousands, `sendings` is in the low thousands,
+  and `sum(assists)` equals the seed's own `assists credited`. Do **not**
+  assert `sum(redCards) ≈ 19,639`; that is the whole-file total and it exceeds
+  the number of appearances that can hold one.
+
+  Verify by recomputation, not by eyeballing magnitudes: re-running the
+  classifier over `game_events.csv` against the `(game_id, player_id)` keys
+  read back out of `Appearance` must reproduce `sum(goals)`, `sum(assists)` and
+  `sum(redCards)` **exactly**. That is a real check; a range is not.
 
 - [ ] **Step 6.4: Confirm the safety property — no CSV, no change.**
 
@@ -1955,9 +2006,9 @@ files unrelated to this feature. Record it as a follow-up instead.
   - **Shootout goals are not counted** (13,574 rows).
   - **Own goals are recognized but not counted** (6,729 rows) — deferred. Whether
     `player_id` on an own-goal row is the scorer or the conceder cannot be
-    determined from this dataset, so `sum(goals)` under-counts by 6,729 rather
-    than credit anyone a goal they may not have scored. Revisable in one
-    `switch` branch.
+determined from this dataset, so `sum(goals)` under-counts rather than credit
+  anyone a goal they may not have scored: 6,729 rows in the file, of which 871
+  are joinable to an appearance. Revisable in one `switch` branch.
   - **Assists come from the `player_assist_id` column**, not from an event type;
     there is no `assist` row in the file. Each is credited to the *assister's*
     own appearance, and self-assists are skipped.
@@ -2032,7 +2083,7 @@ Revert the patch to **v0.2.5**. `git revert` the six commits, or reset to the pr
 | Seed type-check | `cd backend && npx tsc --noEmit -p prisma/tsconfig.json` | exit 0 |
 | Lint | `ESLINT_USE_FLAT_CONFIG=false npx eslint backend/src/` | no output |
 | Measurement | `npm run measure-events -w backend` | sections 1-7, section 8 absent |
-| Seed, CSV present | `npm run seed -w backend` | `1274469 rows read`, the eight-bucket breakdown above, `other=0`, assists in the low hundreds of thousands |
+| Seed, CSV present | `npm run seed -w backend` | `1274469 rows read`, the eight-bucket pairs above, no `other=`, `assists credited` = 20,618 |
 | Seed, CSV absent | `mv scripts/data/game_events.csv /tmp/ && npm run seed -w backend` | `game_events.csv not found; …` then a clean exit |
 | Data landed | `psql "$DATABASE_URL" -c "SELECT sum(goals), sum(assists) FROM \"Appearance\";"` | both non-zero |
 | No migration | `git diff --stat HEAD~3 -- backend/prisma/migrations` | empty |
