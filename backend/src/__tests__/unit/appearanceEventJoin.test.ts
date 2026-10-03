@@ -94,6 +94,9 @@ describe('AppearanceEventIndex', () => {
   });
 
   it('separates the same player in two different games', () => {
+    // Both keys are indexed, so the second goal must land on key(2,101) and
+    // NOT continue key(1,101)'s total. Asserting 1 here is what proves the
+    // games are separate: a shared bucket would report 2.
     const index = new AppearanceEventIndex([key(1, 101), key(2, 101)]);
     index.accumulate(key(1, 101), event('goal'));
     expect(index.accumulate(key(2, 101), event('goal'))).toEqual({ goals: 1, assists: 0, redCards: 0 });
@@ -149,6 +152,46 @@ describe('AppearanceEventIndex', () => {
     const unindexed: FullAppearanceRow = { gameId: 9, playerId: 999, goals: 7, assists: 3, redCards: 2 };
     expect(index.finalize([unindexed])).toEqual([
       { gameId: 9, playerId: 999, goals: 7, assists: 3, redCards: 2 },
+    ]);
+  });
+
+  // The generic signature on `finalize` exists for exactly this shape: Task 5
+  // hands it rows carrying clubId/number/type/position/isCaptain and feeds the
+  // result to `toAppearanceData`, which reads all five. A `FullAppearanceRow[]`
+  // return type would drop them at compile time (TS2322). Asserting they
+  // survive makes the spread's column preservation falsifiable rather than
+  // incidental.
+  it("preserves the caller's extra columns while writing the totals", () => {
+    const index = new AppearanceEventIndex([key(1, 101)]);
+    index.accumulate(key(1, 101), event('goal'));
+    expect(
+      index.finalize([
+        {
+          gameId: 1,
+          playerId: 101,
+          clubId: 55,
+          number: 10,
+          type: 'starter',
+          position: 'GK',
+          isCaptain: true,
+          goals: 0,
+          assists: 0,
+          redCards: 0,
+        },
+      ]),
+    ).toEqual([
+      {
+        gameId: 1,
+        playerId: 101,
+        clubId: 55,
+        number: 10,
+        type: 'starter',
+        position: 'GK',
+        isCaptain: true,
+        goals: 1,
+        assists: 0,
+        redCards: 0,
+      },
     ]);
   });
 });

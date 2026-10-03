@@ -102,18 +102,26 @@ export class AppearanceEventIndex {
   }
 
   /** Merge accumulated totals back onto the appearance rows for the DB write. */
-  finalize(appearances: FullAppearanceRow[]): FullAppearanceRow[] {
-    return appearances.map((appearance) => {
+  finalize<T extends FullAppearanceRow>(rows: T[]): T[] {
+    return rows.map((appearance) => {
       const totals = this.totals.get(compositeKey(appearance.gameId, appearance.playerId));
       if (totals === undefined) return appearance;
-      return { ...appearance, goals: totals.goals, assists: totals.assists, redCards: totals.redCards };
+      return { ...appearance, ...totals };
     });
   }
 }
 
 /**
- * Both ids are non-negative integers with no separator characters, so a colon
- * cannot collide across (gameId, playerId) pairs.
+ * Both ids are assumed to be non-negative integers with no separator
+ * characters, so a colon cannot collide across (gameId, playerId) pairs.
+ *
+ * "Assumed", not checked: the ids arrive from `Number(...)` over CSV text, so
+ * a malformed cell would yield NaN and merge every such row into one bucket.
+ * That failure is absent-or-crash rather than silent — a NaN appearance
+ * reaches `prisma.appearance.createMany` and throws on an Int column, and a
+ * NaN-only event row simply misses every appearance and is dropped — but the
+ * caller is responsible for the invariant, and Task 5 guards it with
+ * `Number.isInteger` before accumulating.
  */
 function compositeKey(gameId: number, playerId: number): string {
   return `${gameId}:${playerId}`;
