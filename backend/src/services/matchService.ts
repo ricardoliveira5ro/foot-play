@@ -94,6 +94,14 @@ function buildLineup(gameId: number, appearances: GameWithRelations['appearances
       shirtNumber: a.number ?? null,
       position: fitted[i].position,
       coords: fitted[i].coords,
+      // Event columns (v1.0.2). These default to 0 and stay 0 on a game that
+      // was seeded before v1.0.1 — 0 is indistinguishable from "did not
+      // score", which is why degradation is per game and carries no flag.
+      goals: a.goals,
+      assists: a.assists,
+      redCards: a.redCards,
+      // Prisma types isCaptain as Boolean?; the wire type is boolean.
+      isCaptain: a.isCaptain ?? false,
     };
   });
 }

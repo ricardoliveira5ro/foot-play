@@ -58,12 +58,27 @@ function mockToken(gameId: number, playerId: number): string {
   return `t${(hash >>> 0).toString(36)}`;
 }
 
+/**
+ * Deterministic event columns so the v1.0.3 shirt badges are visible when
+ * running against the mock dataset. In production these come from
+ * GET /api/matches/* (v1.0.2) and are seeded from game_events.csv (v1.0.1).
+ */
+function mockEvents(playerId: number): Pick<MockLineupPlayer, 'goals' | 'assists' | 'redCards' | 'isCaptain'> {
+  return {
+    goals: playerId % 4 === 0 ? 1 : 0,
+    assists: playerId % 7 === 0 ? 1 : 0,
+    redCards: playerId % 11 === 0 ? 1 : 0,
+    isCaptain: playerId % 9 === 0,
+  };
+}
+
 function buildLineup(gameId: number, players: MockRawPlayer[]): MockLineupPlayer[] {
   return players.map((p) => ({
     ...p,
     nameLength: normalize(p.displayName).length,
     wordBoundaries: getWordBoundaries(p.displayName),
     token: mockToken(gameId, p.playerId),
+    ...mockEvents(p.playerId),
   }));
 }
 

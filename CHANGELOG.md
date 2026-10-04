@@ -8,6 +8,30 @@ from, and release notes are taken from the entry itself.
 
 ---
 
+## v1.0.2 — Event columns on the API & Game filter indexes
+
+_2026-10-04_
+
+### Added
+
+- **`goals`, `assists`, `redCards` and `isCaptain` on every lineup entry**
+  in `GET /api/matches/random` and `GET /api/matches/:id`, mirrored as
+  required fields on `LineupPlayer` in `frontend/types/index.ts`.
+- **Indexes on `Game.season`, `Game.date` and `Game.targetTeamId`**, backing
+  the v1.1 Season and Team filters. Closed list — no other index added.
+
+### Notes
+
+- **No new queries.** The columns were already on the appearance rows the
+  existing `include` selects.
+- **There is no "data missing" flag, and there will not be one.** The
+  columns default to `0`, and `0` is indistinguishable from "did not score",
+  so a game seeded before v1.0.1 reports zeros for all 22 shirts and the UI
+  cannot tell. Degradation is per game, uniform across the board.
+- `isCaptain` is nullable in the database and is sent as `false` when null.
+- Tasks 2 and 3 ship together: the backend field and the required frontend
+  field are one contract.
+
 ## v1.0.1 — Event data foundation: measured join into Appearance
 
 _2026-09-29_

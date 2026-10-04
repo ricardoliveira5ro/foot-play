@@ -60,6 +60,9 @@ model Game {
   appearances             Appearance[]
 
   @@index([competitionId])
+  @@index([season])
+  @@index([date])
+  @@index([targetTeamId])
 }
 
 model Appearance {

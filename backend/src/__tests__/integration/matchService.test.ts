@@ -158,3 +158,65 @@ describe('getRevealAppearances', () => {
     expect(await getRevealAppearances(3, 1)).toEqual([]);
   });
 });
+
+describe('buildMatchResponse event columns', () => {
+  it('exposes goals, assists, redCards and isCaptain on every lineup entry', async () => {
+    const game = await getMatchById(1);
+    const response = buildMatchResponse(game!);
+
+    for (const player of [...response.homeLineup, ...response.awayLineup]) {
+      expect(typeof player.goals).toBe('number');
+      expect(typeof player.assists).toBe('number');
+      expect(typeof player.redCards).toBe('number');
+      expect(typeof player.isCaptain).toBe('boolean');
+    }
+  });
+
+  it('returns the stored values verbatim', async () => {
+    await prisma.appearance.update({
+      where: { gameId_playerId: { gameId: 1, playerId: 108 } },
+      data: { goals: 2, assists: 1, redCards: 1, isCaptain: true },
+    });
+
+    const response = buildMatchResponse((await getMatchById(1))!);
+    const player = response.homeLineup.find(
+      (l) => l.token === generatePlayerToken(1, 108),
+    );
+
+    expect(player?.goals).toBe(2);
+    expect(player?.assists).toBe(1);
+    expect(player?.redCards).toBe(1);
+    expect(player?.isCaptain).toBe(true);
+
+    await seed();
+  });
+
+  it('reports 0 and false when the columns are untouched', async () => {
+    const response = buildMatchResponse((await getMatchById(2))!);
+    const player = response.homeLineup.find(
+      (l) => l.token === generatePlayerToken(2, 101),
+    );
+    expect(player).toMatchObject({ goals: 0, assists: 0, redCards: 0, isCaptain: false });
+  });
+
+  it('coerces a null isCaptain to false', async () => {
+    await prisma.appearance.update({
+      where: { gameId_playerId: { gameId: 2, playerId: 101 } },
+      data: { isCaptain: null },
+    });
+
+    const response = buildMatchResponse((await getMatchById(2))!);
+    const player = response.homeLineup.find(
+      (l) => l.token === generatePlayerToken(2, 101),
+    );
+    expect(player?.isCaptain).toBe(false);
+
+    await seed();
+  });
+
+  it('emits an empty array for a game with no lineups', async () => {
+    const response = buildMatchResponse((await getMatchById(3))!);
+    expect(response.homeLineup).toEqual([]);
+    expect(response.awayLineup).toEqual([]);
+  });
+});

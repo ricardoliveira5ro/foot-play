@@ -37,6 +37,10 @@ function makeShirt(overrides: Partial<ShirtGameData> = {}): ShirtGameData {
     attempts: 0,
     guessHistory: [],
     correctLetters: [],
+    goals: 0,
+    assists: 0,
+    redCards: 0,
+    isCaptain: false,
     ...overrides,
   };
 }
