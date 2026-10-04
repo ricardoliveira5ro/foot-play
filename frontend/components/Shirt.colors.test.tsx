@@ -18,6 +18,10 @@ const mockShirt: ShirtData = {
   state: 'default',
   wordBoundaries: [],
   position: 'ST',
+  goals: 0,
+  assists: 0,
+  redCards: 0,
+  isCaptain: false,
 };
 
 // Barcelona colors: stripes-v with primary #A50044, secondary #004D98

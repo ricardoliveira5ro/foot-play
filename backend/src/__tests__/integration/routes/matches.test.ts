@@ -30,6 +30,17 @@ describe('GET /api/matches/:id', () => {
     expect(res.body.game.gameId).toBe(1);
   });
 
+  it('serves the event columns over HTTP', async () => {
+    const res = await request(app).get('/api/matches/1');
+    expect(res.status).toBe(200);
+    const first = res.body.homeLineup[0];
+    expect(first).toHaveProperty('goals');
+    expect(first).toHaveProperty('assists');
+    expect(first).toHaveProperty('redCards');
+    expect(first).toHaveProperty('isCaptain');
+    expect(typeof first.isCaptain).toBe('boolean');
+  });
+
   it('returns 404 for an unknown id', async () => {
     const res = await request(app).get('/api/matches/999');
     expect(res.status).toBe(404);

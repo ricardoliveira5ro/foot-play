@@ -19,6 +19,10 @@ function player(token: string, nameLength = 5): LineupPlayer {
     shirtNumber: 10,
     position: 'ST',
     coords: { x: 50, y: 50 },
+    goals: 0,
+    assists: 0,
+    redCards: 0,
+    isCaptain: false,
   };
 }
 

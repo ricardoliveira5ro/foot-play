@@ -32,6 +32,14 @@ export interface LineupPlayer {
   /** Position code, e.g. 'GK' | 'CB' | 'LB' | 'CM' | 'ST'. */
   position: string | null;
   coords: PositionCoords;
+  /** Goals scored in this match. 0 when the game predates event data. */
+  goals: number;
+  /** Assists in this match. 0 when the game predates event data. */
+  assists: number;
+  /** Send-offs in this match (direct red or second yellow). 0 when unknown. */
+  redCards: number;
+  /** Captain for this match. False when no captain row exists for the game. */
+  isCaptain: boolean;
 }
 
 export interface Game {
