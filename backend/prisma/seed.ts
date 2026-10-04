@@ -1,10 +1,12 @@
 import dotenv from 'dotenv';
 import { readFile } from 'fs/promises';
-import { createReadStream } from 'fs';
+import { createReadStream, existsSync } from 'fs';
 import { parse } from 'csv-parse';
 import { cleanDisplayName } from '../../scripts/src/name-cleaning';
 import { normalizeCompetitionName, MISSING_COMPETITIONS } from '../../scripts/src/competition-names';
 import { normalizeTeamName } from '../../scripts/src/team-names';
+import { classifyEvent, type EventCsvRow } from '../src/lib/eventMapping';
+import { AppearanceEventIndex } from '../src/lib/appearanceEventJoin';
 import path from 'path';
 import { PrismaPg } from '@prisma/adapter-pg';
 import { PrismaClient, Prisma } from '../src/generated/prisma/client';
@@ -39,7 +41,7 @@ interface Game {
     stadium: string;
 }
 
-interface Appearance { 
+interface Appearance {
     gameId: number;
     clubId: number;
     playerId: number;
@@ -47,6 +49,9 @@ interface Appearance {
     type: string;
     position: string;
     isCaptain: boolean;
+    goals: number;
+    assists: number;
+    redCards: number;
 }
 
 interface Competition {
@@ -134,6 +139,7 @@ async function processGamesDataset(allowedTeamIds: Set<Number>, candidateGames: 
 
 async function processGameLineupsDataset(candidateGames: Game[], candidateGameIds: Set<number>, appearances: Appearance[], games: Game[]) {
     const counts = new Map<string, number>();            
+    let unusableLineupIds = 0;
     
     const parser = createReadStream(path.join(__dirname, '../../scripts/data/game_lineups.csv')).pipe(
         parse({ columns: true, relax_column_count: true })
@@ -168,16 +174,160 @@ async function processGameLineupsDataset(candidateGames: Game[], candidateGameId
         const key = `${row.game_id}:${row.club_id}`;
         if (!fullXiKeys.has(key)) continue;
 
+        // A lineup row with an unparseable game_id/player_id must be dropped,
+        // not pushed: `Number('')` is 0 and a malformed cell is NaN, and a NaN
+        // key would be indexed by AppearanceEventIndex and could silently
+        // absorb malformed event rows into one bucket. Every measured lineup
+        // row has positive integer ids, so this drops nothing in practice.
+        //
+        // Counted, not warned per row: a corrupt file would emit one warning per
+        // bad line and bury the game_events.csv breakdown further down, which is
+        // the operator's only diagnostic. Five is the point at which per-row
+        // detail is worth the noise; past that the count is what matters.
+        const gameId = Number(row.game_id);
+        const playerId = Number(row.player_id);
+        if (!Number.isInteger(gameId) || gameId <= 0 || !Number.isInteger(playerId) || playerId <= 0) {
+            unusableLineupIds++;
+            if (unusableLineupIds <= 5) {
+                console.warn(`lineups: skipping row with unusable ids (game_id=${row.game_id}, player_id=${row.player_id})`);
+            }
+            continue;
+        }
+
         appearances.push({
-            gameId: Number(row.game_id),
+            gameId,
             clubId: Number(row.club_id),
-            playerId: Number(row.player_id),
+            playerId,
             number: Number(row.number),
             type: row.type,
             position: row.position,
             isCaptain: Boolean(Number(row.team_captain)),
+            goals: 0,
+            assists: 0,
+            redCards: 0,
         });
     }
+
+    if (unusableLineupIds > 0) {
+        console.warn(`lineups: skipped ${unusableLineupIds} row(s) with unusable game_id/player_id.`);
+    }
+}
+
+/**
+ * Classifications that can carry an assist.
+ *
+ * Measured: every row with a non-empty `player_assist_id` has raw
+ * `type = Goals`, so no card row can inflate `assists` today. But this guard
+ * is **not** the no-op that fact suggests — it tests the CLASSIFIED type, and
+ * `own_goal` is absent, so it deliberately drops the **3,351** own-goal rows
+ * that carry an assister.
+ *
+ * That exclusion is intentional and is the coherent companion to O5: O5
+ * already declines to trust own-goal rows because attribution is unverifiable
+ * from this dataset, so crediting an assist out of them would take a stat from
+ * a row we have refused to trust. The assist itself is arguably unambiguous,
+ * which is why the exclusion is written down here rather than left implicit.
+ * Admitting those assists later is the one-token change
+ * `SCORING_TYPES.add('own_goal')` and must be paired with an O4 ruling.
+ */
+const SCORING_TYPES = new Set(['goal', 'penalty']);
+
+/**
+ * Streams game_events.csv and folds every row into `index`.
+ *
+ * §3.2 / R4: one row in, one accumulate() call, row discarded. This
+ * function never holds the event set — `index` is bounded by the ~219k
+ * appearances the seed already holds, so memory does not move when the
+ * event count does.
+ *
+ * A missing CSV is a warning, not a failure: the seed is gated by the
+ * operator (§3.4) and someone may run it against an older data directory.
+ * Skipping leaves every column at 0, which is exactly v0.2.5's behaviour.
+ */
+async function processGameEventsDataset(index: AppearanceEventIndex): Promise<void> {
+    const eventsPath = path.join(__dirname, '../../scripts/data/game_events.csv');
+
+    if (!existsSync(eventsPath)) {
+        console.warn('game_events.csv not found; goals/assists/redCards stay at 0.');
+        return;
+    }
+
+    const parser = createReadStream(eventsPath).pipe(
+        parse({ columns: true, relax_column_count: true })
+    );
+
+    const byType = new Map<string, number>();
+    let read = 0;
+    let matched = 0;
+    let assists = 0;
+
+    for await (const row of parser) {
+        read++;
+
+        // EventCsvRow guarantees string fields, so the matcher never has to
+        // defend against a missing CSV column.
+        const event: EventCsvRow = {
+            game_id: String(row.game_id ?? ''),
+            player_id: String(row.player_id ?? ''),
+            type: String(row.type ?? ''),
+            description: String(row.description ?? ''),
+            minute: row.minute === undefined ? undefined : String(row.minute),
+            player_assist_id: String(row.player_assist_id ?? ''),
+        };
+
+        const type = classifyEvent(event);
+        byType.set(type, (byType.get(type) ?? 0) + 1);
+
+        const gameId = Number(event.game_id);
+        const playerId = Number(event.player_id);
+
+        // `compositeKey` assumes two positive integers and cannot verify that.
+        // `Number('')` is 0, `Number('0x10')` is 16, and a malformed cell yields NaN —
+        // any of which would collide every such row into a single composite-key bucket.
+        // The `> 0` half matters: `Number.isInteger(0)` is true, so an empty cell would
+        // otherwise key as "0:<playerId>". Skipping the row is the honest outcome: an
+        // unjoinable row is a normal, counted drop, whereas a collision would silently
+        // merge two appearances. Both values are positive integers for all 1,274,469
+        // measured rows, so this changes no measured count. `read++` and `byType.set()`
+        // have already run above, so the breakdown still counts these rows and they
+        // land in the `read - matched` unjoinable total rather than vanishing.
+        if (!Number.isInteger(gameId) || gameId <= 0 || !Number.isInteger(playerId) || playerId <= 0) {
+            continue;
+        }
+
+        const totals = index.accumulate({ gameId, playerId }, { type, isAssist: false });
+
+        if (totals !== undefined) matched++;
+
+        // A1: the assist belongs to a DIFFERENT player's appearance row, so it
+        // is a second, synthetic event. Skipped when the assister is the
+        // scorer (2,537 measured rows) and when either id is not numeric —
+        // an unjoinable key is dropped by accumulate(), which returns
+        // undefined without touching the map (R4).
+        //
+        // Deliberately NOT gated on the scorer's join succeeding: a goal by a
+        // substitute absent from the filtered appearance set (R3) still names a
+        // real assister, and that assist genuinely happened. Gating it would
+        // silently discard a verifiable fact. Consequence: `assists` is NOT a
+        // subset of `matched` — a row can increment `assists` without
+        // incrementing `matched`, and that is correct, not a leak.
+        const assisterId = String(row.player_assist_id ?? '').trim();
+        if (assisterId !== '' && SCORING_TYPES.has(type)) {
+            const assisterPlayerId = Number(assisterId);
+            if (
+                Number.isInteger(assisterPlayerId)
+                && assisterPlayerId > 0
+                && assisterPlayerId !== playerId
+                && index.accumulate({ gameId, playerId: assisterPlayerId }, { type: 'other', isAssist: true }) !== undefined
+            ) {
+                assists++;
+            }
+        }
+    }
+
+    const breakdown = [...byType.entries()].sort((a, b) => b[1] - a[1]);
+    console.log(`game_events.csv: ${read} rows read, ${matched} joined to an appearance, ${read - matched} unjoinable, ${assists} assists credited.`);
+    console.log(`game_events.csv classified as: ${breakdown.map(([type, n]) => `${type}=${n}`).join(' ')}`);
 }
 
 function processOpponentTeams(games: Game[], opponents: Team[], candidateClubOpponentsNameById: Map<number, string>, candidateNationOpponentsNameById: Map<number, string>, gameOpponentNamesById: Map<number, string>) {
@@ -346,6 +496,9 @@ function toAppearanceData(rows: Appearance[]): Prisma.AppearanceCreateManyInput[
         type: a.type,
         position: toNullableString(a.position),
         isCaptain: a.isCaptain,
+        goals: a.goals,
+        assists: a.assists,
+        redCards: a.redCards,
     }));
 }
 
@@ -470,6 +623,16 @@ async function main(): Promise<void> {
     if (droppedGames > 0)
         console.warn(`Dropped ${droppedGames} games with no complete lineup after players.csv filtering`);
 
+    const finalAppearances = dedupeAppearances(sideFilteredAppearances);
+
+    const eventIndex = new AppearanceEventIndex(
+        finalAppearances.map(a => ({ gameId: a.gameId, playerId: a.playerId }))
+    );
+
+    await processGameEventsDataset(eventIndex);
+
+    const appearancesWithEvents = eventIndex.finalize(finalAppearances);
+
     try {
       console.log('Starting prisma batch');
 
@@ -488,7 +651,7 @@ async function main(): Promise<void> {
       await insertInBatches(prisma.club, toClubData(uniqueClubs));
       await insertInBatches(prisma.player, toPlayerData(players));
       await insertInBatches(prisma.game, toGameData(filteredGames));
-      await insertInBatches(prisma.appearance, toAppearanceData(dedupeAppearances(sideFilteredAppearances)));
+      await insertInBatches(prisma.appearance, toAppearanceData(appearancesWithEvents));
 
     } finally {
         console.log('Batch done');

@@ -8,6 +8,61 @@ from, and release notes are taken from the entry itself.
 
 ---
 
+## v1.0.1 — Event data foundation: measured join into Appearance
+
+_2026-09-29_
+
+### Added
+
+- **`game_events.csv` in the dataset** — added to `REQUIRED_FILES` in
+  `scripts/src/download-data.ts`, with the single-request fetch timeout
+  raised from 120s to 600s to cover the larger archive.
+- **`backend/prisma/measure-event-vocabulary.ts`** — re-runnable measurement
+  of the real `type` / `description` vocabulary, run via
+  `npm run measure-events -w backend`. Prints the complete distinct inventory,
+  a completeness probe for unrecognised `Cards` rows, the `player_assist_id`
+  report, and a copy-pasteable `MEASURED_SENDING_OFF_DESCRIPTIONS` constant.
+- **`backend/src/lib/eventMapping.ts`** — pure, unit-tested mapping from CSV
+  vocabulary to `ParsedEventType`, built against the measured vocabulary: the
+  `type` column is plural and capitalised (`Cards` / `Goals` /
+  `Substitutions` / `Shootout`) and `description` is not a reliable type
+  signal. Whitespace-tolerant, and anchored so the `"Sco-RED"` and tournament
+  `"2."` substring traps cannot enter the dismissal set.
+- **`backend/src/lib/appearanceEventJoin.ts`** — `AppearanceEventIndex`, a
+  streaming join bounded by the ~219k appearances rather than the ~1.27M
+  event rows.
+
+### Changed
+
+- **`backend/prisma/seed.ts`** streams `game_events.csv` and writes
+  `Appearance.goals` / `assists` / `redCards` before the appearance insert.
+  A missing CSV is a warning, not a failure.
+
+### Notes
+
+- No Prisma migration: the columns and the `gameId + playerId` join key
+  already existed.
+- **Re-seed is a manual operator step.** `run_seed` defaults to `false`, so
+  merging this patch changes nothing in production until the box is ticked.
+  Until then the app runs on zeroed columns and renders no icons.
+- **Measured, not predicted.** Against the 1,274,469-row file the eight
+  classifications are `yellow_card` 362,114 · `substitution` 631,339 ·
+  `goal` 219,184 · `penalty` 21,890 · `shootout_goal` 13,574 · `red_card`
+  9,897 · `second_yellow` 9,742 · `own_goal` 6,729 · `other` **0**.
+- **Shootout goals are not counted** (13,574 rows).
+- **Own goals are recognized but not counted** (6,729 rows) — deferred. Whether
+  `player_id` on an own-goal row is the scorer or the conceder cannot be
+  determined from this dataset, so `sum(goals)` under-counts rather than credit
+  anyone a goal they may not have scored: 6,729 rows in the file, of which 871
+  are joinable to an appearance. Revisable in one `switch` branch.
+- **Assists come from the `player_assist_id` column**, not from an event type;
+  there is no `assist` row in the file. Each is credited to the *assister's*
+  own appearance, and self-assists are skipped.
+- **Substitute goals remain unjoinable** — `Appearance.type` is
+  `starting_lineup` for every row, so a substitute has no row to join to.
+
+---
+
 ## v0.2.5 — Deploy Fix: npm Upgrade & Git Force Sync
 
 _2026-09-28_
