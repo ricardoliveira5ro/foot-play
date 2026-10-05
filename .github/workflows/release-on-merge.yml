@@ -7,6 +7,7 @@ on:
 
 permissions:
   contents: write
+  pull-requests: read
 
 concurrency:
   group: release
@@ -36,13 +37,30 @@ jobs:
       - name: Install dependencies
         run: npm install
 
+      - name: Check whether this pull request changed the changelog
+        id: changelog
+        if: github.event_name == 'pull_request'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          FILES="$(gh api --paginate "repos/${GITHUB_REPOSITORY}/pulls/${PR_NUMBER}/files" --jq '.[].filename')"
+          if printf '%s\n' "$FILES" | grep -Fxq 'CHANGELOG.md'; then
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+            echo "CHANGELOG.md changed in this pull request."
+          else
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+            echo "No CHANGELOG.md change in this pull request; release will be skipped."
+          fi
+
       - name: Resolve candidate version from CHANGELOG
         id: version
+        if: github.event_name == 'workflow_dispatch' || steps.changelog.outputs.changed == 'true'
         run: |
           VERSION="$(npm run --silent release -- --next 2>/dev/null)"
           if [ -z "$VERSION" ]; then
             echo "version=" >> "$GITHUB_OUTPUT"
-            echo "No pending release: the top CHANGELOG entry is already tagged."
+            echo "No pending release: the newest CHANGELOG entry is already tagged."
           else
             echo "version=$VERSION" >> "$GITHUB_OUTPUT"
             echo "Will release $VERSION"

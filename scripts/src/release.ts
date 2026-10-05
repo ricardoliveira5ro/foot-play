@@ -223,13 +223,10 @@ async function main(): Promise<void> {
   }
   const nextVersion = process.argv.includes('--next');
   if (nextVersion) {
-    const sections = parseChangelog();
-    for (const section of sections) {
-      if (!findExistingTag(section.version)) {
-        process.stdout.write(`${section.version}\n`);
-        return;
-      }
-    }
+    // Only the newest changelog entry can be a release candidate. Scanning
+    // older sections can accidentally publish an untagged legacy version.
+    const newest = parseChangelog()[0];
+    if (newest && !findExistingTag(newest.version)) process.stdout.write(`${newest.version}\n`);
     return;
   }
   await runRelease();
