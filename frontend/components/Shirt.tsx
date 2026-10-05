@@ -6,6 +6,7 @@ import type { GuessResult } from '@/lib/wordle';
 import { getCorrectLettersByLength } from '@/lib/wordle';
 import type { TeamColorEntry } from '@/lib/teamColors';
 import { getTextColor } from '@/lib/colorUtils';
+import { badgesForShirt, type ShirtBadge } from '@/lib/shirtBadges';
 
 const SHIRT_PATH =
   'M28 10 L32 13 L36 10 L56 14 L62 15 L62 20 L51 22 L51 58 L13 58 L13 22 L2 20 L2 15 L8 14 L28 10 Z';
@@ -29,24 +30,39 @@ interface ShirtProps {
   colors?: TeamColorEntry;
 }
 
+/**
+ * Accessible wording for the badges actually rendered on this shirt.
+ *
+ * The icons themselves are aria-hidden, so this is the only channel that
+ * carries the information to a screen reader. A visible signal that is not
+ * in the accessible name is invisible to part of the audience.
+ */
+const BADGE_LABELS: Record<ShirtBadge, string> = {
+  scorer: 'scored in this match',
+  'sent-off': 'sent off in this match',
+};
+
 /** State-aware accessible name for the shirt button. */
 function shirtAriaLabel(
   state: ShirtState,
   shirtNumber: number | null,
+  badges: ShirtBadge[],
   name?: string,
 ): string {
   const number = shirtNumber ?? '?';
+  const badgesSuffix =
+    badges.length > 0 ? `, ${badges.map((badge) => BADGE_LABELS[badge]).join(', ')}` : '';
   switch (state) {
     case 'default':
-      return `Shirt ${number}, tap to guess the player`;
+      return `Shirt ${number}, tap to guess the player${badgesSuffix}`;
     case 'in-progress':
-      return `Shirt ${number}, guessing in progress`;
+      return `Shirt ${number}, guessing in progress${badgesSuffix}`;
     case 'correct':
       return name
-        ? `Shirt ${number}, guessed correctly: ${name}`
-        : `Shirt ${number}, guessed correctly`;
+        ? `Shirt ${number}, guessed correctly: ${name}${badgesSuffix}`
+        : `Shirt ${number}, guessed correctly${badgesSuffix}`;
     case 'failed':
-      return `Shirt ${number}, not guessed`;
+      return `Shirt ${number}, not guessed${badgesSuffix}`;
   }
 }
 
@@ -129,12 +145,37 @@ function StateBadge({ state }: { state: Extract<ShirtState, 'correct' | 'failed'
 }
 
 /**
+ * Decorative badge glyph. aria-hidden because the badge is already named in
+ * the shirt's aria-label via BADGE_LABELS — announcing it twice is noise.
+ */
+function BadgeIcon({ badge }: { badge: ShirtBadge }) {
+  if (badge === 'scorer') {
+    return (
+      <svg viewBox="0 0 12 12" className="h-3 w-3" fill="none" aria-hidden="true">
+        <circle cx="6" cy="6" r="5" fill="currentColor" />
+        <path d="M6 3.2 8.1 4.8 7.4 7.3 4.6 7.3 3.9 4.8Z" fill="currentColor" opacity="0.3" />
+      </svg>
+    );
+  }
+
+  return (
+    <svg viewBox="0 0 12 12" className="h-3 w-3" fill="none" aria-hidden="true">
+      <rect x="2" y="1" width="8" height="10" rx="1.5" fill="currentColor" />
+    </svg>
+  );
+}
+
+/**
  * A single shirt on the tactic board.
  * Four states: default → in-progress → correct → failed.
  * The whole unit is a button with an expanded (>=44px) hit area.
  */
 export default function Shirt({ shirt, index, onClick, guessHistory, colors }: ShirtProps) {
   const { token, nameLength, shirtNumber, coords, state } = shirt;
+
+  // §3.1: no event data on this game means [] for every shirt. There is no
+  // per-shirt availability signal and this must not invent one.
+  const badges = badgesForShirt({ goals: shirt.goals, redCards: shirt.redCards });
 
   // Resolve colors with defaults so the legacy white/ink rendering is preserved
   // when no team colors are provided.
@@ -204,7 +245,7 @@ export default function Shirt({ shirt, index, onClick, guessHistory, colors }: S
       <button
         type="button"
         onClick={onClick ? () => onClick(token) : undefined}
-        aria-label={shirtAriaLabel(state, shirtNumber, shirt.name)}
+        aria-label={shirtAriaLabel(state, shirtNumber, badges, shirt.name)}
         className={`-m-2 block w-[calc(100%+1rem)] rounded-md p-2 transition-[transform,filter] duration-150 ease-out hover:-translate-y-0.5 hover:drop-shadow-[0_4px_6px_rgba(16,24,32,0.35)] ${state === 'failed' ? 'opacity-60 saturate-[0.6]' : ''}`}
       >
         {/* Inner wrapper carries the entrance animation so positional and
@@ -234,6 +275,22 @@ export default function Shirt({ shirt, index, onClick, guessHistory, colors }: S
             </span>
           )}
         </span>
+
+        {badges.length > 0 && (
+          <span aria-hidden="true" className="absolute -left-1 -top-1 flex items-center gap-0.5">
+            {badges.map((badge) => (
+              <span
+                key={badge}
+                data-badge={badge}
+                className={`flex h-4 w-4 items-center justify-center rounded-full border border-ink/15 bg-paper shadow-sm ${
+                  badge === 'scorer' ? 'text-ink' : 'text-failed'
+                }`}
+              >
+                <BadgeIcon badge={badge} />
+              </span>
+            ))}
+          </span>
+        )}
 
         {(state === 'correct' || state === 'failed') && <StateBadge state={state} />}
       </button>
