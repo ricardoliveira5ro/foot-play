@@ -18,8 +18,8 @@ describe('badgesForShirt', () => {
     expect(badgesForShirt({ goals: 1, redCards: 1 })).toEqual(['scorer', 'sent-off']);
   });
 
-  it('renders one scorer badge for multiple goals', () => {
-    expect(badgesForShirt({ goals: 3, redCards: 0 })).toEqual(['scorer']);
+  it('returns one scorer badge per goal', () => {
+    expect(badgesForShirt({ goals: 3, redCards: 0 })).toEqual(['scorer', 'scorer', 'scorer']);
   });
 
   it('renders one send-off badge for multiple dismissals', () => {

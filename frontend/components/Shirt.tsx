@@ -50,8 +50,15 @@ function shirtAriaLabel(
   name?: string,
 ): string {
   const number = shirtNumber ?? '?';
-  const badgesSuffix =
-    badges.length > 0 ? `, ${badges.map((badge) => BADGE_LABELS[badge]).join(', ')}` : '';
+  const goalCount = badges.filter((badge) => badge === 'scorer').length;
+  const badgeLabels: string[] = [];
+  if (goalCount > 0) {
+    badgeLabels.push(
+      goalCount === 1 ? BADGE_LABELS.scorer : `scored ${goalCount} goals in this match`,
+    );
+  }
+  if (badges.includes('sent-off')) badgeLabels.push(BADGE_LABELS['sent-off']);
+  const badgesSuffix = badgeLabels.length > 0 ? `, ${badgeLabels.join(', ')}` : '';
   switch (state) {
     case 'default':
       return `Shirt ${number}, tap to guess the player${badgesSuffix}`;
@@ -123,7 +130,8 @@ function StateBadge({ state }: { state: Extract<ShirtState, 'correct' | 'failed'
   return (
     <span
       aria-hidden="true"
-      className={`absolute -right-1 -top-1 flex h-4 w-4 items-center justify-center rounded-full text-white ${
+      data-state-badge={state}
+      className={`flex h-4 w-4 items-center justify-center rounded-full text-white ${
         correct ? 'bg-correct' : 'bg-failed'
       }`}
     >
@@ -185,6 +193,11 @@ export default function Shirt({ shirt, index, onClick, guessHistory, colors }: S
   // §3.1: no event data on this game means [] for every shirt. There is no
   // per-shirt availability signal and this must not invent one.
   const badges = badgesForShirt({ goals: shirt.goals, redCards: shirt.redCards });
+  const hasStateBadge = state === 'correct' || state === 'failed';
+  const badgeRowWidth =
+    badges.length * 16 +
+    Math.max(0, badges.length - 1) * 2 +
+    (hasStateBadge ? 16 + (badges.length > 0 ? 2 : 0) : 0);
 
   // Resolve colors with defaults so the legacy white/ink rendering is preserved
   // when no team colors are provided.
@@ -255,7 +268,7 @@ export default function Shirt({ shirt, index, onClick, guessHistory, colors }: S
         type="button"
         onClick={onClick ? () => onClick(token) : undefined}
         aria-label={shirtAriaLabel(state, shirtNumber, badges, shirt.name)}
-        className={`-m-2 block w-[calc(100%+1rem)] rounded-md p-2 transition-[transform,filter] duration-150 ease-out hover:-translate-y-0.5 hover:drop-shadow-[0_4px_6px_rgba(16,24,32,0.35)] ${state === 'failed' ? 'opacity-60 saturate-[0.6]' : ''}`}
+        className={`-m-2 block w-[calc(100%+1rem)] cursor-pointer rounded-md p-2 ${state === 'failed' ? 'opacity-60 saturate-[0.6]' : ''}`}
       >
         {/* Inner wrapper carries the entrance animation so positional and
             hover transforms on the button are never overridden. */}
@@ -285,23 +298,29 @@ export default function Shirt({ shirt, index, onClick, guessHistory, colors }: S
           )}
         </span>
 
-        {badges.length > 0 && (
-          <span aria-hidden="true" className="absolute -left-1 -top-1 flex items-center gap-0.5">
-            {badges.map((badge) => (
-              <span
-                key={badge}
-                data-badge={badge}
-                className={`flex h-4 w-4 items-center justify-center rounded-full border border-ink/15 bg-paper shadow-sm ${
-                  badge === 'scorer' ? 'text-ink' : 'text-failed'
-                }`}
-              >
-                <BadgeIcon badge={badge} />
-              </span>
-            ))}
+        {(badges.length > 0 || hasStateBadge) && (
+          <span
+            aria-hidden="true"
+            data-badge-row
+            className="absolute -left-1 -top-2 flex items-center justify-between"
+            style={{ width: `max(100%, ${badgeRowWidth}px)` }}
+          >
+            <span data-event-badge-group className="flex shrink-0 items-center gap-0.5">
+              {badges.map((badge, index) => (
+                <span
+                  key={`${badge}-${index}`}
+                  data-badge={badge}
+                  className={`flex h-4 w-4 items-center justify-center rounded-full border border-ink/15 bg-paper shadow-sm ${
+                    badge === 'scorer' ? 'text-ink' : 'text-failed'
+                  }`}
+                >
+                  <BadgeIcon badge={badge} />
+                </span>
+              ))}
+            </span>
+            {(state === 'correct' || state === 'failed') && <StateBadge state={state} />}
           </span>
         )}
-
-        {(state === 'correct' || state === 'failed') && <StateBadge state={state} />}
       </button>
 
       {/* Tag below the shirt — absolutely positioned so it never shifts neighbors. */}

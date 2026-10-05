@@ -15,9 +15,9 @@ _2026-09-29_
 ### Added
 
 - **`frontend/src/lib/shirtBadges.ts`** — pure `badgesForShirt({ goals,
-  redCards })` returning `[]`, `['scorer']`, `['sent-off']` or both, in that
-  order. Kept React-free so v1.2's difficulty modes can read the same
-  decision without importing the component.
+  redCards })` returning one scorer badge per goal, followed by a send-off
+  badge when applicable. Kept React-free so v1.2's difficulty modes can read
+  the same decision without importing the component.
 - **Scorer and send-off badges on the tactic-board shirts**, with the badge
   wording carried into the shirt's accessible name.
 

@@ -15,7 +15,7 @@
 export type ShirtBadge = 'scorer' | 'sent-off';
 
 /**
- * Badges for one shirt, ordered: 'scorer' before 'sent-off'.
+ * Badges for one shirt, ordered: one 'scorer' per goal before 'sent-off'.
  *
  * Always [] for a game with no event data — the per-game degradation rule.
  *
@@ -27,7 +27,7 @@ export type ShirtBadge = 'scorer' | 'sent-off';
 export function badgesForShirt(input: { goals: number; redCards: number }): ShirtBadge[] {
   const badges: ShirtBadge[] = [];
 
-  if (input.goals > 0) badges.push('scorer');
+  for (let goal = 0; goal < input.goals; goal += 1) badges.push('scorer');
   if (input.redCards > 0) badges.push('sent-off');
 
   return badges;

@@ -42,6 +42,15 @@ function badgeOrder(container: HTMLElement): (string | null)[] {
   return [...container.querySelectorAll('[data-badge]')].map((el) => el.getAttribute('data-badge'));
 }
 
+function badgeRowOrder(container: HTMLElement): (string | null)[] {
+  const row = container.querySelector('[data-badge-row]');
+  return row
+    ? [...row.querySelectorAll('[data-badge], [data-state-badge]')].map(
+        (el) => el.getAttribute('data-badge') ?? el.getAttribute('data-state-badge'),
+      )
+    : [];
+}
+
 describe('Shirt badges', () => {
   it('renders no badge and no badge wording when the game has no event data', () => {
     const { container, button } = renderShirt({ goals: 0, redCards: 0 });
@@ -49,11 +58,11 @@ describe('Shirt badges', () => {
     expect(button.getAttribute('aria-label')).toBe('Shirt 10, tap to guess the player');
   });
 
-  it('renders a scorer badge for a scorer and names it', () => {
+  it('renders one scorer badge per goal and names the total', () => {
     const { container, button } = renderShirt({ goals: 2, redCards: 0 });
-    expect(badgeOrder(container)).toEqual(['scorer']);
+    expect(badgeOrder(container)).toEqual(['scorer', 'scorer']);
     expect(button.getAttribute('aria-label')).toBe(
-      'Shirt 10, tap to guess the player, scored in this match',
+      'Shirt 10, tap to guess the player, scored 2 goals in this match',
     );
   });
 
@@ -73,9 +82,20 @@ describe('Shirt badges', () => {
     );
   });
 
-  it('renders one scorer badge for a hat-trick', () => {
-    const { container } = renderShirt({ goals: 3, redCards: 0 });
-    expect(container.querySelectorAll('[data-badge="scorer"]')).toHaveLength(1);
+  it('renders each goal badge before the send-off badge', () => {
+    const { container, button } = renderShirt({ goals: 2, redCards: 1 });
+    expect(badgeOrder(container)).toEqual(['scorer', 'scorer', 'sent-off']);
+    expect(button.getAttribute('aria-label')).toBe(
+      'Shirt 10, tap to guess the player, scored 2 goals in this match, sent off in this match',
+    );
+  });
+
+  it('renders three scorer badges for a hat-trick and names the total', () => {
+    const { container, button } = renderShirt({ goals: 3, redCards: 0 });
+    expect(container.querySelectorAll('[data-badge="scorer"]')).toHaveLength(3);
+    expect(button.getAttribute('aria-label')).toBe(
+      'Shirt 10, tap to guess the player, scored 3 goals in this match',
+    );
   });
 
   it('keeps the badges on an in-progress shirt and names them', () => {
@@ -94,6 +114,7 @@ describe('Shirt badges', () => {
       redCards: 1,
     });
     expect(badgeOrder(container)).toEqual(['sent-off']);
+    expect(badgeRowOrder(container)).toEqual(['sent-off', 'correct']);
     expect(button.getAttribute('aria-label')).toBe(
       'Shirt 10, guessed correctly: Neuer, sent off in this match',
     );
@@ -102,8 +123,24 @@ describe('Shirt badges', () => {
   it('keeps the badges on a failed shirt and names them', () => {
     const { container, button } = renderShirt({ state: 'failed', goals: 1, redCards: 0 });
     expect(badgeOrder(container)).toEqual(['scorer']);
+    expect(badgeRowOrder(container)).toEqual(['scorer', 'failed']);
     expect(button.getAttribute('aria-label')).toBe(
       'Shirt 10, not guessed, scored in this match',
+    );
+  });
+
+  it('keeps a five-goal row and the correct mark together', () => {
+    const { container, button } = renderShirt({ state: 'correct', goals: 5 });
+    expect(badgeRowOrder(container)).toEqual([
+      'scorer',
+      'scorer',
+      'scorer',
+      'scorer',
+      'scorer',
+      'correct',
+    ]);
+    expect(button.getAttribute('aria-label')).toBe(
+      'Shirt 10, guessed correctly, scored 5 goals in this match',
     );
   });
 

@@ -1,10 +1,12 @@
 # Scorer & Send-Off Shirt Badges Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **Status:** Implemented and released in commits `84554e6`, `547d251`, `8ec5a00`; scorer artwork refinement followed in `c3d5cfc`. The post-release UI refinements below are also present in the current working tree.
 
-**Goal:** A shirt shows a scorer badge when its player scored and a send-off badge when its player was dismissed — and shows nothing at all when the game has no event data, with no error and no zero-valued icon.
+> **For agentic workers:** This document records the shipped behavior and implementation plan. The original step checkboxes are retained as the implementation workflow; they are not a live status tracker.
 
-**Architecture:** A pure helper `frontend/src/lib/shirtBadges.ts` decides *which* badges exist; `frontend/components/Shirt.tsx` only decides *how* they look. The split exists so v1.2's difficulty modes can ask whether the scorers clue is available without importing React or reaching into a component. `assists` and `isCaptain` are exposed by v1.0.2 but are not read here.
+**Goal:** A shirt shows one football badge per goal and a send-off badge when its player was dismissed. Event badges stay together at the row's left/start; after a guess, the correct or wrong mark sits at the row's right/end. The row expands as needed so the badges do not overlap. Hovering uses a pointer cursor without moving or lifting the shirt and badge row. A game with no event data shows no event badges, with no error or zero-valued icon.
+
+**Architecture:** A pure helper `frontend/src/lib/shirtBadges.ts` decides *which* badges exist, including one scorer badge per goal; `frontend/components/Shirt.tsx` only decides *how* they look. The split exists so v1.2's difficulty modes can ask whether the scorers clue is available without importing React or reaching into a component. `assists` and `isCaptain` are exposed by v1.0.2 but are not read here.
 
 **Tech Stack:** Next.js 16 / React 19, Tailwind 4 design tokens (`text-ink`, `text-failed`, `bg-paper`), inline SVG, Vitest + Testing Library + jsdom.
 
@@ -66,8 +68,8 @@
       expect(badgesForShirt({ goals: 1, redCards: 1 })).toEqual(['scorer', 'sent-off']);
     });
 
-    it('renders one scorer badge for multiple goals', () => {
-      expect(badgesForShirt({ goals: 3, redCards: 0 })).toEqual(['scorer']);
+    it('renders one scorer badge per goal', () => {
+      expect(badgesForShirt({ goals: 3, redCards: 0 })).toEqual(['scorer', 'scorer', 'scorer']);
     });
 
     it('renders one send-off badge for multiple dismissals', () => {
@@ -243,11 +245,11 @@
       expect(button.getAttribute('aria-label')).toBe('Shirt 10, tap to guess the player');
     });
 
-    it('renders a scorer badge for a scorer and names it', () => {
+    it('renders one scorer badge per goal and names the total', () => {
       const { container, button } = renderShirt({ goals: 2, redCards: 0 });
-      expect(badgeOrder(container)).toEqual(['scorer']);
+      expect(badgeOrder(container)).toEqual(['scorer', 'scorer']);
       expect(button.getAttribute('aria-label')).toBe(
-        'Shirt 10, tap to guess the player, scored in this match',
+        'Shirt 10, tap to guess the player, scored 2 goals in this match',
       );
     });
 
@@ -267,9 +269,9 @@
       );
     });
 
-    it('renders one scorer badge for a hat-trick', () => {
+    it('renders one scorer badge per goal in a hat-trick', () => {
       const { container } = renderShirt({ goals: 3, redCards: 0 });
-      expect(container.querySelectorAll('[data-badge="scorer"]')).toHaveLength(1);
+      expect(container.querySelectorAll('[data-badge="scorer"]')).toHaveLength(3);
     });
 
     it('keeps the badges on an in-progress shirt and names them', () => {
@@ -438,32 +440,18 @@
           aria-label={shirtAriaLabel(state, shirtNumber, badges, shirt.name)}
   ```
 
-- [ ] **Step 2.8: Render the badges.**
+- [ ] **Step 2.8: Render one aligned badge row.**
 
-  Edit `frontend/components/Shirt.tsx`, inserting between the closing `</span>`
-  of the shirt wrapper (line 236) and the `StateBadge` line (238):
+  In `frontend/components/Shirt.tsx`, the row groups all `badges` inside
+  `data-event-badge-group` and renders the optional `StateBadge` after it. The
+  row uses `justify-between`, starts at the shirt's left edge and has a width
+  equal to the larger of the shirt width and the content width. This keeps the
+  event group at the left and the state mark at the right, including when five
+  goal badges are shown. The row and its contents are `aria-hidden` decorative
+  overlays inside the button, so they do not intercept clicks.
 
-  ```tsx
-          {badges.length > 0 && (
-            <span aria-hidden="true" className="absolute -left-1 -top-1 flex items-center gap-0.5">
-              {badges.map((badge) => (
-                <span
-                  key={badge}
-                  data-badge={badge}
-                  className={`flex h-4 w-4 items-center justify-center rounded-full border border-ink/15 bg-paper shadow-sm ${
-                    badge === 'scorer' ? 'text-ink' : 'text-failed'
-                  }`}
-                >
-                  <BadgeIcon badge={badge} />
-                </span>
-              ))}
-            </span>
-          )}
-  ```
-
-  `StateBadge` sits at `-right-1 -top-1`, so the badge row at `-left-1 -top-1`
-  cannot collide with it. Both are `aria-hidden` decorative overlays inside
-  the button, so neither intercepts the click.
+  The button uses a pointer cursor but has no hover translation or hover shadow;
+  the shirt and badge row stay stationary while hovered.
 
 - [ ] **Step 2.9: Run the badge tests and watch them pass.**
 
@@ -471,7 +459,7 @@
   cd frontend && npx vitest run src/components/Shirt.badges.test.tsx
   ```
 
-  Expected GREEN: `Test Files 1 passed (1)`, `Tests 9 passed (9)`.
+  Expected GREEN: `Test Files 1 passed (1)`, `Tests 11 passed (11)`.
 
 - [ ] **Step 2.10: Run the whole frontend suite.**
 
@@ -500,8 +488,8 @@
 
   Open `http://localhost:3000/missing-eleven`. With `mockEvents` from v1.0.2
   (`playerId % 4` for goals, `% 11` for red cards) roughly a quarter of the
-  shirts carry a scorer badge and about one in eleven a red card. Then set
-  `NEXT_PUBLIC_USE_MOCK_API=false` against a database that has not been
+  shirts carry scorer badges (one per goal) and about one in eleven a red card.
+  Then set `NEXT_PUBLIC_USE_MOCK_API=false` against a database that has not been
   re-seeded: **no badge appears on any shirt**, and nothing errors. That second
   state is §3.1 working, not a bug — confirm it explicitly before committing.
 
@@ -583,9 +571,9 @@
   ### Added
 
   - **`frontend/src/lib/shirtBadges.ts`** — pure `badgesForShirt({ goals,
-    redCards })` returning `[]`, `['scorer']`, `['sent-off']` or both, in that
-    order. Kept React-free so v1.2's difficulty modes can read the same
-    decision without importing the component.
+    redCards })` returning one scorer badge per goal, followed by a send-off
+    badge when applicable. Kept React-free so v1.2's difficulty modes can read
+    the same decision without importing the component.
   - **Scorer and send-off badges on the tactic-board shirts**, with the badge
     wording carried into the shirt's accessible name.
 
@@ -642,18 +630,18 @@ order leaves `Shirt.tsx` reading fields the API no longer sends.
 ## Acceptance criteria
 
 1. `badgesForShirt({ goals: 0, redCards: 0 })` returns `[]`.
-2. `badgesForShirt({ goals: 2, redCards: 0 })` returns `['scorer']`; three goals still return one badge.
+2. `badgesForShirt({ goals: 2, redCards: 0 })` returns `['scorer', 'scorer']`; three goals return three badges.
 3. `badgesForShirt({ goals: 0, redCards: 1 })` returns `['sent-off']`.
 4. `badgesForShirt({ goals: 1, redCards: 1 })` returns `['scorer', 'sent-off']` in that order.
 5. A shirt with no event data renders zero `[data-badge]` elements and an `aria-label` with no badge clause.
-6. A shirt with goals renders exactly one `data-badge="scorer"` element.
+6. A shirt renders exactly one `data-badge="scorer"` element per goal.
 7. A shirt with a dismissal renders exactly one `data-badge="sent-off"` element.
 8. Badges render on `default`, `in-progress`, `correct` and `failed` shirts alike.
 9. Every badge is named in the shirt's `aria-label`; the glyphs themselves are `aria-hidden`.
 10. A shirt with `shirtNumber: null` still uses `Shirt ?, …` — the mask convention is untouched, and no `'?'` is ever written into `shirtNumber`.
 11. `frontend/src/components/Shirt.badges.test.tsx` runs, and `frontend/vitest.config.ts` is unmodified.
 12. `frontend/src/lib/scoring.ts` and `frontend/src/lib/gameState.ts` contain no reference to `redCards` or `badgesForShirt`.
-13. `cd frontend && npm run test:coverage && npm run lint && npx tsc --noEmit` all pass, with 11 test files collected.
+13. The badge component suite covers multiple goals, the aligned state mark and accessible goal count; the TypeScript check passes. Full frontend suite and lint remain tracked in the validation plan below.
 14. `cd backend && npm run test:coverage` passes unchanged, and `git diff` shows no backend change.
 15. `npm run release -- --notes v1.0.3` prints the section body.
 
@@ -662,7 +650,7 @@ order leaves `Shirt.tsx` reading fields the API no longer sends.
 | What | Command | Expected |
 |---|---|---|
 | Badge helper | `cd frontend && npx vitest run src/lib/shirtBadges.test.ts` | `Tests 7 passed (7)` |
-| Shirt component | `cd frontend && npx vitest run src/components/Shirt.badges.test.tsx` | `Tests 9 passed (9)` |
+| Shirt component | `cd frontend && npx vitest run src/components/Shirt.badges.test.tsx` | `Tests 11 passed (11)` |
 | Frontend gate | `cd frontend && npm run test` | `Test Files 11 passed (11)` |
 | Type-check | `cd frontend && npx tsc --noEmit` | exit 0 |
 | Lint | `cd frontend && npm run lint` | exit 0 |
@@ -681,7 +669,7 @@ order leaves `Shirt.tsx` reading fields the API no longer sends.
 | A nullable or optional event field arrives | Badges silently vanish, or the type claims a value that is not there | Both fields are required `number`s; Task 2 Step 2.6 passes them through untouched and adds no `?? 0` |
 | Someone adds an availability flag | The honest answer "no, the data may be missing" gets smuggled in — §3.1 forbids it | Task 3 Step 3.4 greps for it; Global Constraints state the rule; the CHANGELOG records it |
 | The send-off badge becomes a scored clue | An unmeasured, R2-exposed number starts moving scores | Task 3 Step 3.3 greps scoring and game state; Global Constraints state decoration-only in every mode |
-| Badge collides with the correct/failed `StateBadge` | Two overlays on one corner | StateBadge is `-right-1 -top-1`, badges are `-left-1 -top-1`; Step 2.8 fixes both classes |
+| Event badges collide with the correct/failed `StateBadge` | The state mark can cover the end of a multi-goal row | Keep events grouped at the left and the state mark at the right of a row that grows to fit its contents; cover the five-goal case in the component suite |
 | The component test is never collected | The patch reports green while shipping nothing | The test lives under `src/`, Step 2.10 asserts exactly 11 collected files, and Step 2.13 diffs the vitest config |
 | Widening the vitest include from here | `Shirt.colors.test.tsx` surfaces a pre-existing failure and drags v1.0.3 into v1.1.1's budget (R7) | Explicitly forbidden in Global Constraints and Step 2.10 |
 | A visually wrong send-off icon ships | The known R2 consequence | Decoration-only in every mode, and absent rather than wrong on unseeded games (§3.1) |
