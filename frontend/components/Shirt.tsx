@@ -150,10 +150,19 @@ function StateBadge({ state }: { state: Extract<ShirtState, 'correct' | 'failed'
  */
 function BadgeIcon({ badge }: { badge: ShirtBadge }) {
   if (badge === 'scorer') {
+    // Ball outline + centre panel + five seams. Uniform 1-unit strokes so the
+    // shape stays legible at 12px instead of collapsing into a solid dot.
     return (
-      <svg viewBox="0 0 12 12" className="h-3 w-3" fill="none" aria-hidden="true">
-        <circle cx="6" cy="6" r="5" fill="currentColor" />
-        <path d="M6 3.2 8.1 4.8 7.4 7.3 4.6 7.3 3.9 4.8Z" fill="currentColor" opacity="0.3" />
+      <svg viewBox="0 0 12 12" className="h-3.5 w-3.5" fill="none" aria-hidden="true">
+        <g stroke="currentColor" strokeWidth="1" strokeLinecap="round" strokeLinejoin="round">
+          <circle cx="6" cy="6" r="4.6" />
+          <path d="M6 4.45 L7.47 5.52 L6.91 7.25 L5.09 7.25 L4.53 5.52 Z" />
+          <path d="M6 4.45 V1.4" />
+          <path d="M7.47 5.52 10.38 4.58" />
+          <path d="M6.91 7.25 8.7 9.72" />
+          <path d="M5.09 7.25 3.3 9.72" />
+          <path d="M4.53 5.52 1.62 4.58" />
+        </g>
       </svg>
     );
   }
