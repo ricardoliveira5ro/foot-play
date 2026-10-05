@@ -8,6 +8,38 @@ from, and release notes are taken from the entry itself.
 
 ---
 
+## v1.0.3 — Scorer and send-off shirt badges
+
+_2026-09-29_
+
+### Added
+
+- **`frontend/src/lib/shirtBadges.ts`** — pure `badgesForShirt({ goals,
+  redCards })` returning one scorer badge per goal, followed by a send-off
+  badge when applicable. Kept React-free so v1.2's difficulty modes can read
+  the same decision without importing the component.
+- **Scorer and send-off badges on the tactic-board shirts**, with the badge
+  wording carried into the shirt's accessible name.
+
+### Notes
+
+- **Graceful degradation is per game, not per shirt.** A game seeded before
+  v1.0.1 reports `0` for all 22 shirts and shows no badges anywhere. There is
+  no availability flag and none will be added: `0` is indistinguishable from
+  "did not score", so the UI cannot ask whether the data is present.
+- **The scorer badge is a scored clue in Easy and Normal (v1.2.2). The
+  send-off badge is decoration in every mode and never affects scoring or
+  the multiplier.** Scoring code does not reference either.
+- The dismissal data behind the send-off badge is the known-risky part of
+  v1.0 (R2). A wrong-looking icon is tolerable; a wrong-looking *scoring
+  clue* is not, which is why only the scorer badge is ever scored.
+- **Test placement:** the component test lives at
+  `frontend/src/components/Shirt.badges.test.tsx` because
+  `frontend/vitest.config.ts` collects `src/**` only. Widening that include
+  is v1.1.1's job (R7), deliberately not this one.
+- No change to `TacticBoard`, `page.tsx` or `gameState` — `ShirtData extends
+  LineupPlayer`, so the two fields arrive on the existing prop.
+
 ## v1.0.2 — Event columns on the API & Game filter indexes
 
 _2026-10-04_

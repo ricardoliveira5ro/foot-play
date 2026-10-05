@@ -110,7 +110,7 @@ on screen. Nothing else in v1.x depends on v1.0 being *complete*; see §3.1.
 |---|---|---|
 | v1.0.1 | `game_events.csv` downloaded, parsed and written into `Appearance.goals` / `assists` / `redCards` by the seed. Includes measuring the real dismissal, own-goal and shootout label vocabulary before the mapping is frozen. | v0.2.5 — columns stay at their `@default(0)`, app behaves exactly as it does today |
 | v1.0.2 | Event columns exposed on the match/lineup API response; indexes added on `Game.season`, `Game.date`, `Game.targetTeamId` | v1.0.1 |
-| v1.0.3 | Scorers icon and red-card icon rendered on shirts, with graceful degradation. The **scorers icon is a scored clue** in Easy and Normal (§5.1); the **red-card icon is decoration only, in every mode** (§3.1) | v1.0.2 |
+| v1.0.3 | One football badge per goal and a red-card badge rendered on shirts, with graceful degradation. Event badges align at the left/start of one row; correct/wrong marks align at the right/end after guessing. Hover uses a pointer cursor without lifting the shirt. The **scorers icon is a scored clue** in Easy and Normal (§5.1); the **red-card icon is decoration only, in every mode** (§3.1) | v1.0.2 |
 
 `game_events.csv` is not currently downloaded and is not on disk. It is estimated
 at ~1.27M rows / ~170 MB decompressed. Its join key is `game_id` + `player_id`,
