@@ -90,7 +90,8 @@ export default function MissingElevenPage() {
       setLoading(true);
       fetchRandomMatch()
         .then((response) => {
-          startNewGame(response);
+          if (response) startNewGame(response);
+          else setError('No playable matches are available.');
         })
         .catch((cause: unknown) => {
           setError(describeError(cause));
@@ -182,7 +183,8 @@ export default function MissingElevenPage() {
     setLoading(true);
     fetchRandomMatch()
       .then((response) => {
-        startNewGame(response);
+        if (response) startNewGame(response);
+        else setError('No playable matches are available.');
       })
       .catch((cause: unknown) => {
         setError(describeError(cause));
@@ -197,7 +199,8 @@ export default function MissingElevenPage() {
     setLoading(true);
     fetchRandomMatch()
       .then((response) => {
-        startNewGame(response);
+        if (response) startNewGame(response);
+        else setError('No playable matches are available.');
       })
       .catch((cause: unknown) => {
         setError(describeError(cause));

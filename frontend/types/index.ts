@@ -74,6 +74,50 @@ export interface PlayerSearchResult {
 /** GET /api/players?name=<query> returns a bare array of results. */
 export type PlayerSearchResponse = PlayerSearchResult[];
 
+/** URL and API filter state. Null means the dimension is not selected. */
+export interface GameFilterParams {
+  teamIds: number[] | null;
+  opponentIds: number[] | null;
+  competitionIds: string[] | null;
+  seasonFrom: number | null;
+  seasonTo: number | null;
+}
+
+export const EMPTY_FILTERS: Readonly<GameFilterParams> = Object.freeze({
+  teamIds: null,
+  opponentIds: null,
+  competitionIds: null,
+  seasonFrom: null,
+  seasonTo: null,
+});
+
+/** Named option and server count for competition selectors. */
+export interface FilterOption {
+  id: string;
+  name: string;
+  count: number;
+}
+
+export interface SeasonOption {
+  season: number;
+  count: number;
+}
+
+export interface TeamOption {
+  id: number;
+  name: string;
+  isNationalTeam: boolean;
+  count: number;
+}
+
+export interface FilterOptionsResponse {
+  teams: TeamOption[];
+  opponents: TeamOption[];
+  competitions: FilterOption[];
+  seasons: SeasonOption[];
+  total: number;
+}
+
 /**
  * Visual state of a shirt on the tactic board.
  * Exactly four values — do not extend without updating Shirt.tsx.
