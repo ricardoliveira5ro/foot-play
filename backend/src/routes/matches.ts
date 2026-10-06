@@ -1,6 +1,8 @@
 import { Router } from 'express';
 import { asyncHandler } from '../middleware/asyncHandler';
 import { getRandomMatch, buildMatchResponse, getMatchById } from '../services/matchService';
+import { getFilterOptions } from '../services/filterService';
+import type { GameFilterParams } from '../lib/filterQuery';
 import { validateNonNegativeIntParam } from '../middleware/validate';
 
 const router = Router();
@@ -14,6 +16,19 @@ router.get('/random', asyncHandler(async (_req, res) => {
 
   const response = buildMatchResponse(game);
   res.json(response);
+}));
+
+// MUST stay above '/:id' — Express would otherwise match 'filter-options' as a game id.
+router.get('/filter-options', asyncHandler(async (req, res) => {
+  const filters: GameFilterParams = {
+    teamIds: parseIdList(req.query.teamIds),
+    opponentIds: parseIdList(req.query.opponentIds),
+    competitionIds: parseCompetitionIds(req.query.competitionIds),
+    seasonFrom: parseSeason(req.query.seasonFrom),
+    seasonTo: parseSeason(req.query.seasonTo),
+  };
+
+  res.json(await getFilterOptions(filters));
 }));
 
 router.get('/:id', asyncHandler(async (req, res) => {
@@ -34,3 +49,41 @@ router.get('/:id', asyncHandler(async (req, res) => {
 }));
 
 export default router;
+
+function queryString(value: unknown): string | null {
+  return typeof value === 'string' ? value : null;
+}
+
+function parseIdList(value: unknown): number[] | null {
+  const raw = queryString(value);
+  if (raw === null) return null;
+
+  const ids = raw.split(',').flatMap((part) => {
+    const token = part.trim();
+    if (!/^\d+$/.test(token)) return [];
+    const id = Number(token);
+    return Number.isSafeInteger(id) ? [id] : [];
+  });
+
+  return ids.length > 0 ? ids : null;
+}
+
+function parseCompetitionIds(value: unknown): string[] | null {
+  const raw = queryString(value);
+  if (raw === null) return null;
+
+  const ids = raw.split(',')
+    .map((part) => part.trim())
+    .filter((id) => /^[A-Za-z0-9_-]{1,32}$/.test(id));
+
+  return ids.length > 0 ? ids : null;
+}
+
+function parseSeason(value: unknown): number | null {
+  const raw = queryString(value)?.trim();
+  if (!raw || !/^-?\d+$/.test(raw)) return null;
+
+  const season = Number(raw);
+  if (!Number.isSafeInteger(season)) return null;
+  return Math.min(2025, Math.max(2013, season));
+}
