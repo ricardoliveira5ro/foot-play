@@ -32,7 +32,7 @@ export function filtersToParams(filters: GameFilterParams): URLSearchParams {
 export function isValidGameFilters(value: unknown): value is GameFilterParams {
   if (typeof value !== 'object' || value === null || Array.isArray(value)) return false;
   const filters = value as Record<string, unknown>;
-  if (Object.keys(filters).sort().join(',') !== [...FILTER_KEYS].sort().join(',')) return false;
+  if (Object.keys(filters).sort((a, b) => a.localeCompare(b)).join(',') !== [...FILTER_KEYS].sort((a, b) => a.localeCompare(b)).join(',')) return false;
   return validIdArray(filters.teamIds)
     && validIdArray(filters.opponentIds)
     && validCompetitionArray(filters.competitionIds)

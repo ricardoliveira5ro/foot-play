@@ -232,6 +232,23 @@ describe('GameComplete', () => {
 
     expect(screen.getByLabelText('Shirt 20')).toBeInTheDocument();
     expect(screen.queryByLabelText('Shirt 10')).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole('tab', { name: /Switch to Target FC lineup/ }));
+
+    expect(screen.getByLabelText('Shirt 10')).toBeInTheDocument();
+    expect(screen.queryByLabelText('Shirt 20')).not.toBeInTheDocument();
+  });
+
+  it('sorts mixed known, unknown, and missing positions', () => {
+    renderGameComplete({
+      targetShirts: [
+        makeShirt({ token: 'n', position: null, shirtNumber: 7 }),
+        makeShirt({ token: 'u', position: 'Libero', shirtNumber: 5 }),
+        makeShirt({ token: 'k', position: 'GK', shirtNumber: 1 }),
+      ],
+    });
+    const numbers = screen.getAllByLabelText(/^Shirt /).map((el) => el.textContent);
+    expect(numbers).toEqual(['1', '7', '5']);
   });
 
   it('calls onPlayAgain when Play Again is clicked', async () => {

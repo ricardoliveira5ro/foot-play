@@ -57,6 +57,21 @@ describe('paramsToFilters', () => {
       competitionIds: ['LA-LIGA'],
     });
   });
+
+  it('drops zero and non-representable team ids', () => {
+    expect(paramsToFilters(new URLSearchParams('teamIds=0,5'))).toMatchObject({ teamIds: [5] });
+    expect(paramsToFilters(new URLSearchParams('teamIds=99999999999999999999,5'))).toMatchObject({ teamIds: [5] });
+    expect(paramsToFilters(new URLSearchParams('teamIds=0'))).toEqual(EMPTY_FILTERS);
+  });
+
+  it('drops invalid competition ids, keeping the valid ones', () => {
+    expect(paramsToFilters(new URLSearchParams('competitionIds=LL,not safe'))).toMatchObject({
+      competitionIds: ['LL'],
+    });
+    expect(paramsToFilters(new URLSearchParams('competitionIds=not safe'))).toMatchObject({
+      competitionIds: null,
+    });
+  });
 });
 
 describe('filtersToParams', () => {
@@ -105,5 +120,11 @@ describe('isValidGameFilters', () => {
 
   it('rejects an unknown extra key', () => {
     expect(isValidGameFilters({ ...EMPTY_FILTERS, daily: true })).toBe(false);
+  });
+
+  it('rejects non-object inputs', () => {
+    expect(isValidGameFilters(null)).toBe(false);
+    expect(isValidGameFilters('teamIds=1')).toBe(false);
+    expect(isValidGameFilters([])).toBe(false);
   });
 });

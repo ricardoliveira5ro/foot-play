@@ -189,6 +189,16 @@ describe('gameReducer', () => {
       expect(state.opponentShirts).toHaveLength(0);
     });
 
+    it('treats missing clubs as not curated when picking a side', () => {
+      mockCoinFlip(0);
+      const noClubs = makeMatch({
+        game: { ...makeMatch().game, homeClub: null, awayClub: null },
+      });
+      const state = gameReducer(initialState, { type: 'SET_MATCH', payload: noClubs });
+      expect(state.teamSide).toBe('home');
+      expect(state.targetShirts).toHaveLength(2);
+    });
+
     it('returns the state unchanged for an unknown action type', () => {
       const state = playingState();
       const next = gameReducer(state, { type: 'UNKNOWN' } as unknown as GameAction);

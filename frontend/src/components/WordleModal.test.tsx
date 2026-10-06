@@ -303,6 +303,17 @@ describe('WordleModal', () => {
       expect(submit).toBeDisabled();
       expect(within(within(getGrid()).getAllByRole('row')[0]).getAllByLabelText('empty')).toHaveLength(2);
     });
+
+    it('ignores on-screen letter presses once the guess is full', async () => {
+      const user = userEvent.setup();
+      renderModal({ nameLength: 1 });
+
+      await user.click(screen.getByRole('button', { name: 'A' }));
+      await user.click(screen.getByRole('button', { name: 'B' }));
+
+      expect(getCurrentLetter('A')).toBeInTheDocument();
+      expect(getCurrentLetter('B')).not.toBeInTheDocument();
+    });
   });
 
   describe('dismissal and accessibility', () => {

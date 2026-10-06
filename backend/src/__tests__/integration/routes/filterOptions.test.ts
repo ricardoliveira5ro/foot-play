@@ -21,22 +21,12 @@ describe('GET /api/matches/filter-options', () => {
     expect(response.body.total).toBe(1);
   });
 
-  it('ORs values within a dimension', async () => {
-    const response = await request(app).get('/api/matches/filter-options?teamIds=1,2');
-
-    expect(response.status).toBe(200);
-    expect(response.body.total).toBe(1);
-  });
-
-  it('tolerates whitespace and ignores non-integer team ids', async () => {
-    const response = await request(app).get('/api/matches/filter-options?teamIds=%201,nope,,2%20');
-
-    expect(response.status).toBe(200);
-    expect(response.body.total).toBe(1);
-  });
-
-  it('ignores an unparseable season and returns 200', async () => {
-    const response = await request(app).get('/api/matches/filter-options?seasonFrom=2024x');
+  it.each([
+    { name: 'ORs values within a dimension', query: 'teamIds=1,2' },
+    { name: 'tolerates whitespace and ignores non-integer team ids', query: 'teamIds=%201,nope,,2%20' },
+    { name: 'ignores an unparseable season and returns 200', query: 'seasonFrom=2024x' },
+  ])('$name', async ({ query }) => {
+    const response = await request(app).get(`/api/matches/filter-options?${query}`);
 
     expect(response.status).toBe(200);
     expect(response.body.total).toBe(1);
@@ -56,6 +46,18 @@ describe('GET /api/matches/filter-options', () => {
 
     expect(unknown.body.total).toBe(1);
     expect(unsafe.body.total).toBe(1);
+  });
+
+  it.each([
+    { name: 'drops non-representable team ids but keeps the valid ones', query: 'teamIds=1,99999999999999999999' },
+    { name: 'treats a non-numeric team id list as unfiltered', query: 'teamIds=abc' },
+    { name: 'drops unsafe competition identifiers', query: 'competitionIds=!!!' },
+    { name: 'treats an unrepresentable season as unfiltered', query: 'seasonFrom=99999999999999999999' },
+  ])('$name', async ({ query }) => {
+    const response = await request(app).get(`/api/matches/filter-options?${query}`);
+
+    expect(response.status).toBe(200);
+    expect(response.body.total).toBe(1);
   });
 
   it('never returns a count derived from an incomplete game', async () => {

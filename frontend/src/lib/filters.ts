@@ -69,6 +69,6 @@ function stringValue(value: unknown): string | null {
 function parseSeason(value: unknown): number | null {
   if (typeof value === 'number' && Number.isInteger(value)) return value;
   if (typeof value !== 'string') return null;
-  const match = value.match(/^(\d{4})/);
+  const match = /^(\d{4})/.exec(value);
   return match ? Number(match[1]) : null;
 }

@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import request from 'supertest';
 import { app } from '../../../app';
 import { prisma } from '../../../prisma';
-import { seed } from '../../setup/seed';
+import { seed, createCompleteGame } from '../../setup/seed';
 
 describe('GET /api/matches/random', () => {
   it('returns 200 with a full match response', async () => {
@@ -70,5 +70,32 @@ describe('GET /api/matches/:id', () => {
   it('returns 400 for fractional id', async () => {
     const res = await request(app).get('/api/matches/1.5');
     expect(res.status).toBe(400);
+  });
+});
+
+describe('GET /api/matches/random with a dated complete match', () => {
+  it('converts a stored date into the response', async () => {
+    await prisma.competition.create({
+      data: { competitionId: 'DATE-COMP', name: 'Date Comp' },
+    });
+    try {
+      await createCompleteGame({
+        gameId: 50,
+        homeClubId: 1,
+        awayClubId: 2,
+        competitionId: 'DATE-COMP',
+        season: 2025,
+        date: new Date('2025-03-01T00:00:00Z'),
+      });
+      const res = await request(app).get('/api/matches/random?competitionIds=DATE-COMP');
+      expect(res.status).toBe(200);
+      expect(res.body.game.gameId).toBe(50);
+      expect(res.body.game.date).toBe('2025-03-01');
+    } finally {
+      await prisma.appearance.deleteMany({ where: { gameId: 50 } });
+      await prisma.game.deleteMany({ where: { gameId: 50 } });
+      await prisma.player.deleteMany({ where: { playerId: { gte: 6000, lt: 6100 } } });
+      await prisma.competition.delete({ where: { competitionId: 'DATE-COMP' } });
+    }
   });
 });

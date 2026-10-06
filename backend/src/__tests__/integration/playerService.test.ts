@@ -53,4 +53,12 @@ describe('getPlayers', () => {
       'San-Jose',
     ]);
   });
+
+  it('sorts displayName and name-fallback players together', async () => {
+    const players = await getPlayers('e');
+    expect(players.length).toBeGreaterThan(1);
+    expect(players.some(p => p.id === 114)).toBe(true);
+    const names = players.map(p => p.name);
+    expect(names).toEqual([...names].sort((a, b) => a.localeCompare(b)));
+  });
 });
