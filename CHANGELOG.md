@@ -8,6 +8,38 @@ from, and release notes are taken from the entry itself.
 
 ---
 
+## v1.1.1 — Filter foundation
+
+_2026-10-06 · Spec: `docs/v1/v1.1/plan-v1.1.1-filter-foundation.md`_
+
+### Added
+
+- **Complete-lineup filtering** — random match selection and filter counts now
+  exclude games unless each club has exactly 11 distinct starting-lineup
+  players.
+- **`GET /api/matches/filter-options`** — returns team, opponent, competition,
+  and season options with post-filter counts and a matching total. Counts are
+  computed together, retain zero-count options, and exclude each selected
+  dimension from its own facet counts.
+- **Shared filter foundation** — added frontend filter types, URL helpers,
+  filter predicates, API client support, and matching mock behavior. Filtered
+  parameters now apply to random match selection as well.
+- **Player name consistency** — player search and its response use
+  `displayName ?? name`.
+- **Frontend test discovery** — Vitest now collects tests from `src/`,
+  `components/`, `tests/`, and `app/`; the shadow config was removed and the
+  Shirt colour checks are executable tests.
+
+### Notes
+
+- No filter controls are rendered in this release; the UI ships in a later
+  v1.1 patch.
+- Completeness is enforced per game, with 11 players for each game-specific
+  club. Games with incomplete lineups are excluded from random matches and all
+  filter option counts.
+
+---
+
 ## v1.0.3 — Scorer and send-off shirt badges
 
 _2026-09-29_
