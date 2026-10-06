@@ -6,11 +6,32 @@ import {
   buildMatchResponse,
   getPlayerNameForAppearance,
   getRevealAppearances,
+  hasCompleteLineups,
 } from '../../services/matchService';
 import { generatePlayerToken } from '../../services/tokenService';
 import { seed } from '../setup/seed';
 
 describe('getRandomMatch', () => {
+  it('never returns a game with an incomplete lineup', async () => {
+    const gameIds = new Set<number>();
+
+    for (let attempt = 0; attempt < 200; attempt += 1) {
+      const game = await getRandomMatch();
+      expect(game).not.toBeNull();
+      expect(hasCompleteLineups(game!)).toBe(true);
+      gameIds.add(game!.gameId);
+    }
+
+    expect([...gameIds].every((gameId) => gameId === 5)).toBe(true);
+  });
+
+  it('excludes incomplete games from the candidate set', async () => {
+    await prisma.appearance.deleteMany({ where: { gameId: 5 } });
+
+    await expect(getRandomMatch()).rejects.toMatchObject({ code: 'NOT_FOUND', status: 404 });
+    await seed();
+  });
+
   it('returns a game with relations', async () => {
     // Scope the DB to game 1 so the random pick is deterministic
     await prisma.appearance.deleteMany({ where: { gameId: { in: [2, 3] } } });

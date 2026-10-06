@@ -18,7 +18,7 @@ describe('GET /api/matches/random', () => {
     await prisma.game.deleteMany();
     const res = await request(app).get('/api/matches/random');
     expect(res.status).toBe(404);
-    expect(res.body).toEqual({ error: 'No matches available', code: 'NOT_FOUND' });
+    expect(res.body).toEqual({ error: 'No playable matches available', code: 'NOT_FOUND' });
     await seed();
   });
 });
