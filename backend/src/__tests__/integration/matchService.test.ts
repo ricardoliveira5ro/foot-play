@@ -25,6 +25,28 @@ describe('getRandomMatch', () => {
     expect([...gameIds].every((gameId) => gameId === 5)).toBe(true);
   });
 
+  it('applies all selected dimensions when choosing a random game', async () => {
+    const game = await getRandomMatch({
+      teamIds: [1],
+      opponentIds: [2],
+      competitionIds: ['TEST-COMP'],
+      seasonFrom: 2024,
+      seasonTo: 2024,
+    });
+
+    expect(game?.gameId).toBe(5);
+  });
+
+  it('returns NOT_FOUND when no complete game matches the filters', async () => {
+    await expect(getRandomMatch({
+      teamIds: [2],
+      opponentIds: null,
+      competitionIds: null,
+      seasonFrom: null,
+      seasonTo: null,
+    })).rejects.toMatchObject({ code: 'NOT_FOUND', status: 404 });
+  });
+
   it('excludes incomplete games from the candidate set', async () => {
     await prisma.appearance.deleteMany({ where: { gameId: 5 } });
 

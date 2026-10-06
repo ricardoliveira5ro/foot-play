@@ -7,8 +7,8 @@ import { validateNonNegativeIntParam } from '../middleware/validate';
 
 const router = Router();
 
-router.get('/random', asyncHandler(async (_req, res) => {
-  const game = await getRandomMatch();
+router.get('/random', asyncHandler(async (req, res) => {
+  const game = await getRandomMatch(parseGameFilterParams(req.query));
 
   if (!game) {
     return res.status(404).json({ error: 'No matches available', code: 'NOT_FOUND' });
@@ -20,15 +20,7 @@ router.get('/random', asyncHandler(async (_req, res) => {
 
 // MUST stay above '/:id' — Express would otherwise match 'filter-options' as a game id.
 router.get('/filter-options', asyncHandler(async (req, res) => {
-  const filters: GameFilterParams = {
-    teamIds: parseIdList(req.query.teamIds),
-    opponentIds: parseIdList(req.query.opponentIds),
-    competitionIds: parseCompetitionIds(req.query.competitionIds),
-    seasonFrom: parseSeason(req.query.seasonFrom),
-    seasonTo: parseSeason(req.query.seasonTo),
-  };
-
-  res.json(await getFilterOptions(filters));
+  res.json(await getFilterOptions(parseGameFilterParams(req.query)));
 }));
 
 router.get('/:id', asyncHandler(async (req, res) => {
@@ -49,6 +41,16 @@ router.get('/:id', asyncHandler(async (req, res) => {
 }));
 
 export default router;
+
+function parseGameFilterParams(query: Record<string, unknown>): GameFilterParams {
+  return {
+    teamIds: parseIdList(query.teamIds),
+    opponentIds: parseIdList(query.opponentIds),
+    competitionIds: parseCompetitionIds(query.competitionIds),
+    seasonFrom: parseSeason(query.seasonFrom),
+    seasonTo: parseSeason(query.seasonTo),
+  };
+}
 
 function queryString(value: unknown): string | null {
   return typeof value === 'string' ? value : null;

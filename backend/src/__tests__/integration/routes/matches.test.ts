@@ -13,6 +13,15 @@ describe('GET /api/matches/random', () => {
     expect(Array.isArray(res.body.awayLineup)).toBe(true);
   });
 
+  it('applies filters to random match selection', async () => {
+    const matching = await request(app).get('/api/matches/random?teamIds=1&opponentIds=2');
+    const empty = await request(app).get('/api/matches/random?teamIds=2');
+
+    expect(matching.status).toBe(200);
+    expect(matching.body.game.gameId).toBe(5);
+    expect(empty.status).toBe(404);
+  });
+
   it('returns 404 when no matches exist', async () => {
     await prisma.appearance.deleteMany();
     await prisma.game.deleteMany();

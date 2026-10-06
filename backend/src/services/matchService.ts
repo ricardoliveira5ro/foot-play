@@ -4,6 +4,7 @@ import { Prisma } from '../generated/prisma/client';
 import { normalize, getWordBoundaries } from './wordle';
 import { generatePlayerToken, resolvePlayerToken } from './tokenService';
 import { completeLineupsWhere } from '../lib/lineupCompleteness';
+import { allFiltersWhere, type GameFilterParams } from '../lib/filterQuery';
 
 export type GameWithRelations = Prisma.GameGetPayload<{
   include: {
@@ -16,14 +17,22 @@ export type GameWithRelations = Prisma.GameGetPayload<{
 
 export { hasCompleteLineups } from '../lib/lineupCompleteness';
 
-export async function getRandomMatch(): Promise<GameWithRelations | null> {
+const EMPTY_GAME_FILTERS: GameFilterParams = {
+  teamIds: null,
+  opponentIds: null,
+  competitionIds: null,
+  seasonFrom: null,
+  seasonTo: null,
+};
+
+export async function getRandomMatch(filters: GameFilterParams = EMPTY_GAME_FILTERS): Promise<GameWithRelations | null> {
   const [row] = await prisma.$queryRaw<{
     game: (Omit<GameWithRelations, 'date'> & { date: string | null }) | null;
   }[]>`
     WITH eligible AS MATERIALIZED (
       SELECT g.*
       FROM "Game" g
-      WHERE ${completeLineupsWhere()}
+      WHERE ${completeLineupsWhere()} ${allFiltersWhere(filters)}
     ), picked AS (
       SELECT * FROM eligible
       ORDER BY "gameId"
