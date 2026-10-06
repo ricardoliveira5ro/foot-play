@@ -1,5 +1,66 @@
 import { prisma } from '../../prisma';
 
+export const LINEUP_SIZE = 11;
+
+export async function createCompleteGame(opts: {
+  gameId: number;
+  homeClubId: number;
+  awayClubId: number;
+  competitionId?: string;
+  season?: number | null;
+  round?: string | null;
+  date?: Date | null;
+}): Promise<number> {
+  if (opts.homeClubId === opts.awayClubId) {
+    throw new Error('A complete game must have different home and away clubs');
+  }
+
+  const playerIds = Array.from({ length: LINEUP_SIZE * 2 }, (_, index) =>
+    1000 + opts.gameId * 100 + index,
+  );
+  if (new Set(playerIds).size !== LINEUP_SIZE * 2) {
+    throw new Error('A complete game fixture must use 22 distinct players');
+  }
+
+  const game = await prisma.game.create({
+    data: {
+      gameId: opts.gameId,
+      competitionId: opts.competitionId ?? 'TEST-COMP',
+      season: opts.season ?? null,
+      round: opts.round ?? null,
+      date: opts.date ?? null,
+      homeClubId: opts.homeClubId,
+      awayClubId: opts.awayClubId,
+      targetTeamId: opts.homeClubId,
+      opponentTeamId: opts.awayClubId,
+      homeClubGoals: null,
+      awayClubGoals: null,
+      homeClubFormation: null,
+      awayClubFormation: null,
+    },
+  });
+
+  await prisma.player.createMany({
+    data: playerIds.map((playerId, index) => ({
+      playerId,
+      name: `Fixture XI ${index + 1}`,
+    })),
+  });
+
+  await prisma.appearance.createMany({
+    data: playerIds.map((playerId, index) => ({
+      gameId: opts.gameId,
+      clubId: index < LINEUP_SIZE ? opts.homeClubId : opts.awayClubId,
+      playerId,
+      number: (index % LINEUP_SIZE) + 1,
+      type: 'starting_lineup',
+      position: null,
+    })),
+  });
+
+  return game.gameId;
+}
+
 /**
  * Idempotent test seed: wipes all tables (FK order) then recreates minimal
  * data. Safe to call mid-run to restore state after destructive tests.
@@ -95,5 +156,12 @@ export async function seed(): Promise<void> {
       { gameId: 2, clubId: 1, playerId: 111, number: 7, type: 'starting_lineup', position: null },
       { gameId: 2, clubId: 1, playerId: 114, number: null, type: 'starting_lineup', position: 'centre-forward' },
     ],
+  });
+
+  await createCompleteGame({
+    gameId: 5,
+    homeClubId: 1,
+    awayClubId: 2,
+    season: 2024,
   });
 }
