@@ -1,6 +1,21 @@
-import type { GameResponse, PlayerSearchResult, GuessResponse, RevealResponse, RevealOneResponse, TeamSide } from '@/types';
-import MOCK_MATCHES from './mockData';
+import type {
+  FilterOptionsResponse,
+  GameFilterParams,
+  GameResponse,
+  PlayerSearchResult,
+  GuessResponse,
+  RevealResponse,
+  RevealOneResponse,
+  TeamSide,
+} from '@/types';
+import MOCK_MATCHES, {
+  getMockFilterOptions,
+  getMockRandomMatch,
+  searchMockPlayers,
+} from './mockData';
 import { evaluateGuess } from '@/lib/wordle';
+import { EMPTY_FILTERS } from '@/types';
+import { filtersToParams } from '@/lib/filterParams';
 
 /**
  * API client for the FootPlay backend.
@@ -35,13 +50,71 @@ async function requestJson<T>(path: string): Promise<T> {
   return (await response.json()) as T;
 }
 
+function querySuffix(filters: GameFilterParams): string {
+  const query = filtersToParams(filters).toString();
+  return query ? `?${query}` : '';
+}
+
+async function requestRandomMatch(path: string): Promise<GameResponse | null> {
+  let response: Response;
+  try {
+    response = await fetch(`${API_BASE_URL}${path}`);
+  } catch (cause) {
+    const reason = cause instanceof Error ? cause.message : String(cause);
+    throw new Error(`Network error calling ${path}: ${reason}`);
+  }
+  if (response.status === 404) return null;
+  if (!response.ok) {
+    throw new Error(`API request failed: ${path} responded ${response.status} ${response.statusText}`);
+  }
+  const body = await response.text();
+  return body.trim() ? JSON.parse(body) as GameResponse : null;
+}
+
+function isFilterOptionsResponse(value: unknown): value is FilterOptionsResponse {
+  if (typeof value !== 'object' || value === null) return false;
+  const result = value as Partial<FilterOptionsResponse>;
+  const isCount = (count: unknown) => typeof count === 'number' && Number.isFinite(count);
+  return Array.isArray(result.teams)
+    && result.teams.every((option) => typeof option.id === 'number'
+      && typeof option.name === 'string'
+      && typeof option.isNationalTeam === 'boolean'
+      && isCount(option.count))
+    && Array.isArray(result.opponents)
+    && result.opponents.every((option) => typeof option.id === 'number'
+      && typeof option.name === 'string'
+      && typeof option.isNationalTeam === 'boolean'
+      && isCount(option.count))
+    && Array.isArray(result.competitions)
+    && result.competitions.every((option) => typeof option.id === 'string'
+      && typeof option.name === 'string'
+      && isCount(option.count))
+    && Array.isArray(result.seasons)
+    && result.seasons.every((option) => Number.isInteger(option.season) && isCount(option.count))
+    && isCount(result.total);
+}
+
 /** GET /api/matches/random — a random match with both full lineups. */
-export async function fetchRandomMatch(): Promise<GameResponse> {
+export async function fetchRandomMatch(filters: GameFilterParams = EMPTY_FILTERS): Promise<GameResponse | null> {
   if (USE_MOCK) {
     await delay(MOCK_DELAY_MS);
-    return MOCK_MATCHES[Math.floor(Math.random() * MOCK_MATCHES.length)];
+    return getMockRandomMatch(filters);
   }
-  return requestJson<GameResponse>('/api/matches/random');
+  return requestRandomMatch(`/api/matches/random${querySuffix(filters)}`);
+}
+
+/** GET /api/matches/filter-options — counts and selectable filter options. */
+export async function fetchFilterOptions(filters: GameFilterParams = EMPTY_FILTERS): Promise<FilterOptionsResponse> {
+  if (USE_MOCK) {
+    await delay(MOCK_DELAY_MS);
+    return getMockFilterOptions(filters);
+  }
+  const path = `/api/matches/filter-options${querySuffix(filters)}`;
+  const response = await requestJson<unknown>(path);
+  if (!isFilterOptionsResponse(response)) {
+    throw new Error(`API request returned invalid filter options: ${path}`);
+  }
+  return response;
 }
 
 /** GET /api/matches/:id — a specific match with both full lineups. */
@@ -61,19 +134,7 @@ export async function fetchMatchById(id: number): Promise<GameResponse> {
 export async function searchPlayers(query: string): Promise<PlayerSearchResult[]> {
   if (USE_MOCK) {
     await delay(MOCK_DELAY_MS);
-    const needle = query.trim().toLowerCase();
-    if (!needle) {
-      return [];
-    }
-    const byId = new Map<number, PlayerSearchResult>();
-    for (const entry of MOCK_MATCHES) {
-      for (const player of [...entry.homeLineup, ...entry.awayLineup]) {
-        if (player.displayName && !byId.has(player.playerId) && player.displayName.toLowerCase().includes(needle)) {
-          byId.set(player.playerId, { id: player.playerId, name: player.displayName });
-        }
-      }
-    }
-    return [...byId.values()];
+    return searchMockPlayers(query);
   }
   return requestJson<PlayerSearchResult[]>(`/api/players?name=${encodeURIComponent(query)}`);
 }

@@ -263,4 +263,9 @@ describe('getWordBoundaries', () => {
   it('returns the boundary index for De Bruyne', () => {
     expect(getWordBoundaries('De Bruyne')).toEqual([2]);
   });
+
+  it('records only one boundary for consecutive separators', () => {
+    expect(getWordBoundaries('a  b')).toEqual([1]);
+    expect(getWordBoundaries("O''Brien")).toEqual([1]);
+  });
 });

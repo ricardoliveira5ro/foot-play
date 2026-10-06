@@ -1,17 +1,12 @@
-/**
- * Test: Shirt component accepts and renders team-specific colors.
- *
- * This file validates the new `colors` prop at the TypeScript level.
- * Run `npx tsc --noEmit` to verify type correctness.
- */
-
+// @vitest-environment jsdom
+import { describe, expect, it } from 'vitest';
+import { render, screen } from '@testing-library/react';
 import Shirt from './Shirt';
-import type { TeamColorEntry } from '@/lib/teamColors';
-import type { ShirtData } from '@/types';
+import type { TeamColorEntry } from '../src/lib/teamColors';
+import type { ShirtData } from '../types';
 
-// Mock shirt data for testing
-const mockShirt: ShirtData = {
-  token: 'test-shirt-1',
+const shirt: ShirtData = {
+  token: 'test-shirt',
   nameLength: 8,
   shirtNumber: 10,
   coords: { x: 50, y: 50 },
@@ -24,33 +19,38 @@ const mockShirt: ShirtData = {
   isCaptain: false,
 };
 
-// Barcelona colors: stripes-v with primary #A50044, secondary #004D98
-const barcelonaColors: TeamColorEntry = {
-  primary: '#A50044',
-  secondary: '#004D98',
-  pattern: 'stripes-v',
+const colorsByPattern: Record<TeamColorEntry['pattern'], TeamColorEntry> = {
+  solid: { primary: '#A50044', secondary: '#004D98', pattern: 'solid' },
+  'stripes-v': { primary: '#A50044', secondary: '#004D98', pattern: 'stripes-v' },
+  'stripes-h': { primary: '#A50044', secondary: '#004D98', pattern: 'stripes-h' },
+  halves: { primary: '#A50044', secondary: '#004D98', pattern: 'halves' },
 };
 
-// All four pattern types must be accepted by the colors prop.
-const patterns: TeamColorEntry['pattern'][] = ['solid', 'stripes-v', 'stripes-h', 'halves'];
+describe('Shirt colours', () => {
+  it.each(Object.entries(colorsByPattern))('renders the %s pattern', (pattern, colors) => {
+    render(<Shirt shirt={shirt} index={0} colors={colors} />);
 
-// Render one shirt per pattern to exercise every branch of the renderer.
-const rendered = patterns.map((pattern, i) => (
-  <Shirt
-    key={pattern}
-    shirt={mockShirt}
-    index={i}
-    colors={{ primary: '#A50044', secondary: '#004D98', pattern }}
-  />
-));
+    const button = screen.getByRole('button', { name: 'Shirt 10, tap to guess the player' });
+    const shirtPath = button.querySelector('svg > path');
+    expect(shirtPath).not.toBeNull();
+    expect(shirtPath).toHaveAttribute('stroke', colors.secondary);
 
-// Shirt must still work without the colors prop (default white/ink behavior).
-const defaultShirt = <Shirt shirt={mockShirt} index={0} />;
+    if (pattern === 'stripes-v' || pattern === 'stripes-h') {
+      expect(shirtPath).toHaveAttribute('fill', `url(#pattern-test-shirt-${pattern === 'stripes-v' ? 'v' : 'h'})`);
+    } else {
+      expect(shirtPath).toHaveAttribute('fill', colors.primary);
+    }
 
-// Shirt must accept the Barcelona colors explicitly.
-const barcelonaShirt = <Shirt shirt={mockShirt} index={0} colors={barcelonaColors} />;
+    if (pattern === 'halves') {
+      expect(button.querySelector('svg rect[fill="#004D98"]')).not.toBeNull();
+    }
+  });
 
-console.log('Shirt colors test: All type checks passed!');
-console.log('Rendered patterns:', rendered.length);
-console.log('Default shirt present:', Boolean(defaultShirt));
-console.log('Barcelona shirt present:', Boolean(barcelonaShirt));
+  it('keeps the default fill and stroke when no team colours are provided', () => {
+    render(<Shirt shirt={shirt} index={0} />);
+
+    const shirtPath = screen.getByRole('button').querySelector('svg > path');
+    expect(shirtPath).toHaveAttribute('fill', '#F8FAF8');
+    expect(shirtPath).toHaveAttribute('stroke', '#101820');
+  });
+});

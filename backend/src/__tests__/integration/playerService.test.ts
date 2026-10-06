@@ -4,7 +4,7 @@ import { getPlayers } from '../../services/playerService';
 describe('getPlayers', () => {
   it('finds players by substring (case-insensitive)', async () => {
     const players = await getPlayers('messi');
-    expect(players).toEqual([{ id: 101, name: 'Lionel Messi' }]);
+    expect(players).toEqual([{ id: 101, name: 'Messi' }]);
   });
 
   it('matches case-insensitively', async () => {
@@ -18,6 +18,26 @@ describe('getPlayers', () => {
     expect(players.map(p => p.id)).toEqual([103]);
   });
 
+  it('matches a player whose searchable name lives only in displayName', async () => {
+    expect(await getPlayers('Pelé')).toEqual([{ id: 104, name: 'Pelé' }]);
+  });
+
+  it('matches a player whose searchable name falls back to name', async () => {
+    expect(await getPlayers('Test Player')).toEqual([{ id: 114, name: 'Test Player' }]);
+  });
+
+  it('does not match on name when displayName is populated', async () => {
+    expect(await getPlayers('Lionel')).toEqual([]);
+  });
+
+  it('returns displayName in the response when present', async () => {
+    expect(await getPlayers('Messi')).toEqual([{ id: 101, name: 'Messi' }]);
+  });
+
+  it('falls back to name in the response when displayName is null', async () => {
+    expect(await getPlayers('Test Player')).toEqual([{ id: 114, name: 'Test Player' }]);
+  });
+
   it('returns [] for no matches', async () => {
     expect(await getPlayers('zzzz')).toEqual([]);
   });
@@ -25,15 +45,20 @@ describe('getPlayers', () => {
   it('orders results by displayName ascending', async () => {
     const players = await getPlayers('o');
     expect(players.map(p => p.name)).toEqual([
-      'Thibaut Courtois',
-      'Nico Gaitán',
-      'Lionel Messi',
-      'Luka Modric',
-      "Joey O'Brien",
-      'Edson Arantes do Nascimento',
-      'Sergio Ramos',
-      'Cristiano Ronaldo',
-      'Jose Maria Gimenez',
+      'Courtois',
+      'Modric',
+      "O'Brien",
+      'Ramos',
+      'Ronaldo',
+      'San-Jose',
     ]);
+  });
+
+  it('sorts displayName and name-fallback players together', async () => {
+    const players = await getPlayers('e');
+    expect(players.length).toBeGreaterThan(1);
+    expect(players.some(p => p.id === 114)).toBe(true);
+    const names = players.map(p => p.name);
+    expect(names).toEqual([...names].sort((a, b) => a.localeCompare(b)));
   });
 });

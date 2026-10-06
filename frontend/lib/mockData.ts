@@ -1,5 +1,13 @@
-import type { LineupPlayer, Game, PositionCoords } from '@/types';
+import type {
+  FilterOptionsResponse,
+  Game,
+  GameFilterParams,
+  LineupPlayer,
+  PlayerSearchResult,
+  PositionCoords,
+} from '@/types';
 import { normalize, getWordBoundaries } from '@/lib/wordle';
+import { matchesGameFilters } from '@/lib/filters';
 
 /**
  * Static mock dataset mimicking the Dev 3 API responses exactly.
@@ -33,6 +41,8 @@ export interface MockLineupPlayer extends LineupPlayer {
   playerId: number;
   /** Internal: full display name — local guess evaluation only. */
   displayName: string;
+  /** Resolved-name fallback kept for parity with nullable backend displayName. */
+  name?: string | null;
 }
 
 /** Mock dataset entry: same shape as GameResponse, with internal fields on lineups. */
@@ -40,6 +50,94 @@ export interface MockMatchResponse {
   game: Game;
   homeLineup: MockLineupPlayer[];
   awayLineup: MockLineupPlayer[];
+}
+
+interface MockFilterMetadata {
+  teamId: number;
+  opponentId: number;
+  competitionId: string;
+  season: number;
+}
+
+const MOCK_FILTER_METADATA: Record<number, MockFilterMetadata> = {
+  1: { teamId: 281, opponentId: 985, competitionId: 'PL', season: 2022 },
+  2: { teamId: 131, opponentId: 418, competitionId: 'LL', season: 2010 },
+};
+
+const MOCK_CLUBS = [
+  { id: 131, name: 'FC Barcelona', isNationalTeam: false },
+  { id: 281, name: 'Manchester City', isNationalTeam: false },
+  { id: 985, name: 'Manchester United', isNationalTeam: false },
+  { id: 418, name: 'Real Madrid', isNationalTeam: false },
+];
+const MOCK_COMPETITIONS = [
+  { id: 'LL', name: 'La Liga' },
+  { id: 'PL', name: 'Premier League' },
+];
+
+function withMockFilterMetadata(match: MockMatchResponse) {
+  return { ...match, filterMetadata: MOCK_FILTER_METADATA[match.game.gameId] };
+}
+
+function matchingMockGames(filters: GameFilterParams): MockMatchResponse[] {
+  return MOCK_MATCHES.filter((match) =>
+    matchesGameFilters(filters, withMockFilterMetadata(match)),
+  );
+}
+
+/** Mock parity for backend Task 5: counts use the same facet-exclusion rule. */
+export function getMockFilterOptions(filters: GameFilterParams): FilterOptionsResponse {
+  const teams = MOCK_CLUBS.map((club) => ({
+    ...club,
+    count: matchingMockGames({ ...filters, teamIds: [club.id] }).length,
+  }));
+  const opponents = MOCK_CLUBS.map((club) => ({
+    ...club,
+    count: matchingMockGames({ ...filters, opponentIds: [club.id] }).length,
+  }));
+  const competitions = MOCK_COMPETITIONS.map((competition) => ({
+    ...competition,
+    count: matchingMockGames({ ...filters, competitionIds: [competition.id] }).length,
+  }));
+  const seasons = [...new Set(Object.values(MOCK_FILTER_METADATA)
+    .map(({ season }) => season)
+    .filter((season) => season >= 2013 && season <= 2025))]
+    .sort((a, b) => a - b)
+    .map((season) => ({
+      season,
+      count: matchingMockGames({ ...filters, seasonFrom: season, seasonTo: season }).length,
+    }));
+
+  return {
+    teams,
+    opponents,
+    competitions,
+    seasons,
+    total: matchingMockGames(filters).length,
+  };
+}
+
+/** Mock parity for backend Task 6: only return a game that satisfies its filters. */
+export function getMockRandomMatch(filters: GameFilterParams): MockMatchResponse | null {
+  const matches = matchingMockGames(filters);
+  return matches.length > 0 ? matches[Math.floor(Math.random() * matches.length)] : null;
+}
+
+/** Mock parity for backend Task 7: search and display the resolved player name. */
+export function searchMockPlayers(query: string): PlayerSearchResult[] {
+  const needle = query.trim().toLowerCase();
+  if (!needle) return [];
+
+  const byId = new Map<number, PlayerSearchResult>();
+  for (const match of MOCK_MATCHES) {
+    for (const player of [...match.homeLineup, ...match.awayLineup]) {
+      const resolvedName = player.displayName ?? player.name;
+      if (resolvedName && !byId.has(player.playerId) && resolvedName.toLowerCase().includes(needle)) {
+        byId.set(player.playerId, { id: player.playerId, name: resolvedName });
+      }
+    }
+  }
+  return [...byId.values()];
 }
 
 /**
@@ -164,5 +262,13 @@ const MOCK_MATCHES: MockMatchResponse[] = [
     ]),
   },
 ];
+
+export const MOCK_FILTER_OPTIONS: FilterOptionsResponse = getMockFilterOptions({
+  teamIds: null,
+  opponentIds: null,
+  competitionIds: null,
+  seasonFrom: null,
+  seasonTo: null,
+});
 
 export default MOCK_MATCHES;

@@ -99,6 +99,24 @@ describe('POST /api/guess/reveal-one', () => {
     expect(res.body).toEqual({ name: 'Messi' });
   });
 
+  it('falls back to the player name when displayName is null', async () => {
+    const res = await request(app).post('/api/guess/reveal-one').send({
+      gameId: 2,
+      token: generatePlayerToken(2, 114),
+    });
+    expect(res.status).toBe(200);
+    expect(res.body).toEqual({ name: 'Test Player' });
+  });
+
+  it('returns 404 when the token resolves but the player has no appearance in the game', async () => {
+    const res = await request(app).post('/api/guess/reveal-one').send({
+      gameId: 3,
+      token: generatePlayerToken(3, 101),
+    });
+    expect(res.status).toBe(404);
+    expect(res.body).toEqual({ error: 'Player not found', code: 'NOT_FOUND' });
+  });
+
   it('returns 404 for an unknown token', async () => {
     const res = await request(app).post('/api/guess/reveal-one').send({ gameId: 1, token: 'bogus' });
     expect(res.status).toBe(404);
