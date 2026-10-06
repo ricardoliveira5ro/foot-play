@@ -1,6 +1,7 @@
 import { prisma } from '../../prisma';
+import { LINEUP_SIZE } from '../../lib/lineupCompleteness';
 
-export const LINEUP_SIZE = 11;
+export { LINEUP_SIZE } from '../../lib/lineupCompleteness';
 
 export async function createCompleteGame(opts: {
   gameId: number;

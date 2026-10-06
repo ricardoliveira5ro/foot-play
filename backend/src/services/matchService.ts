@@ -5,7 +5,7 @@ import type { Prisma } from '../generated/prisma/client';
 import { normalize, getWordBoundaries } from './wordle';
 import { generatePlayerToken, resolvePlayerToken } from './tokenService';
 
-type GameWithRelations = Prisma.GameGetPayload<{
+export type GameWithRelations = Prisma.GameGetPayload<{
   include: {
     competition: true;
     homeClub: true;
@@ -13,6 +13,8 @@ type GameWithRelations = Prisma.GameGetPayload<{
     appearances: { include: { player: true } };
   };
 }>;
+
+export { hasCompleteLineups } from '../lib/lineupCompleteness';
 
 export async function getRandomMatch(): Promise<GameWithRelations | null> {
   const count = await prisma.game.count();
