@@ -1,6 +1,6 @@
 'use client';
 
-import { Suspense, useCallback, useEffect, useRef, useState } from 'react';
+import { Suspense, useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import { useGameState, MAX_ATTEMPTS } from '@/lib/gameState';
 import { fetchRandomMatch, submitGuess as submitGuessApi, fetchReveal, revealOnePlayer } from '@/lib/api';
 import { filtersToParams } from '@/lib/filterParams';
@@ -10,6 +10,7 @@ import TacticBoard from '@/components/TacticBoard';
 import WordleModal from '@/components/WordleModal';
 import GameComplete from '@/components/GameComplete';
 import ScoreCounter from '@/components/ScoreCounter';
+import FilterPanel from '@/components/FilterPanel';
 import { computeTotalScore } from '@/lib/scoring';
 import FilterUrlSync from './FilterUrlSync';
 import type { ShirtData, RevealPlayer, GameFilterParams } from '@/types';
@@ -36,13 +37,15 @@ export default function MissingElevenPage() {
     setFilters,
   } = useGameState();
 
-  // Filter options are requested now so the request lifecycle runs and is
-  // tested in this patch; nothing renders them yet — consumed by v1.1.3.
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const { options: filterOptions, loading: optionsLoading, error: optionsError } = useFilterOptions(filters);
 
   // Stable identity: FilterUrlSync's read effect keys on this callback.
   const handleFilters = useCallback((next: GameFilterParams) => setFilters(next), [setFilters]);
+
+  // Panel visibility is a plain boolean, never derived from (or keyed on)
+  // filter state: keying it would remount the panel and reset its draft.
+  const [filtersOpen, setFiltersOpen] = useState(false);
+  const handleToggleFiltersOpen = useCallback(() => setFiltersOpen((open) => !open), []);
 
   const [confirmingSurrender, setConfirmingSurrender] = useState(false);
   const confirmTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -221,9 +224,29 @@ export default function MissingElevenPage() {
   // Derive game complete state from gameStatus
   const isGameComplete = state.gameStatus === 'complete';
 
+  // Shared page chrome: the filter panel, rendered for EVERY branch.
+  // The panel deliberately sits outside the error/loading/board branches:
+  // each applied filter change flips the page through the loading branch,
+  // and a panel inside the board tree would unmount there — discarding the
+  // draft and search text (the panel must not remount on filter change).
+  const shell = (content: ReactNode) => (
+    <div className="mx-auto w-full max-w-6xl px-4 py-6 md:px-6 md:py-8">
+      <FilterPanel
+        open={filtersOpen}
+        onToggleOpen={handleToggleFiltersOpen}
+        filters={filters}
+        options={filterOptions}
+        optionsLoading={optionsLoading}
+        optionsError={optionsError}
+        onApply={setFilters}
+      />
+      {content}
+    </div>
+  );
+
   // Error state
   if (state.error) {
-    return (
+    return shell(
       <div className="mx-auto flex w-full max-w-6xl flex-col items-center px-4 py-24 text-center md:px-6">
         <p className="text-lg font-semibold text-ink">Could not load the puzzle.</p>
         <p className="mt-2 max-w-sm text-sm text-ink/55">{state.error}</p>
@@ -234,18 +257,18 @@ export default function MissingElevenPage() {
         >
           Try again
         </button>
-      </div>
+      </div>,
     );
   }
 
   // Loading state
   if (state.gameStatus === 'loading' || !state.match) {
-    return (
+    return shell(
       <div className="mx-auto flex w-full max-w-6xl items-center justify-center px-4 py-32 md:px-6">
         <p role="status" className="motion-safe:animate-pulse text-sm uppercase tracking-[0.15em] text-ink/55">
           Loading puzzle…
         </p>
-      </div>
+      </div>,
     );
   }
 
@@ -280,14 +303,17 @@ export default function MissingElevenPage() {
       : null;
   const liveScore = scoreBreakdown?.grandTotal ?? 0;
 
-  return (
-    <div className="mx-auto w-full max-w-6xl px-4 py-6 md:px-6 md:py-8">
+  return shell(
+    <>
       {/*
         The <Suspense> boundary is the fix for Next 16's
         missing-suspense-with-csr-bailout, which is a `next build` FAILURE
         ("Entire page /missing-eleven deopted into client-side rendering"),
         not a runtime warning — `next dev` will not show it. FilterUrlSync is
         the app's only reader of the URL search params and must stay below it.
+        It intentionally lives only in this branch: its mount-time read re-syncs
+        the URL after loading/error transitions (and is what Play again / Retry
+        rely on), so it must NOT be hoisted into the always-mounted shell.
       */}
       <Suspense fallback={null}>
         <FilterUrlSync applied={filters} onFilters={handleFilters} />
@@ -378,6 +404,6 @@ export default function MissingElevenPage() {
           onPlayAgain={handlePlayAgain}
         />
       )}
-    </div>
+    </>,
   );
 }
