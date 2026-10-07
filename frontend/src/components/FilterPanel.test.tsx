@@ -66,10 +66,6 @@ function renderPanel(config: PanelConfig = {}) {
   };
 }
 
-async function openPanel(user: ReturnType<typeof userEvent.setup>, panel: ReturnType<typeof renderPanel>) {
-  await user.click(screen.getByRole('button', { name: /^Filters/ }));
-  panel.rerenderPanel({ open: true });
-}
 
 function countLabels(): string[] {
   return screen.getAllByRole('checkbox').map((cb) => cb.closest('label')?.textContent?.trim() ?? '');
@@ -244,7 +240,7 @@ describe('FilterPanel', () => {
 
   it('disables Apply when the draft equals the applied filters', async () => {
     const user = userEvent.setup();
-    const panel = renderPanel({ open: true, filters: filtersOf({ teamIds: [294] }) });
+    renderPanel({ open: true, filters: filtersOf({ teamIds: [294] }) });
     expect(screen.getByRole('button', { name: 'Apply' })).toBeDisabled();
 
     await user.click(screen.getByRole('checkbox', { name: 'FC Porto (7)' }));

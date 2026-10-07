@@ -45,6 +45,7 @@ export default function FilterPanel({
   // touches `draft`, and `filters` is a prop that cannot change until Apply.
   // That asymmetry is the mechanism; do not "simplify" this dependency.
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setDraft(filters);
   }, [filters]);
 
