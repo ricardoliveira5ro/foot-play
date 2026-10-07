@@ -1,8 +1,10 @@
 'use client';
 
 import { useReducer, useCallback } from 'react';
-import type { GameResponse, ShirtData, ShirtState, TeamSide, LineupPlayer, GuessResult } from '@/types';
+import type { GameResponse, ShirtData, ShirtState, TeamSide, LineupPlayer, GuessResult, GameFilterParams } from '@/types';
 import { CURATED_TEAM_IDS } from '@/lib/curatedTeams';
+import { EMPTY_FILTERS } from '@/types';
+import { filtersEqual } from './filtersEqual';
 
 const MAX_ATTEMPTS = 6;
 
@@ -31,6 +33,8 @@ export interface GameState {
   activeShirtIndex: number | null;
   gameStatus: GameStatus;
   error: string | null;
+  /** The applied filter set. Owned by the URL via `FilterUrlSync`; never mutated in place. */
+  filters: GameFilterParams;
 }
 
 export type GameAction =
@@ -44,7 +48,8 @@ export type GameAction =
   | { type: 'SURRENDER' }
   | { type: 'NEW_GAME' }
   | { type: 'SET_ERROR'; payload: string | null }
-  | { type: 'SET_LOADING'; payload: boolean };
+  | { type: 'SET_LOADING'; payload: boolean }
+  | { type: 'SET_FILTERS'; payload: GameFilterParams };
 
 // --- Initial State ---
 
@@ -57,6 +62,7 @@ export const initialState: GameState = {
   activeShirtIndex: null,
   gameStatus: 'idle',
   error: null,
+  filters: EMPTY_FILTERS,
 };
 
 // --- Helpers ---
@@ -252,6 +258,11 @@ function handleSetLoading(state: GameState, loading: boolean): GameState {
 
 export function gameReducer(state: GameState, action: GameAction): GameState {
   switch (action.type) {
+    case 'SET_FILTERS': {
+      if (filtersEqual(state.filters, action.payload)) return state;
+      return { ...state, filters: action.payload };
+    }
+
     case 'SET_MATCH': {
       const side = pickSide(action.payload);
       const { targetLineup, opponentLineup } = lineupsForSide(action.payload, side);
@@ -336,6 +347,8 @@ interface UseGameStateReturn {
   newGame: () => void;
   setError: (error: string | null) => void;
   setLoading: (loading: boolean) => void;
+  filters: GameFilterParams;
+  setFilters: (filters: GameFilterParams) => void;
 }
 
 export function useGameState(): UseGameStateReturn {
@@ -386,6 +399,10 @@ export function useGameState(): UseGameStateReturn {
     dispatch({ type: 'SET_LOADING', payload: loading });
   }, []);
 
+  const setFilters = useCallback((filters: GameFilterParams) => {
+    dispatch({ type: 'SET_FILTERS', payload: filters });
+  }, []);
+
   return {
     state,
     dispatch,
@@ -400,6 +417,8 @@ export function useGameState(): UseGameStateReturn {
     newGame,
     setError,
     setLoading,
+    filters: state.filters,
+    setFilters,
   };
 }
 
