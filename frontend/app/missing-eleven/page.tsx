@@ -1,15 +1,18 @@
 'use client';
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { Suspense, useCallback, useEffect, useRef, useState } from 'react';
 import { useGameState, MAX_ATTEMPTS } from '@/lib/gameState';
 import { fetchRandomMatch, submitGuess as submitGuessApi, fetchReveal, revealOnePlayer } from '@/lib/api';
+import { filtersToParams } from '@/lib/filterParams';
+import { useFilterOptions } from '@/lib/useFilterOptions';
 import MatchInfo from '@/components/MatchInfo';
 import TacticBoard from '@/components/TacticBoard';
 import WordleModal from '@/components/WordleModal';
 import GameComplete from '@/components/GameComplete';
 import ScoreCounter from '@/components/ScoreCounter';
 import { computeTotalScore } from '@/lib/scoring';
-import type { ShirtData, RevealPlayer } from '@/types';
+import FilterUrlSync from './FilterUrlSync';
+import type { ShirtData, RevealPlayer, GameFilterParams } from '@/types';
 import type { ShirtGameData } from '@/lib/gameState';
 
 function describeError(cause: unknown): string {
@@ -29,7 +32,17 @@ export default function MissingElevenPage() {
     setError,
     setLoading,
     toggleBoard,
+    filters,
+    setFilters,
   } = useGameState();
+
+  // Filter options are requested now so the request lifecycle runs and is
+  // tested in this patch; nothing renders them yet — consumed by v1.1.3.
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const { options: filterOptions, loading: optionsLoading, error: optionsError } = useFilterOptions(filters);
+
+  // Stable identity: FilterUrlSync's read effect keys on this callback.
+  const handleFilters = useCallback((next: GameFilterParams) => setFilters(next), [setFilters]);
 
   const [confirmingSurrender, setConfirmingSurrender] = useState(false);
   const confirmTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -84,24 +97,43 @@ export default function MissingElevenPage() {
     }
   }, [confirmingSurrender, state.match, state.teamSide, state.targetShirts, state.opponentShirts, revealTeam, surrender, setError]);
 
-  // Initialize game on mount (no localStorage restore — fixes hydration mismatch)
+  const filterKey = filtersToParams(filters).toString();
+  const fetchedKeyRef = useRef<string | null>(null);
+  const matchSeqRef = useRef(0);
+
+  // One shared path for every match fetch (mount, filter change, Play again,
+  // Retry). The monotonic sequence ref discards stale responses: only the
+  // newest request may write state, however the triggers raced.
+  const loadMatch = useCallback(() => {
+    const seq = ++matchSeqRef.current;
+    setLoading(true);
+    setError(null);
+    fetchRandomMatch(filters)
+      .then((response) => {
+        if (seq !== matchSeqRef.current) return;
+        if (response) startNewGame(response);
+        // null: no match under these filters — distinct from a thrown error.
+        // v1.1.4 replaces this with the real empty state.
+        else setError('No playable matches are available.');
+      })
+      .catch((cause: unknown) => {
+        if (seq !== matchSeqRef.current) return;
+        setError(describeError(cause));
+      })
+      .finally(() => {
+        if (seq === matchSeqRef.current) setLoading(false);
+      });
+  }, [filters, setLoading, setError, startNewGame]);
+
+  // Load once for the initial filter key, and again whenever the canonical
+  // key changes (a deep link's filters arrive via FilterUrlSync's read
+  // dispatch). The fetched-key ref keeps the mount load singular; a later
+  // filter change refetches through this same path instead of a second one.
   useEffect(() => {
-    if (state.gameStatus === 'idle' && !state.match) {
-      setLoading(true);
-      fetchRandomMatch()
-        .then((response) => {
-          if (response) startNewGame(response);
-          else setError('No playable matches are available.');
-        })
-        .catch((cause: unknown) => {
-          setError(describeError(cause));
-        })
-        .finally(() => {
-          setLoading(false);
-        });
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []); // Only run once on mount
+    if (fetchedKeyRef.current === filterKey) return;
+    fetchedKeyRef.current = filterKey;
+    loadMatch();
+  }, [filterKey, loadMatch]);
 
   // Fetch revealed names when the game completes (both teams in parallel)
   useEffect(() => {
@@ -179,36 +211,12 @@ export default function MissingElevenPage() {
 
   const handlePlayAgain = useCallback(() => {
     newGame();
-    // Fetch new match
-    setLoading(true);
-    fetchRandomMatch()
-      .then((response) => {
-        if (response) startNewGame(response);
-        else setError('No playable matches are available.');
-      })
-      .catch((cause: unknown) => {
-        setError(describeError(cause));
-      })
-      .finally(() => {
-        setLoading(false);
-      });
-  }, [newGame, startNewGame, setLoading, setError]);
+    loadMatch();
+  }, [newGame, loadMatch]);
 
   const handleRetry = useCallback(() => {
-    setError(null);
-    setLoading(true);
-    fetchRandomMatch()
-      .then((response) => {
-        if (response) startNewGame(response);
-        else setError('No playable matches are available.');
-      })
-      .catch((cause: unknown) => {
-        setError(describeError(cause));
-      })
-      .finally(() => {
-        setLoading(false);
-      });
-  }, [startNewGame, setLoading, setError]);
+    loadMatch();
+  }, [loadMatch]);
 
   // Derive game complete state from gameStatus
   const isGameComplete = state.gameStatus === 'complete';
@@ -274,6 +282,16 @@ export default function MissingElevenPage() {
 
   return (
     <div className="mx-auto w-full max-w-6xl px-4 py-6 md:px-6 md:py-8">
+      {/*
+        The <Suspense> boundary is the fix for Next 16's
+        missing-suspense-with-csr-bailout, which is a `next build` FAILURE
+        ("Entire page /missing-eleven deopted into client-side rendering"),
+        not a runtime warning — `next dev` will not show it. FilterUrlSync is
+        the app's only reader of the URL search params and must stay below it.
+      */}
+      <Suspense fallback={null}>
+        <FilterUrlSync applied={filters} onFilters={handleFilters} />
+      </Suspense>
       <div className="grid gap-6 lg:grid-cols-[340px_minmax(0,620px)] lg:items-start lg:gap-x-10">
         <aside className="flex flex-col gap-8 text-center lg:sticky lg:top-6 lg:items-start lg:text-left">
           <header className="w-full pb-4">

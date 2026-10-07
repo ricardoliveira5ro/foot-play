@@ -8,6 +8,57 @@ from, and release notes are taken from the entry itself.
 
 ---
 
+## v1.1.2 — Filter URL state
+
+_2026-10-07 · Spec: `docs/v1/v1.1/plan-v1.1.2-filter-url-state.md`_
+
+### Added
+
+- **URL as the single source of truth for filters** — a hand-typed or shared
+  filter URL produces exactly that filter set on load, and every applied
+  filter change rewrites the URL (`router.replace`, no history entry, no
+  scroll jump). Unrelated query params such as the future `?daily=` survive a
+  filter write via the delete-then-merge over `FILTER_PARAM_KEYS`.
+- **`FilterUrlSync`** — the app's only reader/writer of the filter query
+  string, mounted under a `<Suspense>` boundary (Next 16's
+  `missing-suspense-with-csr-bailout` is a `next build` failure). Writes are
+  gated until the initial read completes, so a deep link is adopted rather
+  than stripped.
+- **`SET_FILTERS` game-state action** — records the applied filter set as a
+  structural no-op when the incoming filters deep-equal the current ones,
+  which is what breaks the URL↔state echo loop. Filter changes never disturb
+  a game in progress at the reducer level.
+- **`useFilterOptions` hook** — owns the filter-options request for the
+  applied filter set with a monotonic stale-response guard; errors surface
+  without collapsing into empty counts. Renders nothing yet (v1.1.3 consumes
+  it).
+- **Filter-aware match fetching** — all three `fetchRandomMatch` call sites
+  (mount, Play again, Retry) pass the current filters, handle the nullable
+  "no match" result distinctly from network errors, and discard stale
+  responses when filters change faster than the network answers.
+
+### Validation
+
+- `npm run test` — 19 files, 281 tests, all green; `npm run test:coverage` —
+  98.36% statements / 97.27% branches over `src/**`.
+- `npm run build` — clean; no `missing-suspense-with-csr-bailout`.
+- `npx tsc --noEmit` and `npm run lint` — clean (one pre-existing warning in
+  `GameComplete.test.tsx`).
+- `useSearchParams` appears in exactly one production file
+  (`app/missing-eleven/FilterUrlSync.tsx`); `router.push` is absent from
+  `app/missing-eleven/`; the reducer contains no fetch; `backend/` diff is
+  empty.
+- Live smoke: deep-link, messy-query, no-match, and plain URLs all serve
+  200 from `next dev` with no warnings; visual rendering is unchanged (zero
+  filter UI in this patch).
+
+### Notes
+
+- This patch renders **no** filter controls; v1.1.3 and v1.1.4 render the
+  state built here.
+
+---
+
 ## v1.1.1 — Filter foundation
 
 _2026-10-06 · Spec: `docs/v1/v1.1/plan-v1.1.1-filter-foundation.md`_

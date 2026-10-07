@@ -8,7 +8,11 @@ export default defineConfig({
       // live under src; these imports currently resolve from the frontend root.
       '@/types': path.resolve(__dirname, 'types'),
       '@/lib/curatedTeams': path.resolve(__dirname, 'lib/curatedTeams'),
+      '@/lib/api': path.resolve(__dirname, 'lib/api'),
       '@/components/TeamTabBar': path.resolve(__dirname, 'components/TeamTabBar'),
+      '@/components/MatchInfo': path.resolve(__dirname, 'components/MatchInfo'),
+      '@/components/TacticBoard': path.resolve(__dirname, 'components/TacticBoard'),
+      '@/components/ScoreCounter': path.resolve(__dirname, 'components/ScoreCounter'),
       '@': path.resolve(__dirname, 'src'),
     },
   },

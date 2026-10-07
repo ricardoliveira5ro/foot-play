@@ -7,6 +7,12 @@ const FILTER_KEYS = [
   'seasonFrom',
   'seasonTo',
 ] as const;
+
+// The five URL keys owned by the filter set. Additive export for the
+// delete-then-merge in FilterUrlSync; derived from FILTER_KEYS so the two
+// can never drift.
+export const FILTER_PARAM_KEYS: readonly string[] = Object.freeze([...FILTER_KEYS]);
+
 const COMPETITION_ID = /^[A-Za-z0-9_-]{1,32}$/;
 
 export function paramsToFilters(params: URLSearchParams): GameFilterParams {

@@ -1,3 +1,4 @@
+import { EMPTY_FILTERS } from '../../types';
 /**
  * Characterization tests for the gameReducer — written against the CURRENT
  * implementation (before the cognitive-complexity refactor). Any change in
@@ -459,5 +460,86 @@ describe('gameReducer', () => {
       const next = gameReducer(state, { type: 'SET_LOADING', payload: false });
       expect(next.gameStatus).toBe('loading');
     });
+  });
+
+  describe('SET_FILTERS', () => {
+    it('sets filters on an idle state', () => {
+      const state = initialState;
+      const filters = {
+        teamIds: [1, 2],
+        opponentIds: [3],
+        competitionIds: ['PL'],
+        seasonFrom: 2020,
+        seasonTo: 2024,
+      };
+      const next = gameReducer(state, { type: 'SET_FILTERS', payload: filters });
+      expect(next.filters).toEqual(filters);
+    });
+
+    it('is a no-op when the filters are structurally equal', () => {
+      const filters = {
+        teamIds: [1, 2],
+        opponentIds: [3],
+        competitionIds: ['PL'],
+        seasonFrom: 2020,
+        seasonTo: 2024,
+      };
+      const state = { ...initialState, filters };
+      const next = gameReducer(state, { type: 'SET_FILTERS', payload: { ...filters } });
+      expect(next).toBe(state);
+    });
+
+    it('is a no-op for EMPTY_FILTERS on an empty state', () => {
+      const state = initialState;
+      const next = gameReducer(state, { type: 'SET_FILTERS', payload: EMPTY_FILTERS });
+      expect(next).toBe(state);
+    });
+
+    it('does not reset the current match, shirts or score', () => {
+      const playing = playingState();
+      const filters = {
+        teamIds: [1],
+        opponentIds: [2],
+        competitionIds: ['CL'],
+        seasonFrom: 2021,
+        seasonTo: 2023,
+      };
+      const next = gameReducer(playing, { type: 'SET_FILTERS', payload: filters });
+      expect(next.match).toBe(playing.match);
+      expect(next.targetShirts).toBe(playing.targetShirts);
+      expect(next.opponentShirts).toBe(playing.opponentShirts);
+      expect(next.filters).toEqual(filters);
+    });
+
+    it('does not change gameStatus', () => {
+      const playing = playingState();
+      const filters = {
+        teamIds: [5],
+        opponentIds: [6],
+        competitionIds: ['EL'],
+        seasonFrom: 2019,
+        seasonTo: 2022,
+      };
+      const next = gameReducer(playing, { type: 'SET_FILTERS', payload: filters });
+      expect(next.gameStatus).toBe(playing.gameStatus);
+    });
+
+    it('applies a genuine change', () => {
+      const playing = playingState();
+      const filters = {
+        teamIds: [10],
+        opponentIds: [20],
+        competitionIds: ['WC'],
+        seasonFrom: 2022,
+        seasonTo: 2025,
+      };
+      const next = gameReducer(playing, { type: 'SET_FILTERS', payload: filters });
+      expect(next.filters).toEqual(filters);
+      expect(next).not.toBe(playing);
+    });
+  });
+
+  it('initialises filters to EMPTY_FILTERS', () => {
+    expect(initialState.filters).toEqual(EMPTY_FILTERS);
   });
 });

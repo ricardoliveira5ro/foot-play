@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { EMPTY_FILTERS, type GameFilterParams } from '../../types';
 import { countActiveFilters, hasActiveFilters, matchesGameFilters } from './filters';
+import { FILTER_PARAM_KEYS, paramsToFilters } from './filterParams';
 
 const game = {
   game: {
@@ -118,5 +119,36 @@ describe('hasActiveFilters and countActiveFilters', () => {
     };
     expect(hasActiveFilters(filters)).toBe(true);
     expect(countActiveFilters(filters)).toBe(2);
+  });
+});
+
+describe('FILTER_PARAM_KEYS', () => {
+  it('has no duplicates', () => {
+    expect(new Set(FILTER_PARAM_KEYS).size).toBe(FILTER_PARAM_KEYS.length);
+  });
+
+  it('lists exactly the keys that paramsToFilters reads', () => {
+    // Populate every key at once: the result's own fields are the dimensions
+    // paramsToFilters reads, so they must correspond 1:1 with FILTER_PARAM_KEYS.
+    const all = new URLSearchParams(
+      FILTER_PARAM_KEYS.map((k) => [k, k === 'teamIds' || k === 'opponentIds' ? '7' : k === 'competitionIds' ? 'LL' : '2020']),
+    );
+    expect(Object.keys(paramsToFilters(all)).sort()).toEqual([...FILTER_PARAM_KEYS].sort());
+
+    // And each individual key, fed alone, must actually change the result —
+    // a key listed but never read (or read but unlisted) fails here.
+    const baseline = paramsToFilters(new URLSearchParams());
+    for (const key of FILTER_PARAM_KEYS) {
+      const probe = paramsToFilters(new URLSearchParams([[key, key === 'teamIds' || key === 'opponentIds' ? '7' : key === 'competitionIds' ? 'LL' : '2020']]));
+      expect(probe, `key ${key} is not read by paramsToFilters`).not.toEqual(baseline);
+    }
+  });
+
+  it('does not contain keys that paramsToFilters ignores', () => {
+    const baseline = paramsToFilters(new URLSearchParams());
+    for (const key of ['daily', 'unknownKey']) {
+      expect(paramsToFilters(new URLSearchParams([[key, '1']]))).toEqual(baseline);
+      expect(FILTER_PARAM_KEYS).not.toContain(key);
+    }
   });
 });
