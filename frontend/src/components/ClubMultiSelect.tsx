@@ -1,6 +1,6 @@
 'use client';
 
-import { useDeferredValue, useId, useState } from 'react';
+import { useDeferredValue, useId, useState, type ReactNode } from 'react';
 import { filterClubOptions, groupClubOptions, type ClubOption } from '@/lib/clubFilters';
 
 interface ClubMultiSelectProps {
@@ -38,7 +38,7 @@ export default function ClubMultiSelect({
   onToggle,
   loading,
   hideLegend = false,
-}: ClubMultiSelectProps) {
+}: Readonly<ClubMultiSelectProps>) {
   const [query, setQuery] = useState('');
   // useDeferredValue keeps typing responsive over a ~500-row list. At this
   // size plain state would also work — cheap headroom, not a measured fix.
@@ -81,6 +81,40 @@ export default function ClubMultiSelect({
   const legendClass =
     'px-1 text-[11px] font-semibold uppercase tracking-[0.08em] text-ink/55';
 
+  let body: ReactNode;
+  if (loading) {
+    body = (
+      <output className="px-1 py-3 text-sm text-ink/55">
+        Loading {legend.toLowerCase()} options…
+      </output>
+    );
+  } else if (noMatches) {
+    body = (
+      <output className="px-1 py-3 text-sm text-ink/55">
+        No clubs match “{deferredQuery.trim()}”.
+      </output>
+    );
+  } else {
+    body = (
+      <>
+        {/* Both groups render even when empty: an unlabelled gap is worse
+            for a screen reader than an empty labelled group. */}
+        <fieldset className={groupClass}>
+          <legend className={legendClass}>Clubs</legend>
+          <ul className="max-h-56 overflow-y-auto pr-1">
+            {visibleClubs.map(renderOption)}
+          </ul>
+        </fieldset>
+        <fieldset className={groupClass}>
+          <legend className={legendClass}>National teams</legend>
+          <ul className="max-h-40 overflow-y-auto pr-1">
+            {visibleNational.map(renderOption)}
+          </ul>
+        </fieldset>
+      </>
+    );
+  }
+
   return (
     <fieldset className="min-w-0">
       <legend
@@ -114,32 +148,7 @@ export default function ClubMultiSelect({
         )}
       </div>
 
-      {loading ? (
-        <p role="status" className="px-1 py-3 text-sm text-ink/55">
-          Loading {legend.toLowerCase()} options…
-        </p>
-      ) : noMatches ? (
-        <p role="status" className="px-1 py-3 text-sm text-ink/55">
-          No clubs match “{deferredQuery.trim()}”.
-        </p>
-      ) : (
-        <>
-          {/* Both groups render even when empty: an unlabelled gap is worse
-              for a screen reader than an empty labelled group. */}
-          <fieldset className={groupClass}>
-            <legend className={legendClass}>Clubs</legend>
-            <ul className="max-h-56 overflow-y-auto pr-1">
-              {visibleClubs.map(renderOption)}
-            </ul>
-          </fieldset>
-          <fieldset className={groupClass}>
-            <legend className={legendClass}>National teams</legend>
-            <ul className="max-h-40 overflow-y-auto pr-1">
-              {visibleNational.map(renderOption)}
-            </ul>
-          </fieldset>
-        </>
-      )}
+      {body}
     </fieldset>
   );
 }

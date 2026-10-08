@@ -56,7 +56,7 @@ export default function FilterPanel({
   optionsError,
   onApply,
   onStart,
-}: FilterPanelProps) {
+}: Readonly<FilterPanelProps>) {
   const startMode = onStart !== undefined;
   const [draft, setDraft] = useState<GameFilterParams>(filters);
   const panelId = useId();
@@ -160,7 +160,7 @@ export default function FilterPanel({
 
       {/* Always mounted (hidden when closed) so the panel never remounts on a
           filter change: an in-progress search and the draft survive. */}
-      <div id={panelId} role="region" aria-label="Filters" hidden={!open} className="mt-3">
+      <section id={panelId} aria-label="Filters" hidden={!open} className="mt-3">
         {optionsError && (
           <p role="alert" className="mb-3 rounded-md border border-failed/40 bg-failed/10 px-3 py-2 text-sm text-failed">
             {optionsError}
@@ -200,7 +200,7 @@ export default function FilterPanel({
             Clear all
           </button>
         </div>
-      </div>
+      </section>
     </div>
   );
 }

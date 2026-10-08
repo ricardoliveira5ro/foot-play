@@ -45,7 +45,7 @@ export default function FilterSection({
   chips = [],
   onRemoveChip,
   children,
-}: FilterSectionProps) {
+}: Readonly<FilterSectionProps>) {
   const bodyId = useId();
   const headerRef = useRef<HTMLButtonElement>(null);
 
