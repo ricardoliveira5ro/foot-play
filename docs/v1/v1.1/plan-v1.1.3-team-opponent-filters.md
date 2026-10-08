@@ -1098,6 +1098,82 @@
   git commit -m "docs: append pre-screen validation evidence to the v1.1.3 changelog"
   ```
 
+### Task 8: Make the filter sections collapsible (approved amendment)
+
+Recorded mid-patch after user testing: the panel opened with both ~500-row lists at once. The approved design (brainstorming Q&A, 2026-10-08): sections inside the Filters panel, collapsed everywhere including the pre-screen, count on the collapsed header, extracted `FilterSection` component. Contract: criteria 22–26.
+
+**Test inventory (written first, red → green):**
+
+- `FilterPanel.test.tsx` gains a `sectionHeader`/`expandSection` helper (headers read `Team` or `Team (N)`), the existing checkbox/search interactions expand their section first, and a new `describe('FilterPanel sections')` covers: both collapsed when open; independent expand/collapse with `aria-expanded` flipping; header count following the draft and resetting on Clear all; collapse keeping search text and selection; expand state surviving panel close/reopen; start mode starting collapsed with Start reachable; Clear all not touching expand state.
+- `page.test.tsx` gains the same helpers; the in-game describe asserts both sections collapsed after opening the panel, the pre-screen describe asserts both collapsed with the toggle hidden and checkboxes invisible until expanded, and every checkbox interaction expands its section first. The old `getByText('Team')` panel assertions became role queries — DTL's `getByText` does not filter `hidden` elements, so the hidden legend made the text ambiguous.
+
+**Implementation:**
+
+- `FilterSection.tsx` (new): header `button` with `aria-expanded`/`aria-controls`, `Label (N)` count (bare label when 0, the panel's `Filters (N)` convention), `▲`/`▼` glyph matching the panel toggle, and a `hidden`-attributed body so the content stays mounted but out of the accessibility tree and focus order.
+- `FilterPanel.tsx`: local `openSections` state (`{ team: false, opponent: false }`) — component-local only, never URL or storage; a two-entry `sections` config (id, label, draft count, body) maps to `FilterSection`, so v1.1.4 appends one entry per new dimension; the footer (Apply / Start game / Clear all) stays outside the sections.
+- `ClubMultiSelect.tsx`: optional `hideLegend` renders the legend `sr-only` — the section header owns the visible label while the fieldset keeps its accessible name (group queries and `Search {legend}` wiring unchanged). Default `false`, so other callers are untouched.
+- `page.tsx` placeholder copy: “Expand a filter above and pick your clubs — or start with any match.”
+
+### Task 9: Re-validate after the sections amendment
+
+Measured (2026-10-08, all after the amendment):
+
+- `npx vitest run` — **22 files, 370 tests, all green** (was 363): `FilterPanel` 31 (7 new section cases), page suite 26 (contracts re-anchored, none removed).
+- `npx vitest run --coverage` — 98.69% statements / 97.54% branches / 98.33% functions / 99.47% lines (681/690 statements).
+- `npm run build` — clean on Next.js 16.3.4 (Turbopack), `/missing-eleven` still static, no `missing-suspense-with-csr-bailout`.
+- `npx tsc --noEmit` — exit 0; `npm run lint` — 0 errors, the one pre-existing `GameComplete.test.tsx` warning.
+- Greps unchanged from Task 7: no storage flags, no page-level `useSearchParams`, `backend/` diff empty, Vitest `include` untouched, checkbox renderers still `ClubMultiSelect` + tests (FilterSection renders no checkbox).
+
+### Task 10: Remove the in-game filter panel (approved amendment)
+
+Recorded after user testing of Tasks 6–8: once the game is running there is no reason to expose the filter surface — filters are chosen up front, and every new game should cross the pre-screen. The approved design (Q&A, 2026-10-08): the panel renders on the pre-screen only; **every** new-game path (sidebar New puzzle, game-complete Play Again, and the error state, which needs its own route back now that no panel exists in-game) returns there. Contract: amended criteria 13 and 19, new criteria 27–29.
+
+**Test inventory (written first, red → green):**
+
+- `page.test.tsx`: the 10-case in-game `missing-eleven page filter panel` describe (toggle, open/close, Apply, Clear all, reopen, draft, mounted-across-Apply contracts) is replaced by 4 cases — no `Filters` toggle/region/checkboxes while playing; New puzzle → pre-screen with no fetch, URL cleared, and `Team (1)` collapsed on return; Start after New puzzle fetches exactly once more under the same filters; Play Again (via surrender → GameComplete) takes the same route. The wiring describe's Play-again test becomes the New-puzzle contract; a fifth case covers the error state's **Change filters** button.
+- Count-based assertions baseline after the deep-link mount settles: the gate starts before `FilterUrlSync`'s board-mount read lands the URL filters, so a deep link legitimately fetches twice (empty, then filtered) — pre-existing branch-layout behavior that Task 6's gate made visible; tests now wait for the second fetch before capturing `callsBefore` instead of racing it.
+- `FilterPanel.test.tsx` gains one case: start mode renders and starts with **no** `onToggleOpen` handler at all (the pre-screen omits it).
+
+**Implementation:**
+
+- `page.tsx`: `filtersOpen`/`handleToggleFiltersOpen` deleted; `shell` renders `FilterPanel` only when `!started` (`open`, `onStart` always, no `onToggleOpen`). One `handleNewPuzzle` callback serves all three exits: `newGame()` to drop the board, then **reapply the captured applied filters** (`NEW_GAME` returns `initialState`, which wipes `filters` too — without the reapply the panel would reopen empty), then `fetchedKeyRef.current = null` (or Start under identical filters would dedupe itself into silence), `router.replace(pathname, { scroll: false })` (any params mean "started"), `setStarted(false)`.
+- `page.tsx` error branch: secondary **Change filters** button (text-button style under the primary Try again) wired to `handleNewPuzzle` — without it the error state, now panel-less, would be a dead end when the filters themselves are the problem.
+- `FilterPanel.tsx`: `onToggleOpen` becomes optional (`onToggleOpen?.()` in apply) — start mode never reaches it (the toggle renders only in apply mode), so the pre-screen simply omits the prop.
+
+### Task 11: Re-validate after the in-game removal
+
+Measured (2026-10-08, all after the removal):
+
+- `npx vitest run` — **22 files, 366 tests, all green** (was 370): `FilterPanel` 32 (+1 handlerless start-mode case), page suite 21 (10 in-game panel cases → 4 contract cases, one wiring case re-anchored).
+- `npx vitest run --coverage` — 98.69% statements / 97.54% branches / 98.33% functions / 99.47% lines (681/690 statements).
+- `npm run build` — clean on Next.js 16.3.4 (Turbopack), `/missing-eleven` still static, no `missing-suspense-with-csr-bailout`.
+- `npx tsc --noEmit` — exit 0; `npm run lint` — 0 errors, the one pre-existing `GameComplete.test.tsx` warning.
+- Greps unchanged: no storage flags, no page-level `useSearchParams`, `backend/` diff empty, Vitest `include` untouched; `filtersOpen`/`handleToggleFiltersOpen`/`handlePlayAgain` no longer exist anywhere.
+
+### Task 12: Selected-value chips on section headers (approved amendment)
+
+Recorded after the sections landed: a collapsed header counts a selection but does not name it, so undoing one value means expanding the section and hunting the checkbox. The approved design (brainstorming Q&A, 2026-10-08; layout amended same day at user request): one chip per draft selection in a wrapping row **below** the section header — the disclosure button always fills the row — in **both** dimensions, removed via the chip's X — and no cap: the chip row wraps onto more lines instead of hiding values behind "+N more". Contract: criteria 30–31.
+
+**Test inventory (written first, red → green):**
+
+- `FilterPanel.test.tsx` gains a `describe('FilterPanel selected chips')` with 7 cases: chip name under `Label (N)` with the X proven to sit **outside** the disclosure button and after it in DOM order (the strict header-name regex matching at all is the proof of the former; nested buttons are invalid HTML); X editing the draft only — no `onApply`, Apply re-disarmed when the draft returns to the applied set, checkbox mirrored; one chip per selection removed independently; opponent chips labelled against their dimension; `#id` fallback for a draft id outside the option universe (stale deep link); focus handed to the section header after removal (the X unmounts with its chip); start mode removing chips without starting.
+- `page.test.tsx` gains one pre-screen integration case: select → chip visible with no fetch and no `replace` → X → chip gone, still no fetch or URL write.
+
+**Implementation:**
+
+- `FilterSection.tsx`: new optional `chips` (`{ id, name }[]`) and `onRemoveChip` props. The disclosure button stays full-width exactly as before; chips render in their own `mt-2 flex flex-wrap items-center gap-2` row **below** it — outside the button (nested buttons are invalid HTML) and wrapping onto extra lines when there are many. Each chip is a bordered pill with a truncating name (`max-w-[12rem]`) and an X `button` labelled `Remove {name} from {label}`; removal calls the handler then refocuses the header button so keyboard focus does not drop to `<body>`.
+- `FilterPanel.tsx`: `nameFor` reads the existing merged `clubNames` map (robust to either facet list being narrower) with a `#id` fallback; each section entry maps its draft ids through it and passes `toggleTeam`/`toggleOpponent` as the removal handler — the same toggle semantics as the checkbox, so the two controls can never disagree.
+
+### Task 13: Re-validate after the chips amendment
+
+Measured (2026-10-08, all after the amendment):
+
+- `npx vitest run` — **22 files, 374 tests, all green** (was 366): `FilterPanel` 39 (7 new chip cases), page suite 22 (+1 pre-screen chip integration).
+- `npx vitest run --coverage` — 98.71% statements / 97.58% branches / 98.38% functions / 99.48% lines (up from 98.69 / 97.54 / 98.33 / 99.47).
+- `npm run build` — clean on Next.js 16.3.4 (Turbopack), `/missing-eleven` still static, no `missing-suspense-with-csr-bailout`.
+- `npx tsc --noEmit` — exit 0; `npm run lint` — 0 errors, the one pre-existing `GameComplete.test.tsx` warning.
+- Greps unchanged: no storage flags, no page-level `useSearchParams`, `backend/` diff empty, Vitest `include` untouched; the strict header-name regex (`^Team( \(\d+\))?$`) still resolves in both suites — the chips stayed outside the disclosure button.
+
 ## Acceptance criteria
 
 1. This patch renders **Team and Opponent only**. Competition, Season, and the empty state belong to v1.1.4; their absence here is correct, not incomplete.
@@ -1112,15 +1188,25 @@
 10. The panel **does not remount** on filter change — the user's in-progress search text and scroll position survive a fetch. `key` is not derived from the filter state.
 11. New components live in `frontend/src/components/`, not `frontend/components/`, so Vitest's flat `@` alias resolves them identically to the App Router.
 12. Accessibility is a requirement, not a finish: the trigger is a real `button` with `aria-expanded` and `aria-controls`; each option is a labelled `input[type=checkbox]` reachable by keyboard; the grouped list is announced; focus is visible.
-13. The panel is closed by default **once the game is running**, and its open/closed state is never persisted to storage or the URL. On the pre-screen it is forced open with its toggle hidden, so the Start action is always reachable.
+13. The panel renders **only on the pre-screen** — forced open with its toggle hidden, so the Start action is always reachable. Once the game is running it does not render at all (no toggle, no region, no checkboxes), and its open/closed state is never persisted to storage or the URL.
 14. No new dependencies, and no backend, schema, or API change in this patch.
 15. `npm run test`, `npm run build`, `npx tsc --noEmit`, and `npm run lint` are all clean, and every new suite is collected. No suite is asserted against a fixed count — it is measured and recorded, per `docs/v1/v1.2/overview.md:209`.
 16. First visit with an empty URL renders the pre-screen and performs **no** match fetch until Start is pressed — no skeleton, no board, no request.
 17. Start commits the draft, writes the URL **before** the board mounts, flips `started`, and triggers exactly one match fetch — including the empty-draft case, where the URL stays empty and one fetch still fires.
 18. A URL with params auto-starts exactly as today: v1.1.2's landing contract and the whole `FilterUrlSync` suite pass unchanged.
-19. Once started, mid-game Apply, Play again, Retry, and surrender behave exactly as before this append — the gate changes entry, not play.
+19. Once started, Retry and surrender behave exactly as before this append — the gate changes entry, not play. Play again and the sidebar's New puzzle instead return to the pre-screen, and mid-game Apply no longer exists: filter changes happen only from the pre-screen (criteria 27–29).
 20. Reloading with an empty URL returns to the pre-screen. No session or storage flag survives; the URL is the only thing that decides.
 21. On the pre-screen the panel is forced open with its toggle hidden, the primary button reads "Start game", and the board area shows the placeholder — one path into the game, no second Start.
+22. Each dimension is a collapsible section inside the panel with its own disclosure button (`aria-expanded`/`aria-controls`). Both start collapsed — on the pre-screen too — and the footer (Apply / Start game / Clear all) sits outside the sections, always reachable regardless of what is collapsed.
+23. Sections are independent (either can be open while the other is closed). Disclosure state is component-local: it survives opening/closing the panel, resets on reload, and never lands in the URL or storage.
+24. A collapsed section's header carries the draft selection count in the panel's `Label (N)` convention (bare label when 0); the count tracks the draft, not the applied set, so it always agrees with the checkboxes you would see on expand.
+25. Section bodies stay mounted while collapsed (`hidden` attribute), so search text and checkbox selections survive a collapse; hidden content stays out of the accessibility tree and the keyboard focus order.
+26. `ClubMultiSelect`'s legend is visually hidden only when wrapped by a section header (`hideLegend`); the fieldset keeps its accessible name, and the default rendering (no wrapper) is unchanged.
+27. While the game runs there is **no filter surface**: no `Filters` toggle, no panel region, no checkboxes anywhere on the page. The panel exists solely on the pre-screen (criterion 13).
+28. Every new-game path — the sidebar **New puzzle**, the game-complete **Play Again**, and the error state's **Change filters** button — returns to the pre-screen: board reset, URL cleared (the gate reads any params as "started"), and no match fetch until Start is pressed again. The applied filters survive the round trip: the panel reopens with them selected, sections collapsed.
+29. Start after a return fetches even under identical filters — the fetch-key ref is re-armed by the return handler. The handler reapplies the captured filter set immediately after `NEW_GAME`, because the reducer's `initialState` wipes `filters` along with the rest of the state; without that reapply the panel would reopen empty.
+30. Each section header shows every draft selection as a removable chip — the club name plus an X — in a wrapping row **below** its `Label (N)` header, in both the Team and Opponent dimensions. The disclosure button always fills the row; chips sit outside it, never inside (nested buttons are invalid HTML), and the chip row wraps onto more lines rather than capping or hiding values. The X edits the draft only — no Apply, no fetch, no URL write — using the same toggle semantics as the matching checkbox, and keyboard focus moves to the section header after removal so it does not drop to `<body>`. A draft id with no matching option renders as `#id` instead of vanishing.
+31. Chip removal behaves identically in start mode: the draft, count, and chip row update together, and Start game still requires its explicit press — removing the last chip never starts anything.
 
 ## Validation
 
@@ -1139,6 +1225,9 @@
 | The include was not re-narrowed (R7) | `grep -n "include:" frontend/vitest.config.ts` | unchanged from v1.1.1 |
 | The gate, at page level | `cd frontend && npx vitest run app/missing-eleven/page.test.tsx` | empty mount fetches nothing; Start writes the URL, then fetches once; the deep-linked fixture starts with no pre-screen |
 | `FilterUrlSync` contract intact | `cd frontend && npx vitest run app/missing-eleven/` | the whole directory green — the mount-order read is unchanged |
+| Collapsible sections | `cd frontend && npx vitest run src/components/FilterPanel.test.tsx` | the `FilterPanel sections` describe green — collapsed default, independent toggles, draft count, state survival, footer reachable |
+| No filters in-game, one loop back | `cd frontend && npx vitest run app/missing-eleven/page.test.tsx` | no `Filters` toggle/region while playing; New puzzle, Play Again, and Change filters each land on the pre-screen without fetching; Start after a return refetches the same filters |
+| Selected-value chips | `cd frontend && npx vitest run src/components/FilterPanel.test.tsx` | the `FilterPanel selected chips` describe green — name under the header, draft-only removal with Apply re-disarmed, `#id` fallback, focus handoff, start mode unchanged; the strict header-name regex still resolves and the X follows the button in DOM order (chips below, outside the button) |
 
 ## Risks
 
@@ -1155,5 +1244,10 @@
 | **Start double-fetches**, because `started` and `filterKey` change in the same commit. | One effect keyed on `[started, filterKey]`, with `fetchedKeyRef` dedupe and a skip-unless-started guard (criterion 17); the test asserts a single request. |
 | **The pre-screen is a dead end** — the user closes the panel and Start disappears with it. | The toggle is hidden while `started === false` (criterion 21); the panel cannot close before the game starts. |
 | **Existing auto-fetch tests are re-anchored silently**, leaving a behavior change with a green suite that no longer asserts the old contract anywhere. | Task 6 inventories every page test that assumes an empty-URL auto-fetch and re-anchors it to a deep-link fixture or inverts it to assert no-fetch; the full suite runs at Task 7. |
+| **Collapsed sections hide a selection**, so the user opens every section to discover what is set. | The header carries the draft count in the `Label (N)` convention (criterion 24) and the panel toggle keeps the applied dimension count; both are asserted by the sections suite. |
+| **The footer becomes unreachable** because it lives inside a collapsible region — the pre-screen dead-end returning at one level down. | Apply / Start game / Clear all render outside the sections (criterion 22), asserted visible with everything collapsed in `FilterPanel.test.tsx`. |
+| **The error state becomes a dead end** once no panel exists in-game: a bad filter set can only be retried forever. | The error branch carries its own **Change filters** button back to the pre-screen (criterion 28), clicked in the page suite; Try again keeps its retry semantics. |
+| **`NEW_GAME` wipes the applied filters** (`initialState`), so the pre-screen reopens empty and the user loses their selection. | The return handler reapplies the captured set in the same batch (criterion 29); the page suite asserts `Team (1)` survives New puzzle. |
+| **Start after a return fetches nothing**, because `fetchedKeyRef` still holds the key the identical filters produced before. | The return handler nulls the ref (criterion 29); the page suite asserts exactly one additional request carrying the same filters. |
 
 **Escalate before proceeding if:** the counts v1.1.1 returns cannot support an unfiltered, complete option universe for one of the dimensions — for example if a facet legitimately returns a truncated list. That would contradict R5 and the grouped-query decision, and the fix belongs upstream in v1.1.1 rather than in a client-side recomputation here. **Escalate likewise if:** the match-fetch effect cannot be keyed on `[started, filterKey]` without either dropping the deep link's initial fetch or double-fetching on Start — that would mean `FilterUrlSync`'s mount contract and the gate cannot coexist as designed, and the URL-write ordering rule above needs revisiting before code is written.

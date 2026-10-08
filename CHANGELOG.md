@@ -52,11 +52,49 @@ _2026-10-07 · Spec: `docs/v1/v1.1/plan-v1.1.3-team-opponent-filters.md`_
   exists. Start commits the draft, writes the URL *before* the board mounts
   (D4-class ordering — `FilterUrlSync`'s mount read stays idempotent), then
   opens the gate: exactly one match fetch, zero before it. Any URL with
-  params auto-starts exactly as before, and once running, Apply, Play again,
-  Retry, and surrender are untouched — the gate changes entry, not play.
+  params auto-starts exactly as before, and Retry and surrender keep
+  behaving exactly as they did — the gate changes entry, not play.
   `Clear all` also gained a direct draft reset so it visibly clears a
   draft-only selection when the applied set is already empty (the
   pre-screen's default state).
+- **Collapsible filter sections** — each dimension inside the Filters panel
+  is now its own disclosure (`FilterSection`), collapsed by default
+  everywhere, the pre-screen included. The header shows the draft selection
+  as `Label (N)` (matching `Filters (N)`); bodies stay mounted while
+  collapsed, so search text and selections survive; Apply / Start game /
+  Clear all sit outside the sections and stay reachable no matter what is
+  collapsed. Disclosure state is component-local — it survives opening and
+  closing the panel and resets on reload (no storage). `ClubMultiSelect`
+  gained `hideLegend` so the section header owns the visible label while
+  the fieldset keeps its accessible name.
+- **In-game filter panel removed** — while the game runs there is no
+  Filters toggle, no panel, no checkboxes: the board is the only surface.
+  The panel lives on the pre-screen alone (forced open, toggle hidden),
+  and every route back to it takes the same loop: the sidebar **New
+  puzzle**, the game-complete **Play Again**, and the error state's new
+  **Change filters** button (the fix for what would otherwise be a dead
+  end — an error you could only retry). Each resets the board, clears the
+  URL (any params mean "started"), and lands on the pre-screen without
+  fetching. The applied filters survive the round trip: `NEW_GAME` wipes
+  them along with everything else, so the return handler reapplies them
+  immediately, and the panel reopens with the selection intact, sections
+  collapsed. The fetch-key ref is re-armed on return, so Start after a
+  return fetches even under identical filters. Mid-game Apply disappears
+  with the panel — filter changes happen only from the pre-screen.
+- **Selected-value chips on section headers** — every draft selection now
+  appears as a named chip in its own row **below** the section header, in
+  both dimensions: `Team (1)` keeps its full-width header, with *FC Porto*
+  and an X underneath, so a value can be undone without expanding the
+  section and hunting the checkbox. Chips sit outside the disclosure
+  button (never inside it — nested buttons are invalid HTML) and the chip
+  row wraps onto more lines rather than capping selections behind a
+  "+N more" counter. The X edits the draft
+  only — no Apply, no fetch, no URL write — through the same toggle
+  semantics as the checkbox, and keyboard focus returns to the section
+  header after removal (the X unmounts with its chip). A draft id with no
+  matching option renders as `#id` (stale deep links) instead of
+  vanishing; start mode removes chips the same way without ever starting
+  the game.
 
 ### Validation
 
@@ -114,6 +152,40 @@ _2026-10-07 · Spec: `docs/v1/v1.1/plan-v1.1.3-team-opponent-filters.md`_
   first fetch and fires exactly one request (empty draft included); a
   deep-linked fixture starts with no pre-screen; draft edits and Clear all
   start nothing. Browser click-through remains a manual oracle.
+- Sections append: `npm run test` measured at **22 files, 370 tests, all
+  green** — `FilterPanel` 31 (the 7-case `FilterPanel sections` suite plus
+  expand-first re-anchors of the existing interactions) and the page suite
+  26 (both sections collapsed asserted in-game and on the pre-screen; every
+  checkbox interaction expands its section first). Coverage 98.69%
+  statements / 97.54% branches / 98.33% functions / 99.47% lines (690
+  statements); build, `tsc`, and lint clean (pre-existing
+  `GameComplete.test.tsx` warning aside). The old `getByText('Team')`
+  panel assertions became role queries — `getByText` does not filter
+  `hidden` elements, so the collapsed sections' legends made them ambiguous.
+- In-game removal append: `npm run test` measured at **22 files, 366 tests,
+  all green** — page suite 21 (the 10-case in-game panel describe replaced
+  by 4 contract cases: no panel while playing, New puzzle → pre-screen
+  without fetching, Start after return refetching the same filters, Play
+  Again → pre-screen, plus the error state's Change-filters route back)
+  and `FilterPanel` 32 (start mode runs without an `onToggleOpen` handler
+  at all). Coverage 98.69% statements / 97.54% branches / 98.33% functions
+  / 99.47% lines (681/690 statements); build, `tsc`, and lint clean
+  (pre-existing `GameComplete.test.tsx` warning aside). Deep-link mounts
+  fetch twice — the gate starts before `FilterUrlSync`'s board-mount read
+  lands the URL filters, a pre-existing branch-layout behavior — so the
+  count-based tests now baseline after the second fetch instead of racing
+  it.
+- Chips append: `npm run test` measured at **22 files, 374 tests, all
+  green** — `FilterPanel` 39 (the 7-case `FilterPanel selected chips`
+  suite: chip below a full-width header with the X outside the disclosure
+  button, draft-only removal re-disarming Apply, independent multi-removal,
+  opponent labelling, `#id` fallback, focus handoff, start mode) and the
+  page suite 22 (+1 pre-screen integration: chip removal writes neither
+  the fetch nor the URL). Coverage 98.71% statements / 97.58% branches /
+  98.38% functions / 99.48% lines; build, `tsc`, and lint clean
+  (pre-existing `GameComplete.test.tsx` warning aside). The strict
+  header-name regex (`^Team( \(\d+\))?$`) still resolves in both suites —
+  the chips stayed outside the disclosure button.
 
 ### Notes
 

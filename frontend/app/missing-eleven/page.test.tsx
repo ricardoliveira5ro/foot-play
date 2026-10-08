@@ -4,7 +4,7 @@ import userEvent from '@testing-library/user-event';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { useSearchParams, useRouter, usePathname } from 'next/navigation';
 import MissingElevenPage from './page';
-import { fetchRandomMatch, fetchFilterOptions } from '@/lib/api';
+import { fetchRandomMatch, fetchFilterOptions, fetchReveal } from '@/lib/api';
 import type { GameResponse, LineupPlayer, FilterOptionsResponse } from '@/types';
 
 vi.mock('next/navigation', () => ({
@@ -26,6 +26,7 @@ const mockUsePathname = vi.mocked(usePathname);
 const mockUseRouter = vi.mocked(useRouter);
 const mockFetchRandomMatch = vi.mocked(fetchRandomMatch);
 const mockFetchFilterOptions = vi.mocked(fetchFilterOptions);
+const mockFetchReveal = vi.mocked(fetchReveal);
 const mockReplace = vi.fn();
 const mockPush = vi.fn();
 
@@ -113,6 +114,21 @@ async function renderAndSettle() {
   const utils = render(<MissingElevenPage />);
   await waitFor(() => expect(screen.getByRole('button', { name: 'New puzzle' })).toBeTruthy());
   return utils;
+}
+
+/** Section headers read "Team" or "Team (2)" depending on the draft count. */
+function sectionHeader(name: 'Team' | 'Opponent') {
+  return screen.getByRole('button', { name: new RegExp(`^${name}( \\(\\d+\\))?$`) });
+}
+
+async function expandSection(
+  user: ReturnType<typeof userEvent.setup>,
+  ...names: Array<'Team' | 'Opponent'>
+) {
+  for (const name of names) {
+    const header = sectionHeader(name);
+    if (header.getAttribute('aria-expanded') !== 'true') await user.click(header);
+  }
 }
 
 describe('missing-eleven page filter wiring', () => {
@@ -217,17 +233,30 @@ describe('missing-eleven page filter wiring', () => {
     }
   });
 
-  it('passes the current filters to the match fetch on Play again', async () => {
+  it('New puzzle leaves the game for the pre-screen without fetching', async () => {
+    const user = userEvent.setup();
     setUrl('teamIds=7');
     await renderAndSettle();
-
-    fireEvent.click(screen.getByRole('button', { name: 'New puzzle' }));
-
+    // Deep links fetch twice by design of the branch layout: the gate starts
+    // before FilterUrlSync's board-mount read lands the URL filters, so the
+    // second (correctly filtered) fetch settles last — baseline after it.
     await waitFor(() =>
       expect(mockFetchRandomMatch).toHaveBeenLastCalledWith(
         expect.objectContaining({ teamIds: [7] }),
       ),
     );
+    const callsBefore = mockFetchRandomMatch.mock.calls.length;
+
+    await user.click(screen.getByRole('button', { name: 'New puzzle' }));
+
+    // Back at the gate: URL cleared, no new match requested, and the panel
+    // returns with the previous selection still applied, sections collapsed.
+    expect(screen.getByRole('button', { name: 'Start game' })).toBeTruthy();
+    expect(mockReplace).toHaveBeenCalledWith('/missing-eleven', { scroll: false });
+    expect(mockFetchRandomMatch.mock.calls.length).toBe(callsBefore);
+    expect(screen.getByRole('region', { name: 'Filters' })).toBeTruthy();
+    expect(sectionHeader('Team')).toHaveTextContent('Team (1)');
+    expect(sectionHeader('Team')).toHaveAttribute('aria-expanded', 'false');
   });
 
   it('passes the current filters to the match fetch on Retry', async () => {
@@ -268,165 +297,87 @@ describe('missing-eleven page filter wiring', () => {
 });
 
 describe('missing-eleven page filter panel', () => {
-  const toggleButton = () => screen.getByRole('button', { name: /^Filters/ });
-  const portoCheckbox = () => screen.getByRole('checkbox', { name: /FC Porto/ });
-
-  beforeEach(() => {
-    // These tests exercise in-game behaviour with an EMPTY applied set (their
-    // original contract). 'daily=1' is not a filter key: it opens the gate
-    // (non-empty location) while parsing to the empty filter set, so drafts
-    // start empty and no FilterUrlSync re-dispatch refetches mid-test.
+  it('the running game has no filter panel at all', async () => {
     setUrl('daily=1');
-    mockFetchFilterOptions.mockResolvedValue(clubOptions);
-  });
-
-  it('renders the filter panel toggle', async () => {
     await renderAndSettle();
-    expect(toggleButton()).toHaveAttribute('aria-expanded', 'false');
-    expect(toggleButton()).toHaveAttribute('aria-controls');
-  });
-
-  it('starts closed', async () => {
-    await renderAndSettle();
-    expect(toggleButton()).toHaveAttribute('aria-expanded', 'false');
-    // The region stays mounted but hidden — queries skip hidden elements.
+    // In-game there is no Filters toggle and no panel region: the only way
+    // to the filter selection is New puzzle (or Play Again / Change filters,
+    // which take the same route back to the pre-screen).
+    expect(screen.queryByRole('button', { name: /^Filters/ })).toBeNull();
     expect(screen.queryByRole('region', { name: 'Filters' })).toBeNull();
+    expect(screen.queryAllByRole('checkbox')).toHaveLength(0);
   });
 
-  it('opens and shows the Team and Opponent lists', async () => {
+  it('Start after New puzzle fetches under the same filters', async () => {
+    mirrorReplace();
     const user = userEvent.setup();
+    setUrl('teamIds=7');
     await renderAndSettle();
-
-    await user.click(toggleButton());
-    expect(toggleButton()).toHaveAttribute('aria-expanded', 'true');
-
-    const region = screen.getByRole('region', { name: 'Filters' });
-    expect(region).toBeVisible();
-    expect(within(region).getByText('Team')).toBeTruthy();
-    expect(within(region).getByText('Opponent')).toBeTruthy();
-    await waitFor(() => {
-      expect(within(region).getByRole('checkbox', { name: /FC Porto \(7\)/ })).toBeTruthy();
-      expect(within(region).getByRole('checkbox', { name: /Nacional \(3\)/ })).toBeTruthy();
-    });
-  });
-
-  it('applies a Team selection and refetches the match under the new filters', async () => {
-    const user = userEvent.setup();
-    await renderAndSettle();
+    // See the wiring describe: deep links settle through two fetches (gate
+    // first, FilterUrlSync's board-mount read second) — baseline after both.
+    await waitFor(() =>
+      expect(mockFetchRandomMatch).toHaveBeenLastCalledWith(
+        expect.objectContaining({ teamIds: [7] }),
+      ),
+    );
     const callsBefore = mockFetchRandomMatch.mock.calls.length;
 
-    await user.click(toggleButton());
-    await waitFor(() => expect(portoCheckbox()).toBeTruthy());
-    await user.click(portoCheckbox());
-    await user.click(screen.getByRole('button', { name: 'Apply' }));
+    await user.click(screen.getByRole('button', { name: 'New puzzle' }));
+    expect(mockFetchRandomMatch.mock.calls.length).toBe(callsBefore);
+    await user.click(screen.getByRole('button', { name: 'Start game' }));
 
-    // Match the *sequence* after Apply: the URL re-sync on board remount can
-    // legitimately refetch, but the new filter set must reach the match fetch.
-    await waitFor(() => {
-      const applied = mockFetchRandomMatch.mock.calls
-        .slice(callsBefore)
-        .some(([params]) => params?.teamIds?.[0] === 31);
-      expect(applied).toBe(true);
-    });
-  });
-
-  it('shows the new URL after applying', async () => {
-    const user = userEvent.setup();
-    await renderAndSettle();
-
-    await user.click(toggleButton());
-    await waitFor(() => expect(portoCheckbox()).toBeTruthy());
-    await user.click(portoCheckbox());
-    await user.click(screen.getByRole('button', { name: 'Apply' }));
-
-    await waitFor(() => {
-      const hrefs = mockReplace.mock.calls.map(([href]) => String(href));
-      expect(hrefs.some((href) => href.includes('teamIds=31'))).toBe(true);
-    });
-  });
-
-  it('preserves the applied selection when the panel is reopened', async () => {
-    const user = userEvent.setup();
-    await renderAndSettle();
-
-    await user.click(toggleButton());
-    await waitFor(() => expect(portoCheckbox()).toBeTruthy());
-    await user.click(portoCheckbox());
-    // Keep the mocked URL in step with what router.replace will write, so the
-    // board-remount read sees ?teamIds=31 instead of stripping it (in the real
-    // app the router has already updated useSearchParams by then).
-    setUrl('teamIds=31');
-    await user.click(screen.getByRole('button', { name: 'Apply' }));
-
-    await waitFor(() => expect(toggleButton()).toHaveAttribute('aria-expanded', 'false'));
-    await user.click(toggleButton());
-    await waitFor(() => expect(portoCheckbox()).toBeChecked());
-  });
-
-  it('clears all filters and reloads the unfiltered match', async () => {
-    const user = userEvent.setup();
-    setUrl('teamIds=31');
-    const { rerender } = await renderAndSettle();
-
-    await user.click(toggleButton());
-    await waitFor(() => expect(portoCheckbox()).toBeChecked());
-    await user.click(screen.getByRole('button', { name: 'Clear all' }));
-    // router.replace('/missing-eleven') rewrote the URL; mirror it, then
-    // re-render so the remounting FilterUrlSync reads the empty key.
-    setUrl('');
-    rerender(<MissingElevenPage />);
-
+    // The return re-arms the fetch-key ref: identical filters must fetch
+    // again — without the reset this start would silently show nothing.
     await waitFor(() =>
-      expect(mockFetchRandomMatch).toHaveBeenLastCalledWith(
-        expect.objectContaining({ teamIds: null }),
-      ),
+      expect(mockFetchRandomMatch.mock.calls.length).toBe(callsBefore + 1),
     );
-    const hrefs = mockReplace.mock.calls.map(([href]) => String(href));
-    expect(hrefs).toContain('/missing-eleven');
-  });
-
-  it('does not fetch a new match when the user only edits the draft', async () => {
-    const user = userEvent.setup();
-    await renderAndSettle();
-    const fetchesBefore = mockFetchRandomMatch.mock.calls.length;
-    const replacesBefore = mockReplace.mock.calls.length;
-
-    await user.click(toggleButton());
-    await waitFor(() => expect(portoCheckbox()).toBeTruthy());
-    await user.click(portoCheckbox());
-    await user.type(screen.getByRole('searchbox', { name: 'Search Team' }), 'porto');
-
-    // The draft differs from the applied set (Apply is armed), but nothing
-    // beyond the panel may observe the edit — no fetch, no URL write.
-    expect(screen.getByRole('button', { name: 'Apply' })).not.toBeDisabled();
-    expect(mockFetchRandomMatch.mock.calls.length).toBe(fetchesBefore);
-    expect(mockReplace.mock.calls.length).toBe(replacesBefore);
-  });
-
-  it('keeps the panel mounted across a filter change', async () => {
-    const user = userEvent.setup();
-    await renderAndSettle();
-
-    await user.click(toggleButton());
-    const search = await screen.findByRole('searchbox', { name: 'Search Team' });
-    await user.type(search, 'porto');
-    await waitFor(() => expect(portoCheckbox()).toBeTruthy());
-    await user.click(portoCheckbox());
-    setUrl('teamIds=31');
-    await user.click(screen.getByRole('button', { name: 'Apply' }));
-
-    // Apply flips the page through the loading branch; the panel must come
-    // back with its search text and draft intact (shell, not board tree).
-    await waitFor(() =>
-      expect(mockFetchRandomMatch).toHaveBeenLastCalledWith(
-        expect.objectContaining({ teamIds: [31] }),
-      ),
+    expect(mockFetchRandomMatch).toHaveBeenLastCalledWith(
+      expect.objectContaining({ teamIds: [7] }),
     );
     await screen.findByRole('button', { name: 'New puzzle' });
-    await user.click(toggleButton());
+    const hrefs = mockReplace.mock.calls.map(([href]) => String(href));
+    expect(hrefs.at(-1)).toContain('teamIds=7');
+  });
 
-    expect(screen.getByRole('searchbox', { name: 'Search Team' })).toHaveValue('porto');
-    await waitFor(() => expect(portoCheckbox()).toBeChecked());
+  it('Play Again from the game-complete overlay also returns to the pre-screen', async () => {
+    mirrorReplace();
+    mockFetchReveal.mockResolvedValue({ players: [] } as never);
+    const user = userEvent.setup();
+    setUrl('teamIds=7');
+    await renderAndSettle();
+    await waitFor(() =>
+      expect(mockFetchRandomMatch).toHaveBeenLastCalledWith(
+        expect.objectContaining({ teamIds: [7] }),
+      ),
+    );
+    const callsBefore = mockFetchRandomMatch.mock.calls.length;
+
+    await user.click(screen.getByRole('button', { name: 'Give up?' }));
+    await user.click(screen.getByRole('button', { name: 'Are you sure?' }));
+    await screen.findByRole('button', { name: 'Play Again' });
+    expect(mockFetchRandomMatch.mock.calls.length).toBe(callsBefore);
+    await user.click(screen.getByRole('button', { name: 'Play Again' }));
+
+    expect(screen.getByRole('button', { name: 'Start game' })).toBeTruthy();
+    expect(screen.queryByRole('button', { name: 'New puzzle' })).toBeNull();
+    expect(mockReplace).toHaveBeenCalledWith('/missing-eleven', { scroll: false });
+    expect(mockFetchRandomMatch.mock.calls.length).toBe(callsBefore);
+  });
+
+  it('the error state offers a way back to the filters', async () => {
+    mirrorReplace();
+    const user = userEvent.setup();
+    setUrl('teamIds=7');
+    mockFetchRandomMatch.mockRejectedValueOnce(new Error('Network down'));
+    render(<MissingElevenPage />);
+    await screen.findByText('Network down');
+
+    await user.click(screen.getByRole('button', { name: 'Change filters' }));
+
+    expect(screen.getByRole('button', { name: 'Start game' })).toBeTruthy();
+    expect(screen.queryByText('Network down')).toBeNull();
+    expect(mockReplace).toHaveBeenCalledWith('/missing-eleven', { scroll: false });
+    expect(mockFetchRandomMatch).toHaveBeenCalledTimes(1); // returning fetches nothing
   });
 });
 
@@ -450,21 +401,54 @@ describe('missing-eleven pre-screen gate', () => {
     expect(mockFetchRandomMatch).not.toHaveBeenCalled();
   });
 
-  it('forces the panel open with its toggle hidden until the game starts', async () => {
+  it('forces the panel open with its toggle hidden and sections collapsed', async () => {
     render(<MissingElevenPage />);
 
     expect(screen.queryByRole('button', { name: /^Filters/ })).toBeNull();
     const region = screen.getByRole('region', { name: 'Filters' });
     expect(region).toBeVisible();
+    // Collapsed on the pre-screen too: the first screen stays quiet, and
+    // the footer (Start game) sits below the sections, always reachable.
+    expect(sectionHeader('Team')).toHaveAttribute('aria-expanded', 'false');
+    expect(sectionHeader('Opponent')).toHaveAttribute('aria-expanded', 'false');
+    expect(screen.queryByRole('checkbox', { name: /FC Porto/ })).toBeNull();
+
+    const user = userEvent.setup();
+    await expandSection(user, 'Team');
     await waitFor(() =>
       expect(within(region).getByRole('checkbox', { name: /FC Porto \(7\)/ })).toBeTruthy(),
     );
+  });
+
+  it('selected clubs appear as removable chips beside the section header', async () => {
+    const user = userEvent.setup();
+    render(<MissingElevenPage />);
+    await expandSection(user, 'Team');
+    await waitFor(() => expect(screen.getByRole('checkbox', { name: /FC Porto \(7\)/ })).toBeTruthy());
+    await user.click(screen.getByRole('checkbox', { name: /FC Porto \(7\)/ }));
+
+    // The header carries the count AND the name with an X — the selection is
+    // visible and undoable without finding the checkbox again. Draft-only:
+    // no fetch and no URL write until Start game commits it.
+    expect(sectionHeader('Team')).toHaveTextContent('Team (1)');
+    const remove = screen.getByRole('button', { name: 'Remove FC Porto from Team' });
+    expect(remove).toBeVisible();
+    expect(mockFetchRandomMatch).not.toHaveBeenCalled();
+    expect(mockReplace).not.toHaveBeenCalled();
+
+    await user.click(remove);
+
+    expect(screen.queryByRole('button', { name: /Remove FC Porto/ })).toBeNull();
+    expect(screen.getByRole('button', { name: 'Team' })).toBeTruthy();
+    expect(mockFetchRandomMatch).not.toHaveBeenCalled();
+    expect(mockReplace).not.toHaveBeenCalled();
   });
 
   it('starts the game: URL first, exactly one fetch, pre-screen gone', async () => {
     mirrorReplace();
     const user = userEvent.setup();
     render(<MissingElevenPage />);
+    await expandSection(user, 'Team');
     await waitFor(() => expect(screen.getByRole('checkbox', { name: /FC Porto \(7\)/ })).toBeTruthy());
     await user.click(screen.getByRole('checkbox', { name: /FC Porto \(7\)/ }));
     await user.click(screen.getByRole('button', { name: 'Start game' }));
@@ -504,6 +488,7 @@ describe('missing-eleven pre-screen gate', () => {
   it('draft edits on the pre-screen start nothing', async () => {
     const user = userEvent.setup();
     render(<MissingElevenPage />);
+    await expandSection(user, 'Team');
     await waitFor(() => expect(screen.getByRole('checkbox', { name: /FC Porto \(7\)/ })).toBeTruthy());
     await user.click(screen.getByRole('checkbox', { name: /FC Porto \(7\)/ }));
 
@@ -515,6 +500,7 @@ describe('missing-eleven pre-screen gate', () => {
   it('Clear all on the pre-screen clears the draft without starting', async () => {
     const user = userEvent.setup();
     render(<MissingElevenPage />);
+    await expandSection(user, 'Team');
     await waitFor(() => expect(screen.getByRole('checkbox', { name: /FC Porto \(7\)/ })).toBeTruthy());
     await user.click(screen.getByRole('checkbox', { name: /FC Porto \(7\)/ }));
     await user.click(screen.getByRole('button', { name: 'Clear all' }));

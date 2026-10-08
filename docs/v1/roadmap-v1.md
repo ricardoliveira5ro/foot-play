@@ -272,7 +272,7 @@ re-litigated:
 |---|---|---|
 | v1.1.1 | `hasCompleteLineups` predicate; filter-options endpoint returning runtime option lists **and POST-filter counts** (§4.4, §4.5) + autocomplete `name`/`displayName` fix + **widen the frontend vitest include and delete the dead `frontend/vitest.config.mts`** (R7, §8) | v1.0.x |
 | v1.1.2 | Filter state encoded in URL query params | v1.1.1 |
-| v1.1.3 | Team + Opponent multi-selects, searchable, grouped + **entry-gate pre-screen** (filters chosen before the match loads) | v1.1.2 |
+| v1.1.3 | Team + Opponent multi-selects, searchable, grouped, **collapsible sections** + **entry-gate pre-screen** (filters chosen before the match loads) + **no filter surface in-game** (New puzzle, Play Again, and the error state all loop back through the pre-screen) | v1.1.2 |
 | v1.1.4 | Competition multi-select + Season range + empty state | v1.1.3 |
 
 Two constraints carry real weight here:

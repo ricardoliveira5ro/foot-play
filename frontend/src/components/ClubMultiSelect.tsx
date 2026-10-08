@@ -15,6 +15,12 @@ interface ClubMultiSelectProps {
   /** Reports a toggle only — applying filters is the panel's Apply button. */
   onToggle: (id: number) => void;
   loading: boolean;
+  /**
+   * Visually hide the legend when a wrapper (the panel's section header)
+   * already owns the visible label. The fieldset keeps its accessible name
+   * either way, so group queries and "Search {legend}" wiring are unchanged.
+   */
+  hideLegend?: boolean;
 }
 
 /**
@@ -31,6 +37,7 @@ export default function ClubMultiSelect({
   selected,
   onToggle,
   loading,
+  hideLegend = false,
 }: ClubMultiSelectProps) {
   const [query, setQuery] = useState('');
   // useDeferredValue keeps typing responsive over a ~500-row list. At this
@@ -76,7 +83,11 @@ export default function ClubMultiSelect({
 
   return (
     <fieldset className="min-w-0">
-      <legend className="mb-2 text-xs font-semibold uppercase tracking-[0.08em] text-ink/65">
+      <legend
+        className={
+          hideLegend ? 'sr-only' : 'mb-2 text-xs font-semibold uppercase tracking-[0.08em] text-ink/65'
+        }
+      >
         {legend}
       </legend>
 

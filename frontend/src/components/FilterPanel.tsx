@@ -2,6 +2,7 @@
 
 import { useEffect, useId, useState } from 'react';
 import ClubMultiSelect from './ClubMultiSelect';
+import FilterSection from './FilterSection';
 import { toClubOptions, toggleId } from '@/lib/clubFilters';
 import { hasActiveFilters, countActiveFilters } from '@/lib/filters';
 import { filtersEqual } from '@/lib/filtersEqual';
@@ -10,7 +11,12 @@ import { EMPTY_FILTERS, type FilterOptionsResponse, type GameFilterParams } from
 interface FilterPanelProps {
   /** Controlled open/closed state — not persisted anywhere. */
   open: boolean;
-  onToggleOpen: () => void;
+  /**
+   * Closes (or reopens) the panel from the toggle and after Apply — apply
+   * mode only. Start mode hides the toggle and returns from `apply` before
+   * this is touched, so the pre-screen may omit the handler entirely.
+   */
+  onToggleOpen?: () => void;
   /** The APPLIED filter set. The panel never mutates it directly. */
   filters: GameFilterParams;
   /** Server options for the applied set (v1.1.1/v1.1.2); counts come as-is. */
@@ -23,7 +29,8 @@ interface FilterPanelProps {
    * Present on the pre-screen only: commits the draft AND starts the game.
    * When set, the primary button reads "Start game", is never disabled, the
    * panel toggle is hidden (so the panel cannot close before Start is
-   * reachable), and the panel stays open — the page decides when it closes.
+   * reachable), and the panel never closes itself — Start leaves the
+   * pre-screen entirely and unmounts it.
    */
   onStart?: (next: GameFilterParams) => void;
 }
@@ -36,7 +43,9 @@ interface FilterPanelProps {
  * on the *applied* set) from changing while the user is editing — R5.
  * When `onStart` is present (the pre-screen) the panel runs in start mode:
  * "Start game" replaces Apply, the toggle is hidden, and the panel never
- * closes itself.
+ * closes itself. Inside, each dimension is a collapsed-by-default
+ * FilterSection disclosure; the footer sits outside them so Apply/Start
+ * stays reachable no matter what is collapsed.
  */
 export default function FilterPanel({
   open,
@@ -51,6 +60,16 @@ export default function FilterPanel({
   const startMode = onStart !== undefined;
   const [draft, setDraft] = useState<GameFilterParams>(filters);
   const panelId = useId();
+
+  // Section disclosure state lives here — not in the URL, not in storage:
+  // every dimension starts collapsed (pre-screen included), survives opening
+  // and closing the panel while the page is mounted, and resets on reload.
+  const [openSections, setOpenSections] = useState<Record<string, boolean>>({
+    team: false,
+    opponent: false,
+  });
+  const toggleSection = (id: string) =>
+    setOpenSections((current) => ({ ...current, [id]: !current[id] }));
 
   // Re-sync the draft when the APPLIED set changes underneath us (deep link,
   // Clear all, Back button) — but not while the user is editing: editing only
@@ -70,6 +89,10 @@ export default function FilterPanel({
   );
   const teamOptions = toClubOptions(teams, clubNames);
   const opponentOptions = toClubOptions(opponents, clubNames);
+  // Chip label source: the merged name map. A stale deep link can carry an id
+  // the current universe does not list — fall back to "#id" so the chip still
+  // shows something recognisable instead of vanishing.
+  const nameFor = (id: number) => clubNames.get(id) ?? `#${id}`;
 
   const toggleTeam = (id: number) =>
     setDraft((current) => ({ ...current, teamIds: toggleId(current.teamIds, id) }));
@@ -82,7 +105,7 @@ export default function FilterPanel({
       return;
     }
     onApply(draft);
-    onToggleOpen();
+    onToggleOpen?.();
   };
 
   const clearAll = () => {
@@ -93,6 +116,47 @@ export default function FilterPanel({
     setDraft({ ...EMPTY_FILTERS });
     onApply({ ...EMPTY_FILTERS });
   };
+
+  // One entry per dimension — v1.1.4 adds Competition/Season by appending
+  // here, and the section machinery (header, count, disclosure) comes along.
+  const sections = [
+    {
+      id: 'team',
+      label: 'Team',
+      count: draft.teamIds?.length ?? 0,
+      chips: (draft.teamIds ?? []).map((id) => ({ id, name: nameFor(id) })),
+      onRemoveChip: toggleTeam,
+      body: (
+        <ClubMultiSelect
+          legend="Team"
+          inputIdPrefix="filter-team"
+          options={teamOptions}
+          selected={draft.teamIds}
+          onToggle={toggleTeam}
+          loading={optionsLoading}
+          hideLegend
+        />
+      ),
+    },
+    {
+      id: 'opponent',
+      label: 'Opponent',
+      count: draft.opponentIds?.length ?? 0,
+      chips: (draft.opponentIds ?? []).map((id) => ({ id, name: nameFor(id) })),
+      onRemoveChip: toggleOpponent,
+      body: (
+        <ClubMultiSelect
+          legend="Opponent"
+          inputIdPrefix="filter-opponent"
+          options={opponentOptions}
+          selected={draft.opponentIds}
+          onToggle={toggleOpponent}
+          loading={optionsLoading}
+          hideLegend
+        />
+      ),
+    },
+  ];
 
   // Count active *dimensions*, not selected values: Team x3 + Opponent x1
   // reads as 2 filters, not 4 — the alternative (selected-value count) looks
@@ -128,23 +192,20 @@ export default function FilterPanel({
           </p>
         )}
 
-        <div className="flex flex-col gap-4">
-          <ClubMultiSelect
-            legend="Team"
-            inputIdPrefix="filter-team"
-            options={teamOptions}
-            selected={draft.teamIds}
-            onToggle={toggleTeam}
-            loading={optionsLoading}
-          />
-          <ClubMultiSelect
-            legend="Opponent"
-            inputIdPrefix="filter-opponent"
-            options={opponentOptions}
-            selected={draft.opponentIds}
-            onToggle={toggleOpponent}
-            loading={optionsLoading}
-          />
+        <div className="flex flex-col gap-3">
+          {sections.map((section) => (
+            <FilterSection
+              key={section.id}
+              label={section.label}
+              count={section.count}
+              expanded={openSections[section.id] ?? false}
+              onToggleExpanded={() => toggleSection(section.id)}
+              chips={section.chips}
+              onRemoveChip={section.onRemoveChip}
+            >
+              {section.body}
+            </FilterSection>
+          ))}
         </div>
 
         <div className="mt-4 flex items-center gap-2">

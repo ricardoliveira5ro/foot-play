@@ -43,11 +43,6 @@ export default function MissingElevenPage() {
   // Stable identity: FilterUrlSync's read effect keys on this callback.
   const handleFilters = useCallback((next: GameFilterParams) => setFilters(next), [setFilters]);
 
-  // Panel visibility is a plain boolean, never derived from (or keyed on)
-  // filter state: keying it would remount the panel and reset its draft.
-  const [filtersOpen, setFiltersOpen] = useState(false);
-  const handleToggleFiltersOpen = useCallback(() => setFiltersOpen((open) => !open), []);
-
   // Entry gate: the URL is the single source of truth. An empty URL is the
   // pre-screen; any params mean the game has begun (a deep link). Initialized
   // false so the server's HTML and the first client render agree — the
@@ -245,10 +240,22 @@ export default function MissingElevenPage() {
     // Modal will close via state change if correct or failed
   }, [activeShirt, state.match, submitGuess, revealName, setError]);
 
-  const handlePlayAgain = useCallback(() => {
+  // Every route back to the pre-screen — the sidebar's New puzzle, the
+  // game-complete Play Again, and the error state's Change filters — resets
+  // the board, clears the URL (the gate reads ANY params as "started"), and
+  // re-arms the fetch-key ref so the next Start fetches again even under
+  // identical filters. NEW_GAME wipes filters along with everything else
+  // (initialState), so the applied set is reapplied right after: returning
+  // to the gate must show it still selected. The panel remounts on return,
+  // draft re-synced from it, sections collapsed.
+  const handleNewPuzzle = useCallback(() => {
+    const applied = filters;
     newGame();
-    loadMatch();
-  }, [newGame, loadMatch]);
+    setFilters(applied);
+    fetchedKeyRef.current = null;
+    router.replace(pathname, { scroll: false });
+    setStarted(false);
+  }, [filters, newGame, setFilters, router, pathname]);
 
   const handleRetry = useCallback(() => {
     loadMatch();
@@ -257,23 +264,24 @@ export default function MissingElevenPage() {
   // Derive game complete state from gameStatus
   const isGameComplete = state.gameStatus === 'complete';
 
-  // Shared page chrome: the filter panel, rendered for EVERY branch.
-  // The panel deliberately sits outside the error/loading/board branches:
-  // each applied filter change flips the page through the loading branch,
-  // and a panel inside the board tree would unmount there — discarding the
-  // draft and search text (the panel must not remount on filter change).
+  // Shared page chrome. The filter panel lives on the pre-screen only —
+  // during the game there is no in-page filter access; New puzzle / Play
+  // Again / Change filters all return to the gate instead. Unmounting the
+  // panel for the game is deliberate: on return it remounts and re-syncs its
+  // draft from the applied filters (sections start collapsed again).
   const shell = (content: ReactNode) => (
     <div className="mx-auto w-full max-w-6xl px-4 py-6 md:px-6 md:py-8">
-      <FilterPanel
-        open={!started || filtersOpen}
-        onToggleOpen={handleToggleFiltersOpen}
-        filters={filters}
-        options={filterOptions}
-        optionsLoading={optionsLoading}
-        optionsError={optionsError}
-        onApply={setFilters}
-        onStart={started ? undefined : handleStart}
-      />
+      {!started && (
+        <FilterPanel
+          open
+          filters={filters}
+          options={filterOptions}
+          optionsLoading={optionsLoading}
+          optionsError={optionsError}
+          onApply={setFilters}
+          onStart={handleStart}
+        />
+      )}
       {content}
     </div>
   );
@@ -297,7 +305,7 @@ export default function MissingElevenPage() {
             Choose your match
           </h2>
           <p className="mt-3 text-sm text-ink/65">
-            Pick a team or an opponent in the filters above — or start with any match.
+            Expand a filter above and pick your clubs — or start with any match.
           </p>
           <p className="mt-4 text-xs uppercase tracking-[0.15em] text-ink/45">
             Press Start game when you&rsquo;re ready
@@ -313,13 +321,24 @@ export default function MissingElevenPage() {
       <div className="mx-auto flex w-full max-w-6xl flex-col items-center px-4 py-24 text-center md:px-6">
         <p className="text-lg font-semibold text-ink">Could not load the puzzle.</p>
         <p className="mt-2 max-w-sm text-sm text-ink/55">{state.error}</p>
-        <button
-          type="button"
-          onClick={handleRetry}
-          className="mt-6 rounded-lg bg-ink px-6 py-3 font-semibold text-chalk transition-colors hover:bg-flare focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-flare"
-        >
-          Try again
-        </button>
+        <div className="mt-6 flex flex-col items-center gap-3">
+          <button
+            type="button"
+            onClick={handleRetry}
+            className="rounded-lg bg-ink px-6 py-3 font-semibold text-chalk transition-colors hover:bg-flare focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-flare"
+          >
+            Try again
+          </button>
+          {/* No panel exists in-game, so the error state carries its own route
+              back to the filters — the error itself is often a filter problem. */}
+          <button
+            type="button"
+            onClick={handleNewPuzzle}
+            className="text-sm text-ink/60 underline underline-offset-4 transition-colors hover:text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-flare"
+          >
+            Change filters
+          </button>
+        </div>
       </div>,
     );
   }
@@ -414,7 +433,7 @@ export default function MissingElevenPage() {
             </div>
             <button
               type="button"
-              onClick={handlePlayAgain}
+              onClick={handleNewPuzzle}
               className="w-full rounded-lg bg-ink px-5 py-3 font-semibold text-chalk transition-colors hover:bg-flare focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-flare"
             >
               New puzzle
@@ -464,7 +483,7 @@ export default function MissingElevenPage() {
           opponentShirts={state.opponentShirts}
           targetTeamName={targetTeamName}
           opponentTeamName={opponentTeamName}
-          onPlayAgain={handlePlayAgain}
+          onPlayAgain={handleNewPuzzle}
         />
       )}
     </>,
