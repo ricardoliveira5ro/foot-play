@@ -44,6 +44,19 @@ _2026-10-07 · Spec: `docs/v1/v1.1/plan-v1.1.3-team-opponent-filters.md`_
   mount-time URL re-read is what keeps Play again and Retry in step with
   the URL after a `NEW_GAME` reset, and hoisting it broke both flows
   (recorded as controller decision D4 in `.superpowers/sdd/progress.md`).
+- **Entry-gate pre-screen** — an empty URL no longer auto-loads a match: the
+  page renders the filter panel (forced open, toggle hidden, primary button
+  reading **Start game**) and a placeholder that points at it. `started` is
+  a page-level flag recomputed from `location.search` on every load, so the
+  URL stays the single source of truth and no session or storage flag
+  exists. Start commits the draft, writes the URL *before* the board mounts
+  (D4-class ordering — `FilterUrlSync`'s mount read stays idempotent), then
+  opens the gate: exactly one match fetch, zero before it. Any URL with
+  params auto-starts exactly as before, and once running, Apply, Play again,
+  Retry, and surrender are untouched — the gate changes entry, not play.
+  `Clear all` also gained a direct draft reset so it visibly clears a
+  draft-only selection when the applied set is already empty (the
+  pre-screen's default state).
 
 ### Validation
 
@@ -82,6 +95,25 @@ _2026-10-07 · Spec: `docs/v1/v1.1/plan-v1.1.3-team-opponent-filters.md`_
   an Apply → refetch round trip; a club can be simultaneously a selected
   Team and a selected Opponent; OR-within-a-dimension keeps earlier
   selections.
+- Pre-screen append: `npm run test` measured at **22 files, 363 tests, all
+  green** — page suite 26 (7 new gate cases; 3 existing cases re-anchored
+  from the empty URL to a deep-link fixture and the 9-case panel describe
+  anchored once in its `beforeEach` on `daily=1`, a non-filter param that
+  opens the gate while parsing to the empty set their original contract
+  assumes) and `FilterPanel` 24 (5 start-mode cases plus the Clear-all
+  draft-reset contract the gate exposed). Coverage 98.67% statements /
+  97.67% branches / 99.46% lines (680 statements).
+- `npm run build` clean — no `missing-suspense-with-csr-bailout`, the gate
+  reading `window.location` in an effect rather than `useSearchParams` at
+  page level; `npx tsc --noEmit` and `npm run lint` clean (pre-existing
+  `GameComplete.test.tsx` warning aside). Grep gates: no
+  `localStorage`/`sessionStorage` under `missing-eleven/`, no page-level
+  `useSearchParams` (comment-only mention), no count arithmetic, `backend/`
+  diff empty, Vitest `include` unchanged. The gate's jsdom contracts: an
+  empty mount fetches nothing; Start writes the URL before the board's
+  first fetch and fires exactly one request (empty draft included); a
+  deep-linked fixture starts with no pre-screen; draft edits and Clear all
+  start nothing. Browser click-through remains a manual oracle.
 
 ### Notes
 

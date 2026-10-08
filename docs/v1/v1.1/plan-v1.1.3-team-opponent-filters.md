@@ -975,12 +975,16 @@
 
   ```tsx
   beforeEach(() => {
-    setUrl('teamIds=7'); // these tests exercise in-game behaviour, not the gate
+    // These tests exercise in-game behaviour with an EMPTY applied set (their
+    // original contract). 'daily=1' is not a filter key: it opens the gate
+    // (non-empty location) while parsing to the empty filter set, so drafts
+    // start empty and no FilterUrlSync re-dispatch refetches mid-test.
+    setUrl('daily=1');
     mockFetchFilterOptions.mockResolvedValue(clubOptions);
   });
   ```
 
-  (`setUrl` order is safe: the file-level `beforeEach` runs first and resets to `''`, so this line wins. The two tests that call `setUrl` themselves — `clears all filters…` and the two that pass `teamIds=31` before Apply — still override it.)
+  `daily=1`, not a filter-carrying query: these tests assert draft-level facts (`teamIds[0] === 31` after ticking Porto, a single fetch across a draft edit) that only hold when the applied set starts empty — a `teamIds=7` base would make every draft `[7, 31]` and add a FilterUrlSync re-dispatch fetch mid-test. (`setUrl` order is safe: the file-level `beforeEach` runs first and resets to `''`, so this line wins. The two tests that call `setUrl` themselves — `clears all filters…` and the two that pass `teamIds=31` before Apply — still override it.)
 
   No other test changes: the remaining wiring tests already pass `setUrl('teamIds=7')` (or another query) and therefore auto-start exactly as before.
 
