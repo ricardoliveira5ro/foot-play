@@ -1,12 +1,12 @@
 /**
- * Pure helpers for the Team / Opponent club lists (v1.1.3).
+ * Pure helpers for the Team club list (v1.1.3).
  *
  * No React, no fetching, no arithmetic over counts: every number here comes
  * straight from the server's grouped option response (v1.1.1).
  */
 
 /**
- * One count-bearing entry from `FilterOptionsResponse.teams` / `.opponents`.
+ * One count-bearing entry from `FilterOptionsResponse.teams`.
  * `name` is optional because a count entry may not resolve against the name
  * map; `TeamOption` is assignable to this shape.
  */

@@ -51,7 +51,6 @@ describe('FilterUrlSync', () => {
     expect(onFilters).toHaveBeenCalledTimes(1);
     expect(onFilters).toHaveBeenCalledWith({
       teamIds: [7],
-      opponentIds: null,
       competitionIds: null,
       seasonFrom: 2020,
       seasonTo: 2022,
@@ -120,6 +119,22 @@ describe('FilterUrlSync', () => {
     const href = mockReplace.mock.calls[0][0] as string;
     expect(href).not.toContain('teamIds');
     expect(href).toContain('daily=1');
+  });
+
+  it('strips a legacy opponentIds param when writing', async () => {
+    // Bookmarks from before the Opponent dimension was removed still carry
+    // the key; the first canonical write must drop it, not preserve it as an
+    // unknown param.
+    setUrl('opponentIds=5&daily=1');
+    const { rerender } = renderSync(makeFilters());
+
+    rerender(<FilterUrlSync applied={makeFilters({ teamIds: [7] })} onFilters={vi.fn()} />);
+
+    await waitFor(() => expect(mockReplace).toHaveBeenCalledTimes(1));
+    const href = mockReplace.mock.calls[0][0] as string;
+    expect(href).not.toContain('opponentIds');
+    expect(href).toContain('daily=1');
+    expect(href).toContain('teamIds=7');
   });
 
   it('calls router.replace, not router.push, with scroll disabled', async () => {

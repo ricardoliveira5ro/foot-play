@@ -12,10 +12,6 @@ const options: FilterOptionsResponse = {
     { id: 31, name: 'FC Porto', isNationalTeam: false, count: 7 },
     { id: 999, name: 'Ghost FC', isNationalTeam: false, count: 0 },
   ],
-  opponents: [
-    { id: 294, name: 'SL Benfica', isNationalTeam: false, count: 40 },
-    { id: 31, name: 'FC Porto', isNationalTeam: false, count: 12 },
-  ],
   competitions: [],
   seasons: [],
   total: 101,
@@ -78,13 +74,13 @@ function countLabels(): string[] {
 }
 
 /** Section headers read "Team" or "Team (2)" depending on the draft count. */
-function sectionHeader(name: 'Team' | 'Opponent') {
+function sectionHeader(name: 'Team') {
   return screen.getByRole('button', { name: new RegExp(`^${name}( \\(\\d+\\))?$`) });
 }
 
 async function expandSection(
   user: ReturnType<typeof userEvent.setup>,
-  ...names: Array<'Team' | 'Opponent'>
+  ...names: Array<'Team'>
 ) {
   for (const name of names) {
     const header = sectionHeader(name);
@@ -94,10 +90,10 @@ async function expandSection(
 
 describe('FilterPanel', () => {
   it('renders a toggle button showing how many filters are active', () => {
-    renderPanel({ filters: filtersOf({ teamIds: [1, 2], opponentIds: [3] }) });
-    // Counts dimensions, not selected values: two active dimensions read "2",
-    // not 3 selected teams+opponents — otherwise "Team x3" reads as a count of 9.
-    expect(screen.getByRole('button', { name: 'Filters (2)' })).toBeTruthy();
+    renderPanel({ filters: filtersOf({ teamIds: [1, 2] }) });
+    // Counts dimensions, not selected values: one active dimension reads "1",
+    // not 2 selected teams — otherwise "Team x2" would read as a count of 4.
+    expect(screen.getByRole('button', { name: 'Filters (1)' })).toBeTruthy();
   });
 
   it('renders the toggle with no count when no filter is active', () => {
@@ -122,12 +118,14 @@ describe('FilterPanel', () => {
     expect(reopened.getAttribute('aria-controls')).toBe(region.id);
   });
 
-  it('renders the Team and Opponent lists when open', async () => {
+  it('renders the Team list when open and no Opponent section at all', async () => {
     const user = userEvent.setup();
     renderPanel({ open: true });
-    await expandSection(user, 'Team', 'Opponent');
+    await expandSection(user, 'Team');
     expect(within(screen.getByRole('group', { name: 'Team' })).getAllByRole('checkbox').length).toBeGreaterThan(0);
-    expect(within(screen.getByRole('group', { name: 'Opponent' })).getAllByRole('checkbox').length).toBeGreaterThan(0);
+    // The Opponent dimension is removed end to end: no header, no section.
+    expect(screen.queryByRole('button', { name: /^Opponent/ })).toBeNull();
+    expect(screen.queryByRole('group', { name: 'Opponent' })).toBeNull();
   });
 
   it('renders nothing but the toggle when closed', () => {
@@ -163,7 +161,7 @@ describe('FilterPanel', () => {
 
   it('calls onApply with EMPTY_FILTERS when Clear all is pressed', async () => {
     const user = userEvent.setup();
-    const panel = renderPanel({ open: true, filters: filtersOf({ teamIds: [294], opponentIds: [31] }) });
+    const panel = renderPanel({ open: true, filters: filtersOf({ teamIds: [294] }) });
     await user.click(screen.getByRole('button', { name: 'Clear all' }));
     expect(panel.onApply).toHaveBeenCalledWith(EMPTY_FILTERS);
   });
@@ -253,21 +251,6 @@ describe('FilterPanel', () => {
     expect(panel.onApply).toHaveBeenCalledWith(filtersOf({ teamIds: [294, 31] }));
   });
 
-  it('a club can be both a selected Team and a selected Opponent', async () => {
-    const user = userEvent.setup();
-    const panel = renderPanel({ open: true });
-    await expandSection(user, 'Team', 'Opponent');
-    await user.click(screen.getByRole('checkbox', { name: 'SL Benfica (42)' })); // Team
-    await user.click(screen.getByRole('checkbox', { name: 'SL Benfica (40)' })); // Opponent
-
-    expect(screen.getByRole('checkbox', { name: 'SL Benfica (42)' })).toBeChecked();
-    expect(screen.getByRole('checkbox', { name: 'SL Benfica (40)' })).toBeChecked();
-    await user.click(screen.getByRole('button', { name: 'Apply' }));
-    expect(panel.onApply).toHaveBeenCalledWith(
-      filtersOf({ teamIds: [294], opponentIds: [294] }),
-    );
-  });
-
   it('shows the options error without hiding the toggle', () => {
     renderPanel({ open: true, optionsError: 'Options failed to load' });
     expect(screen.getByText('Options failed to load')).toBeTruthy();
@@ -277,9 +260,9 @@ describe('FilterPanel', () => {
   it('shows a loading state for the lists while options load', async () => {
     const user = userEvent.setup();
     renderPanel({ open: true, optionsLoading: true, options: null });
-    // Both dimensions announce their own loading state once their section
-    // is expanded; collapsed sections hide theirs behind the header.
-    await expandSection(user, 'Team', 'Opponent');
+    // The dimension announces its loading state once its section is
+    // expanded; the collapsed section hides it behind the header.
+    await expandSection(user, 'Team');
     expect(screen.getAllByRole('status').length).toBeGreaterThan(0);
     expect(screen.queryAllByRole('checkbox')).toHaveLength(0);
   });
@@ -315,22 +298,22 @@ describe('FilterPanel', () => {
 });
 
 describe('FilterPanel sections', () => {
-  it('starts with both sections collapsed when the panel is open', () => {
+  it('starts with the Team section collapsed when the panel is open', () => {
     renderPanel({ open: true });
-    for (const name of ['Team', 'Opponent'] as const) {
-      const header = sectionHeader(name);
-      expect(header).toHaveAttribute('aria-expanded', 'false');
-      const bodyId = header.getAttribute('aria-controls');
-      expect(bodyId).toBeTruthy();
-      expect(document.getElementById(bodyId as string)?.hidden).toBe(true);
-    }
+    const header = sectionHeader('Team');
+    expect(header).toHaveAttribute('aria-expanded', 'false');
+    const bodyId = header.getAttribute('aria-controls');
+    expect(bodyId).toBeTruthy();
+    expect(document.getElementById(bodyId as string)?.hidden).toBe(true);
     expect(screen.queryAllByRole('checkbox')).toHaveLength(0);
+    // The Opponent dimension is removed — one section, no second disclosure.
+    expect(screen.queryByRole('button', { name: /^Opponent/ })).toBeNull();
     // The footer (Apply / Clear all / Start game) lives outside the sections
     // and must stay reachable no matter what is collapsed.
     expect(screen.getByRole('button', { name: 'Apply' })).toBeVisible();
   });
 
-  it('expands and collapses sections independently', async () => {
+  it('expands and collapses the Team section', async () => {
     const user = userEvent.setup();
     renderPanel({ open: true });
 
@@ -339,21 +322,10 @@ describe('FilterPanel sections', () => {
     expect(
       within(screen.getByRole('group', { name: 'Team' })).getAllByRole('checkbox').length,
     ).toBeGreaterThan(0);
-    expect(sectionHeader('Opponent')).toHaveAttribute('aria-expanded', 'false');
-    expect(screen.queryByRole('group', { name: 'Opponent' })).toBeNull();
 
-    await user.click(sectionHeader('Opponent'));
-    expect(sectionHeader('Opponent')).toHaveAttribute('aria-expanded', 'true');
-    expect(
-      within(screen.getByRole('group', { name: 'Opponent' })).getAllByRole('checkbox').length,
-    ).toBeGreaterThan(0);
-
-    await user.click(sectionHeader('Team')); // collapsing Team leaves Opponent alone
+    await user.click(sectionHeader('Team')); // collapse
     expect(sectionHeader('Team')).toHaveAttribute('aria-expanded', 'false');
     expect(screen.queryByRole('group', { name: 'Team' })).toBeNull();
-    expect(
-      within(screen.getByRole('group', { name: 'Opponent' })).getAllByRole('checkbox').length,
-    ).toBeGreaterThan(0);
   });
 
   it('header count shows the draft selection and resets with Clear all', async () => {
@@ -399,10 +371,9 @@ describe('FilterPanel sections', () => {
     expect(screen.getByRole('button', { name: 'Apply' })).toBeEnabled(); // draft survived too
   });
 
-  it('starts with both sections collapsed in start mode', () => {
+  it('starts collapsed in start mode', () => {
     renderPanel({ open: true, onStart: vi.fn() });
     expect(sectionHeader('Team')).toHaveAttribute('aria-expanded', 'false');
-    expect(sectionHeader('Opponent')).toHaveAttribute('aria-expanded', 'false');
     expect(screen.getByRole('button', { name: 'Start game' })).toBeVisible();
   });
 
@@ -471,18 +442,6 @@ describe('FilterPanel selected chips', () => {
     expect(screen.getByRole('button', { name: 'Remove SL Benfica from Team' })).toBeTruthy();
     expect(screen.getByRole('checkbox', { name: 'FC Porto (7)' })).not.toBeChecked();
     expect(screen.getByRole('checkbox', { name: 'SL Benfica (42)' })).toBeChecked();
-  });
-
-  it('labels opponent chips against the opponent dimension', async () => {
-    const user = userEvent.setup();
-    renderPanel({ open: true });
-    await expandSection(user, 'Opponent');
-    await user.click(screen.getByRole('checkbox', { name: 'SL Benfica (40)' }));
-    expect(sectionHeader('Opponent')).toHaveTextContent('Opponent (1)');
-
-    await user.click(screen.getByRole('button', { name: 'Remove SL Benfica from Opponent' }));
-    expect(screen.queryByRole('button', { name: /Remove SL Benfica from Opponent/ })).toBeNull();
-    expect(screen.getByRole('button', { name: 'Opponent' })).toBeTruthy();
   });
 
   it('falls back to #id for a draft id outside the option universe', () => {

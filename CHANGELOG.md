@@ -8,9 +8,9 @@ from, and release notes are taken from the entry itself.
 
 ---
 
-## v1.1.3 — Team & Opponent filters
+## v1.1.3 — Team filters
 
-_2026-10-07 · Spec: `docs/v1/v1.1/plan-v1.1.3-team-opponent-filters.md`_
+_2026-10-07 · Spec: `docs/v1/v1.1/plan-v1.1.3-team-filters.md`_
 
 ### Added
 
@@ -22,7 +22,7 @@ _2026-10-07 · Spec: `docs/v1/v1.1/plan-v1.1.3-team-opponent-filters.md`_
   `Medellín`), and `toggleId` (set-toggle that returns `null` for the empty
   selection the API expects).
 - **`ClubMultiSelect`** — the single searchable, grouped, counted checkbox
-  control used for **both** dimensions. Counts are rendered exactly as the
+  control used for the Team dimension. Counts are rendered exactly as the
   server sent them: no arithmetic, no `options.length` fallback, so toggling
   can never change another option's number. The option universe is always
   the complete unfiltered list — a selected or zero-count club stays
@@ -82,8 +82,8 @@ _2026-10-07 · Spec: `docs/v1/v1.1/plan-v1.1.3-team-opponent-filters.md`_
   return fetches even under identical filters. Mid-game Apply disappears
   with the panel — filter changes happen only from the pre-screen.
 - **Selected-value chips on section headers** — every draft selection now
-  appears as a named chip in its own row **below** the section header, in
-  both dimensions: `Team (1)` keeps its full-width header, with *FC Porto*
+  appears as a named chip in its own row **below** the section header:
+  `Team (1)` keeps its full-width header, with *FC Porto*
   and an X underneath, so a value can be undone without expanding the
   section and hunting the checkbox. Chips sit outside the disclosure
   button (never inside it — nested buttons are invalid HTML) and the chip
@@ -95,6 +95,23 @@ _2026-10-07 · Spec: `docs/v1/v1.1/plan-v1.1.3-team-opponent-filters.md`_
   matching option renders as `#id` (stale deep links) instead of
   vanishing; start mode removes chips the same way without ever starting
   the game.
+
+### Removed
+
+- **The Opponent filter dimension, end to end** — the panel renders no
+  Opponent section, `GameFilterParams` carries four fields (teamIds,
+  competitionIds, seasonFrom, seasonTo), and `GET /api/matches/filter-options`
+  returns `teams`, `competitions`, `seasons`, `total` (no `opponents` key; the
+  runtime guard dropped it too). The backend stops parsing `?opponentIds=`
+  and builds no opponent SQL — the param is simply unknown and ignored, so
+  `?opponentIds=999` behaves as unfiltered instead of matching nothing.
+  Removed because the dimension proved confusing and redundant UX (spec
+  Tasks 14–15). Legacy bookmarks converge rather than strand: the key parses
+  to nothing (the pre-screen gate starts the game unfiltered), and
+  `FilterUrlSync` deletes a stale `opponentIds` param on the first canonical
+  write via the new `LEGACY_FILTER_KEYS` export. Gameplay keeps its opponent
+  untouched — `Game.opponentTeamId`, the seed, the opponent board, shirts,
+  tabs, and scoring are all unchanged; only the filter is gone.
 
 ### Validation
 
@@ -130,8 +147,7 @@ _2026-10-07 · Spec: `docs/v1/v1.1/plan-v1.1.3-team-opponent-filters.md`_
   same steps remains a manual oracle): toggling a checkbox fires no fetch
   and no URL write; Apply rewrites `?teamIds=…` and refetches; the applied
   selection is checked again on reopen; search text and selection survive
-  an Apply → refetch round trip; a club can be simultaneously a selected
-  Team and a selected Opponent; OR-within-a-dimension keeps earlier
+  an Apply → refetch round trip; OR-within-a-dimension keeps earlier
   selections.
 - Pre-screen append: `npm run test` measured at **22 files, 363 tests, all
   green** — page suite 26 (7 new gate cases; 3 existing cases re-anchored
@@ -186,6 +202,25 @@ _2026-10-07 · Spec: `docs/v1/v1.1/plan-v1.1.3-team-opponent-filters.md`_
   (pre-existing `GameComplete.test.tsx` warning aside). The strict
   header-name regex (`^Team( \(\d+\))?$`) still resolves in both suites —
   the chips stayed outside the disclosure button.
+- Opponent removal append (Tasks 14–15): rows above that mention the
+  `opponents` key, "479 opponents", or the Opponent dimension predate this
+  removal and describe intermediate states of the unreleased patch.
+  Frontend `npx vitest run` measured at **22 files, 375 tests, all green**
+  (+1 legacy URL-strip case; opponent-chip case replaced by no-Opponent
+  absence cases); coverage 98.69% statements / 97.49% branches / 98.36%
+  functions / 99.47% lines. Backend `npm test` measured at **23 files, 336
+  tests, all green**; coverage 99.85% / 99.23% / 100% / 99.82% (95%
+  thresholds). `npx tsc --noEmit` exit 0 and `npm run lint` 0 errors in
+  both packages (pre-existing `GameComplete.test.tsx` warning aside);
+  `npm run build` clean. Absence greps: no `opponentIds`/`opponents`
+  outside gameplay, seed-domain code, the `LEGACY_FILTER_KEYS` convergence
+  entry, and the tests asserting the absence; no `opponentWhere` anywhere;
+  Prisma schema diff empty. Contract probes: `?opponentIds=999` on
+  `filter-options` still returns the unfiltered total; the response key
+  list is `['competitions', 'seasons', 'teams', 'total']`; the spec file
+  was renamed `plan-v1.1.3-team-opponent-filters.md` →
+  `plan-v1.1.3-team-filters.md` (v1.1.3 unreleased) with this entry and
+  `.superpowers/sdd/progress.md` re-pointed.
 
 ### Notes
 

@@ -467,7 +467,6 @@ describe('gameReducer', () => {
       const state = initialState;
       const filters = {
         teamIds: [1, 2],
-        opponentIds: [3],
         competitionIds: ['PL'],
         seasonFrom: 2020,
         seasonTo: 2024,
@@ -479,7 +478,6 @@ describe('gameReducer', () => {
     it('is a no-op when the filters are structurally equal', () => {
       const filters = {
         teamIds: [1, 2],
-        opponentIds: [3],
         competitionIds: ['PL'],
         seasonFrom: 2020,
         seasonTo: 2024,
@@ -499,7 +497,6 @@ describe('gameReducer', () => {
       const playing = playingState();
       const filters = {
         teamIds: [1],
-        opponentIds: [2],
         competitionIds: ['CL'],
         seasonFrom: 2021,
         seasonTo: 2023,
@@ -515,7 +512,6 @@ describe('gameReducer', () => {
       const playing = playingState();
       const filters = {
         teamIds: [5],
-        opponentIds: [6],
         competitionIds: ['EL'],
         seasonFrom: 2019,
         seasonTo: 2022,
@@ -528,7 +524,6 @@ describe('gameReducer', () => {
       const playing = playingState();
       const filters = {
         teamIds: [10],
-        opponentIds: [20],
         competitionIds: ['WC'],
         seasonFrom: 2022,
         seasonTo: 2025,

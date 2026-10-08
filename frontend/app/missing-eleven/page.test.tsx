@@ -83,7 +83,6 @@ function makeMatch(): GameResponse {
 
 const emptyOptions: FilterOptionsResponse = {
   teams: [],
-  opponents: [],
   competitions: [],
   seasons: [],
   total: 0,
@@ -95,7 +94,6 @@ const clubOptions: FilterOptionsResponse = {
     { id: 31, name: 'FC Porto', isNationalTeam: false, count: 7 },
     { id: 294, name: 'SL Benfica', isNationalTeam: false, count: 42 },
   ],
-  opponents: [{ id: 5, name: 'Nacional', isNationalTeam: true, count: 3 }],
   competitions: [],
   seasons: [],
   total: 101,
@@ -117,13 +115,13 @@ async function renderAndSettle() {
 }
 
 /** Section headers read "Team" or "Team (2)" depending on the draft count. */
-function sectionHeader(name: 'Team' | 'Opponent') {
+function sectionHeader(name: 'Team') {
   return screen.getByRole('button', { name: new RegExp(`^${name}( \\(\\d+\\))?$`) });
 }
 
 async function expandSection(
   user: ReturnType<typeof userEvent.setup>,
-  ...names: Array<'Team' | 'Opponent'>
+  ...names: Array<'Team'>
 ) {
   for (const name of names) {
     const header = sectionHeader(name);
@@ -410,7 +408,8 @@ describe('missing-eleven pre-screen gate', () => {
     // Collapsed on the pre-screen too: the first screen stays quiet, and
     // the footer (Start game) sits below the sections, always reachable.
     expect(sectionHeader('Team')).toHaveAttribute('aria-expanded', 'false');
-    expect(sectionHeader('Opponent')).toHaveAttribute('aria-expanded', 'false');
+    // The Opponent dimension is removed — no second section anywhere.
+    expect(screen.queryByRole('button', { name: /^Opponent/ })).toBeNull();
     expect(screen.queryByRole('checkbox', { name: /FC Porto/ })).toBeNull();
 
     const user = userEvent.setup();

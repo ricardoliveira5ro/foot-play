@@ -2,7 +2,7 @@
 
 import { useEffect, useRef } from 'react';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
-import { filtersToParams, paramsToFilters, FILTER_PARAM_KEYS } from '@/lib/filterParams';
+import { filtersToParams, paramsToFilters, FILTER_PARAM_KEYS, LEGACY_FILTER_KEYS } from '@/lib/filterParams';
 import type { GameFilterParams } from '@/types';
 
 interface Props {
@@ -40,6 +40,9 @@ export default function FilterUrlSync({ applied, onFilters }: Props): null {
     if (!readyRef.current) return; // never write before the first read
     const next = new URLSearchParams(key);
     for (const k of FILTER_PARAM_KEYS) next.delete(k);
+    // Bookmark convergence: keys from removed dimensions must be actively
+    // stripped, not left behind as unknown params forever.
+    for (const k of LEGACY_FILTER_KEYS) next.delete(k);
     for (const [k, v] of filtersToParams(applied)) next.set(k, v);
     const href = next.size ? `${pathname}?${next}` : pathname;
     if (href === (key ? `${pathname}?${key}` : pathname)) return; // already canonical

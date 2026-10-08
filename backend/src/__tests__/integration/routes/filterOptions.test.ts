@@ -7,15 +7,26 @@ describe('GET /api/matches/filter-options', () => {
     const response = await request(app).get('/api/matches/filter-options');
 
     expect(response.status).toBe(200);
-    expect(Object.keys(response.body).sort()).toEqual(['competitions', 'opponents', 'seasons', 'teams', 'total']);
+    expect(Object.keys(response.body).sort()).toEqual(['competitions', 'seasons', 'teams', 'total']);
+    // The Opponent dimension was removed from the contract entirely.
+    expect(response.body).not.toHaveProperty('opponents');
     expect(response.body.total).toBe(1);
     expect(response.body.teams.find((option: { id: number }) => option.id === 1).count).toBe(1);
   });
 
-  it('applies all four dimensions with AND across dimensions', async () => {
+  it('applies all dimensions with AND across dimensions', async () => {
     const response = await request(app).get(
-      '/api/matches/filter-options?teamIds=1&opponentIds=2&competitionIds=TEST-COMP&seasonFrom=2024&seasonTo=2024',
+      '/api/matches/filter-options?teamIds=1&competitionIds=TEST-COMP&seasonFrom=2024&seasonTo=2024',
     );
+
+    expect(response.status).toBe(200);
+    expect(response.body.total).toBe(1);
+  });
+
+  it('ignores the legacy opponentIds query param', async () => {
+    // Bookmarks from before the removal still carry the key; it must behave
+    // as unfiltered rather than narrowing the counts to nothing.
+    const response = await request(app).get('/api/matches/filter-options?opponentIds=999');
 
     expect(response.status).toBe(200);
     expect(response.body.total).toBe(1);

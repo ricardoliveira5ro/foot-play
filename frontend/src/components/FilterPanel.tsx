@@ -66,7 +66,6 @@ export default function FilterPanel({
   // and closing the panel while the page is mounted, and resets on reload.
   const [openSections, setOpenSections] = useState<Record<string, boolean>>({
     team: false,
-    opponent: false,
   });
   const toggleSection = (id: string) =>
     setOpenSections((current) => ({ ...current, [id]: !current[id] }));
@@ -80,24 +79,18 @@ export default function FilterPanel({
     setDraft(filters);
   }, [filters]);
 
-  // Both facets carry the same club universe with different counts; the
-  // merged map is a name source robust to either list being narrower.
-  const teams = options?.teams ?? [];
-  const opponents = options?.opponents ?? [];
-  const clubNames = new Map<number, string>(
-    [...teams, ...opponents].map((club) => [club.id, club.name]),
-  );
-  const teamOptions = toClubOptions(teams, clubNames);
-  const opponentOptions = toClubOptions(opponents, clubNames);
-  // Chip label source: the merged name map. A stale deep link can carry an id
+  // Chip labels come from the Team universe. A stale deep link can carry an id
   // the current universe does not list — fall back to "#id" so the chip still
   // shows something recognisable instead of vanishing.
+  const teams = options?.teams ?? [];
+  const clubNames = new Map<number, string>(
+    teams.map((club) => [club.id, club.name]),
+  );
+  const teamOptions = toClubOptions(teams, clubNames);
   const nameFor = (id: number) => clubNames.get(id) ?? `#${id}`;
 
   const toggleTeam = (id: number) =>
     setDraft((current) => ({ ...current, teamIds: toggleId(current.teamIds, id) }));
-  const toggleOpponent = (id: number) =>
-    setDraft((current) => ({ ...current, opponentIds: toggleId(current.opponentIds, id) }));
 
   const apply = () => {
     if (onStart) {
@@ -138,29 +131,11 @@ export default function FilterPanel({
         />
       ),
     },
-    {
-      id: 'opponent',
-      label: 'Opponent',
-      count: draft.opponentIds?.length ?? 0,
-      chips: (draft.opponentIds ?? []).map((id) => ({ id, name: nameFor(id) })),
-      onRemoveChip: toggleOpponent,
-      body: (
-        <ClubMultiSelect
-          legend="Opponent"
-          inputIdPrefix="filter-opponent"
-          options={opponentOptions}
-          selected={draft.opponentIds}
-          onToggle={toggleOpponent}
-          loading={optionsLoading}
-          hideLegend
-        />
-      ),
-    },
   ];
 
-  // Count active *dimensions*, not selected values: Team x3 + Opponent x1
-  // reads as 2 filters, not 4 — the alternative (selected-value count) looks
-  // equally plausible and misreports the filter set.
+  // Count active *dimensions*, not selected values: three selected teams read
+  // as 1 filter, not 3 — the alternative (selected-value count) looks equally
+  // plausible and misreports the filter set.
   const activeCount = hasActiveFilters(filters) ? countActiveFilters(filters) : 0;
   const draftChanged = !filtersEqual(draft, filters);
 

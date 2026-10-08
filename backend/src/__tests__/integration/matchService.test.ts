@@ -28,7 +28,6 @@ describe('getRandomMatch', () => {
   it('applies all selected dimensions when choosing a random game', async () => {
     const game = await getRandomMatch({
       teamIds: [1],
-      opponentIds: [2],
       competitionIds: ['TEST-COMP'],
       seasonFrom: 2024,
       seasonTo: 2024,
@@ -40,7 +39,6 @@ describe('getRandomMatch', () => {
   it('returns NOT_FOUND when no complete game matches the filters', async () => {
     await expect(getRandomMatch({
       teamIds: [2],
-      opponentIds: null,
       competitionIds: null,
       seasonFrom: null,
       seasonTo: null,

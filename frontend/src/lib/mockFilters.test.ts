@@ -8,18 +8,16 @@ import {
 import { EMPTY_FILTERS } from '../../types';
 
 describe('mock filter parity', () => {
-  it('keeps unfiltered team and opponent option counts consistent with total', () => {
+  it('keeps unfiltered team option counts consistent with total', () => {
     expect(MOCK_FILTER_OPTIONS.total).toBe(2);
     expect(MOCK_FILTER_OPTIONS.teams.reduce((sum, option) => sum + option.count, 0)).toBe(2);
-    expect(MOCK_FILTER_OPTIONS.opponents.reduce((sum, option) => sum + option.count, 0)).toBe(2);
   });
 
-  it('excludes a selected dimension from its own counts', () => {
+  it('excludes a selected team from its own counts', () => {
     const options = getMockFilterOptions({ ...EMPTY_FILTERS, teamIds: [281] });
 
     expect(options.total).toBe(1);
     expect(options.teams.find(({ id }) => id === 281)?.count).toBe(1);
-    expect(options.opponents.find(({ id }) => id === 985)?.count).toBe(1);
   });
 
   it('returns null instead of an unrelated match when no mock game matches', () => {

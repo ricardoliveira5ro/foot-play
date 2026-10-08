@@ -20,14 +20,13 @@ describe('matchesGameFilters', () => {
 
   it('matches every selected filter dimension', () => {
     const filters: GameFilterParams = {
-      teamIds: [7], opponentIds: [9], competitionIds: ['LL'], seasonFrom: 2023, seasonTo: 2025,
+      teamIds: [7], competitionIds: ['LL'], seasonFrom: 2023, seasonTo: 2025,
     };
     expect(matchesGameFilters(filters, game)).toBe(true);
   });
 
-  it('rejects a non-matching team or opponent', () => {
+  it('rejects a non-matching team', () => {
     expect(matchesGameFilters({ ...EMPTY_FILTERS, teamIds: [9] }, game)).toBe(false);
-    expect(matchesGameFilters({ ...EMPTY_FILTERS, opponentIds: [7] }, game)).toBe(false);
   });
 
   it('rejects a non-matching competition or season', () => {
@@ -64,15 +63,11 @@ describe('matchesGameFilters metadata fallbacks', () => {
       },
     };
     expect(matchesGameFilters({ ...EMPTY_FILTERS, teamIds: [7] }, wrapped)).toBe(true);
-    expect(matchesGameFilters({ ...EMPTY_FILTERS, opponentIds: [9] }, wrapped)).toBe(true);
-    expect(matchesGameFilters({ ...EMPTY_FILTERS, opponentIds: [7] }, wrapped)).toBe(false);
     expect(matchesGameFilters({ ...EMPTY_FILTERS, competitionIds: ['LL'] }, wrapped)).toBe(true);
   });
 
-  it('uses the away club as the opponent when no opponent id exists anywhere', () => {
+  it('falls back to club ids when no metadata exists anywhere', () => {
     const bare = { game: { ...clubs } };
-    expect(matchesGameFilters({ ...EMPTY_FILTERS, opponentIds: [9] }, bare)).toBe(true);
-    expect(matchesGameFilters({ ...EMPTY_FILTERS, opponentIds: [7] }, bare)).toBe(false);
     expect(matchesGameFilters({ ...EMPTY_FILTERS, teamIds: [7] }, bare)).toBe(true);
     expect(matchesGameFilters({ ...EMPTY_FILTERS, teamIds: [11] }, bare)).toBe(false);
     expect(matchesGameFilters({ ...EMPTY_FILTERS, competitionIds: ['LL'] }, bare)).toBe(false);
@@ -98,9 +93,8 @@ describe('matchesGameFilters metadata fallbacks', () => {
   });
 
   it('falls back to club ids when metadata ids are not integers', () => {
-    const odd = { game: { ...clubs, filterMetadata: { teamId: 1.5, opponentId: 1.5 } } };
+    const odd = { game: { ...clubs, filterMetadata: { teamId: 1.5 } } };
     expect(matchesGameFilters({ ...EMPTY_FILTERS, teamIds: [7] }, odd)).toBe(true);
-    expect(matchesGameFilters({ ...EMPTY_FILTERS, opponentIds: [9] }, odd)).toBe(true);
   });
 });
 
@@ -131,7 +125,7 @@ describe('FILTER_PARAM_KEYS', () => {
     // Populate every key at once: the result's own fields are the dimensions
     // paramsToFilters reads, so they must correspond 1:1 with FILTER_PARAM_KEYS.
     const all = new URLSearchParams(
-      FILTER_PARAM_KEYS.map((k) => [k, k === 'teamIds' || k === 'opponentIds' ? '7' : k === 'competitionIds' ? 'LL' : '2020']),
+      FILTER_PARAM_KEYS.map((k) => [k, k === 'teamIds' ? '7' : k === 'competitionIds' ? 'LL' : '2020']),
     );
     expect(Object.keys(paramsToFilters(all)).sort()).toEqual([...FILTER_PARAM_KEYS].sort());
 
@@ -139,14 +133,14 @@ describe('FILTER_PARAM_KEYS', () => {
     // a key listed but never read (or read but unlisted) fails here.
     const baseline = paramsToFilters(new URLSearchParams());
     for (const key of FILTER_PARAM_KEYS) {
-      const probe = paramsToFilters(new URLSearchParams([[key, key === 'teamIds' || key === 'opponentIds' ? '7' : key === 'competitionIds' ? 'LL' : '2020']]));
+      const probe = paramsToFilters(new URLSearchParams([[key, key === 'teamIds' ? '7' : key === 'competitionIds' ? 'LL' : '2020']]));
       expect(probe, `key ${key} is not read by paramsToFilters`).not.toEqual(baseline);
     }
   });
 
   it('does not contain keys that paramsToFilters ignores', () => {
     const baseline = paramsToFilters(new URLSearchParams());
-    for (const key of ['daily', 'unknownKey']) {
+    for (const key of ['daily', 'unknownKey', 'opponentIds']) {
       expect(paramsToFilters(new URLSearchParams([[key, '1']]))).toEqual(baseline);
       expect(FILTER_PARAM_KEYS).not.toContain(key);
     }

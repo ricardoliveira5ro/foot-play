@@ -14,7 +14,7 @@ describe('GET /api/matches/random', () => {
   });
 
   it('applies filters to random match selection', async () => {
-    const matching = await request(app).get('/api/matches/random?teamIds=1&opponentIds=2');
+    const matching = await request(app).get('/api/matches/random?teamIds=1');
     const empty = await request(app).get('/api/matches/random?teamIds=2');
 
     expect(matching.status).toBe(200);

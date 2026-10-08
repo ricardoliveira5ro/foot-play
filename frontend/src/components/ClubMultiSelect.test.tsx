@@ -160,8 +160,8 @@ describe('ClubMultiSelect', () => {
   });
 
   it('exposes the legend as the fieldset accessible name', () => {
-    renderSelect({ legend: 'Opponent' });
-    expect(screen.getByRole('group', { name: 'Opponent' })).toBeTruthy();
+    renderSelect({ legend: 'Second list' });
+    expect(screen.getByRole('group', { name: 'Second list' })).toBeTruthy();
   });
 
   it('is reachable by getByRole with an accessible name', () => {
@@ -174,12 +174,12 @@ describe('ClubMultiSelect', () => {
     render(
       <>
         <ClubMultiSelect legend="Team" inputIdPrefix="filter-team" options={options} selected={null} onToggle={vi.fn()} loading={false} />
-        <ClubMultiSelect legend="Opponent" inputIdPrefix="filter-opponent" options={options} selected={null} onToggle={vi.fn()} loading={false} />
+        <ClubMultiSelect legend="Second list" inputIdPrefix="filter-second" options={options} selected={null} onToggle={vi.fn()} loading={false} />
       </>,
     );
     const ids = screen.getAllByRole('checkbox').map((cb) => cb.id);
     expect(new Set(ids).size).toBe(ids.length);
     expect(ids.filter((id) => id.startsWith('filter-team-')).length).toBe(options.length);
-    expect(ids.filter((id) => id.startsWith('filter-opponent-')).length).toBe(options.length);
+    expect(ids.filter((id) => id.startsWith('filter-second-')).length).toBe(options.length);
   });
 });

@@ -91,10 +91,6 @@ export function getMockFilterOptions(filters: GameFilterParams): FilterOptionsRe
     ...club,
     count: matchingMockGames({ ...filters, teamIds: [club.id] }).length,
   }));
-  const opponents = MOCK_CLUBS.map((club) => ({
-    ...club,
-    count: matchingMockGames({ ...filters, opponentIds: [club.id] }).length,
-  }));
   const competitions = MOCK_COMPETITIONS.map((competition) => ({
     ...competition,
     count: matchingMockGames({ ...filters, competitionIds: [competition.id] }).length,
@@ -110,7 +106,6 @@ export function getMockFilterOptions(filters: GameFilterParams): FilterOptionsRe
 
   return {
     teams,
-    opponents,
     competitions,
     seasons,
     total: matchingMockGames(filters).length,
@@ -265,7 +260,6 @@ const MOCK_MATCHES: MockMatchResponse[] = [
 
 export const MOCK_FILTER_OPTIONS: FilterOptionsResponse = getMockFilterOptions({
   teamIds: null,
-  opponentIds: null,
   competitionIds: null,
   seasonFrom: null,
   seasonTo: null,
