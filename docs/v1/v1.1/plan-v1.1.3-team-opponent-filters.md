@@ -472,6 +472,628 @@
   git commit -m "docs: add v1.1.3 changelog and validation evidence"
   ```
 
+---
+
+### Task 6: Add the entry-gate pre-screen
+
+**Files:**
+- Modify: `frontend/src/components/FilterPanel.tsx`
+- Modify: `frontend/src/components/FilterPanel.test.tsx`
+- Modify: `frontend/app/missing-eleven/page.tsx`
+- Modify: `frontend/app/missing-eleven/page.test.tsx`
+
+**Interfaces:**
+- Consumes: `FilterPanel` (Task 3), `filtersToParams` (`frontend/src/lib/filterParams.ts`), `useGameState`'s `filters` / `setFilters` (v1.1.2 Task 1), `FilterUrlSync`'s mount-read contract (v1.1.2 — untouched).
+- Produces:
+  ```tsx
+  // FilterPanel gains exactly one optional prop. Existing callers keep
+  // today's behaviour by not passing it.
+  onStart?: (next: GameFilterParams) => void;
+  // present → start mode: primary button reads "Start game", is never
+  //           disabled, the panel toggle is hidden, and pressing it calls
+  //           onStart(draft) and nothing else (the panel stays open).
+  // absent  → Apply mode, byte-for-byte today's behaviour.
+  // Page:
+  const [started, setStarted] = useState(false);        // flipped from location.search on mount
+  function handleStart(next: GameFilterParams): void;   // URL write → gate flip → setFilters
+  ```
+
+**Steps:**
+
+- [ ] **Step 6.1: Extend the `FilterPanel` test harness and write the failing start-mode tests.**
+
+  In `frontend/src/components/FilterPanel.test.tsx`:
+
+  1. Add `onStart` to the config interface:
+
+  ```tsx
+  interface PanelConfig {
+    filters?: GameFilterParams;
+    open?: boolean;
+    options?: FilterOptionsResponse | null;
+    optionsLoading?: boolean;
+    optionsError?: string | null;
+    onApply?: (next: GameFilterParams) => void;
+    onToggleOpen?: () => void;
+    onStart?: (next: GameFilterParams) => void;
+  }
+  ```
+
+  2. Thread it through `renderPanel`. Absence must survive the harness — passing `onStart` to an Apply-mode panel would silently flip it into start mode and make every existing test assert the wrong mode. The only changes to the function are the two starred lines; everything else (including `rerenderPanel`, which spreads `{...base}`) is unchanged, because `{...base}` now carries `onStart` whenever it was configured:
+
+  ```tsx
+  function renderPanel(config: PanelConfig = {}) {
+    const onApply = config.onApply ?? vi.fn();
+    const onToggleOpen = config.onToggleOpen ?? vi.fn();
+    const onStart = config.onStart;                      // ← new: undefined unless configured
+    const base = {
+      open: config.open ?? false,
+      onToggleOpen,
+      filters: config.filters ?? (EMPTY_FILTERS as GameFilterParams),
+      options: config.options === undefined ? options : config.options,
+      optionsLoading: config.optionsLoading ?? false,
+      optionsError: config.optionsError ?? null,
+      onApply,
+      ...(onStart ? { onStart } : {}),                   // ← new: absence must survive
+    };
+    const view = render(<FilterPanel {...base} />);
+    return {
+      ...view,
+      onApply,
+      onToggleOpen,
+      onStart,                                           // ← new
+      rerenderPanel: (next: PanelConfig = {}) =>
+        view.rerender(
+          <FilterPanel
+            {...base}
+            {...(next.filters !== undefined ? { filters: next.filters } : {})}
+            {...(next.open !== undefined ? { open: next.open } : {})}
+            {...(next.options !== undefined ? { options: next.options } : {})}
+            {...(next.optionsLoading !== undefined ? { optionsLoading: next.optionsLoading } : {})}
+            {...(next.optionsError !== undefined ? { optionsError: next.optionsError } : {})}
+          />,
+        ),
+    };
+  }
+  ```
+
+  3. Append this describe block at the end of the file, after the existing `describe('FilterPanel', ...)`:
+
+  ```tsx
+  describe('FilterPanel start mode', () => {
+    it('reads "Start game" instead of "Apply"', () => {
+      renderPanel({ open: true, onStart: vi.fn() });
+      expect(screen.getByRole('button', { name: 'Start game' })).toBeTruthy();
+      expect(screen.queryByRole('button', { name: 'Apply' })).toBeNull();
+    });
+
+    it('never disables Start game, even when the draft equals the applied filters', () => {
+      renderPanel({ open: true, filters: filtersOf({ teamIds: [294] }), onStart: vi.fn() });
+      // Apply is armed by a change; Start is always armed — starting with
+      // nothing selected (or with the deep-link set as-is) is legal.
+      expect(screen.getByRole('button', { name: 'Start game' })).not.toBeDisabled();
+    });
+
+    it('calls onStart with the draft and nothing else when Start game is pressed', async () => {
+      const user = userEvent.setup();
+      const panel = renderPanel({ open: true, onStart: vi.fn() });
+      await user.click(screen.getByRole('checkbox', { name: 'SL Benfica (42)' }));
+      expect(panel.onStart).not.toHaveBeenCalled();           // toggling starts nothing
+      await user.click(screen.getByRole('button', { name: 'Start game' }));
+      expect(panel.onStart).toHaveBeenCalledTimes(1);
+      expect(panel.onStart).toHaveBeenCalledWith(filtersOf({ teamIds: [294] }));
+      expect(panel.onApply).not.toHaveBeenCalled();           // start is not an apply
+      expect(panel.onToggleOpen).not.toHaveBeenCalled();      // the page decides when it closes
+    });
+
+    it('hides the panel toggle in start mode so Start cannot become unreachable', () => {
+      renderPanel({ open: true, onStart: vi.fn() });
+      expect(screen.queryByRole('button', { name: /^Filters/ })).toBeNull();
+      expect(screen.getByRole('region', { name: 'Filters' })).toBeVisible();
+    });
+
+    it('still routes Clear all through onApply in start mode', async () => {
+      const user = userEvent.setup();
+      const panel = renderPanel({ open: true, filters: filtersOf({ teamIds: [294] }), onStart: vi.fn() });
+      await user.click(screen.getByRole('button', { name: 'Clear all' }));
+      expect(panel.onApply).toHaveBeenCalledWith(EMPTY_FILTERS);
+      expect(panel.onStart).not.toHaveBeenCalled();
+    });
+  });
+  ```
+
+- [ ] **Step 6.2: Run it and confirm red.**
+
+  ```bash
+  cd frontend && npx vitest run src/components/FilterPanel.test.tsx
+  ```
+
+  Expected: the five new `start mode` cases fail (no button named `Start game`, toggle still rendered), the 18 existing cases still green.
+
+- [ ] **Step 6.3: Implement start mode in `FilterPanel`.**
+
+  Three changes, nothing else — the draft logic, the re-sync effect, and Clear all are untouched:
+
+  1. Add the prop to the interface, above `onApply`:
+
+  ```tsx
+    /** Called only by Apply and Clear all — never by a checkbox toggle. */
+    onApply: (next: GameFilterParams) => void;
+    /**
+   * Present on the pre-screen only: commits the draft AND starts the game.
+   * When set, the primary button reads "Start game", is never disabled, the
+   * panel toggle is hidden (so the panel cannot close before Start is
+   * reachable), and the panel stays open — the page decides when it closes.
+   */
+  onStart?: (next: GameFilterParams) => void;
+  ```
+
+  2. Destructure it and derive the mode; rewrite the `apply` function:
+
+  ```tsx
+  export default function FilterPanel({
+    open,
+    onToggleOpen,
+    filters,
+    options,
+    optionsLoading,
+    optionsError,
+    onApply,
+    onStart,
+  }: FilterPanelProps) {
+    const startMode = onStart !== undefined;
+    ...
+    const apply = () => {
+      if (onStart) {
+        onStart(draft);   // commit + start in one call; the gate is the page's
+        return;
+      }
+      onApply(draft);
+      onToggleOpen();
+    };
+  ```
+
+  3. Wrap the toggle `<button>` in `{!startMode && ( ... )}` (the region below keeps its `hidden={!open}` exactly as it is — the page forces `open` on the pre-screen), and replace the primary button's label and disabled check:
+
+  ```tsx
+          <button
+            type="button"
+            onClick={apply}
+            disabled={!startMode && !draftChanged}
+            className="flex-1 rounded-lg bg-ink px-4 py-2.5 text-sm font-semibold text-chalk transition-colors hover:bg-flare focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-flare disabled:cursor-not-allowed disabled:opacity-40"
+          >
+            {startMode ? 'Start game' : 'Apply'}
+          </button>
+  ```
+
+  Also update the component's doc comment (lines 24–30) with one sentence: `When onStart is present (the pre-screen) the panel runs in start mode: "Start game" replaces Apply, the toggle is hidden, and the panel never closes itself.`
+
+- [ ] **Step 6.4: Verify green.**
+
+  ```bash
+  cd frontend && npx vitest run src/components/FilterPanel.test.tsx
+  ```
+
+  Expected: all cases green (18 existing + 5 new).
+
+- [ ] **Step 6.5: Re-anchor the page test harness and write the failing pre-screen tests.**
+
+  In `frontend/app/missing-eleven/page.test.tsx`:
+
+  1. `setUrl` must mirror the real location, because the gate reads `window.location.search` exactly once on mount — in the real app the mocked params and the location are the same thing:
+
+  ```tsx
+  function setUrl(query: string) {
+    mockUseSearchParams.mockReturnValue(new URLSearchParams(query) as never);
+    // The gate reads window.location.search on mount, so the test location
+    // must mirror the mocked params — in the real app the two are one thing.
+    window.history.replaceState(null, '', query ? `/missing-eleven?${query}` : '/missing-eleven');
+  }
+  ```
+
+  2. Add a `mirrorReplace` helper directly below `setUrl`. `router.replace` is mocked, so it does not move the location by itself; the Start test needs the real ordering (URL write → fetch) to be observable:
+
+  ```tsx
+  // Keep window.location (and the useSearchParams mock) in step with what
+  // router.replace writes, exactly as the real router does — the Start test
+  // asserts the D4-class ordering this produces.
+  function mirrorReplace() {
+    mockReplace.mockImplementation((href: string) => {
+      const url = new URL(href, 'http://localhost');
+      setUrl(url.search.replace(/^\?/, ''));
+    });
+  }
+  ```
+
+  3. Hoist the `clubOptions` fixture: cut the whole `const clubOptions: FilterOptionsResponse = { ... };` block from inside `describe('missing-eleven page filter panel', ...)` and paste it at file scope beside `emptyOptions` (values unchanged), so the pre-screen describe can share it.
+
+  4. Append this describe at the end of the file:
+
+  ```tsx
+  describe('missing-eleven pre-screen gate', () => {
+    beforeEach(() => {
+      mockFetchFilterOptions.mockResolvedValue(clubOptions);
+    });
+
+    it('renders the pre-screen on an empty URL and fetches no match', async () => {
+      render(<MissingElevenPage />);
+
+      expect(screen.getByRole('heading', { level: 1, name: 'Missing Eleven' })).toBeTruthy();
+      expect(screen.getByRole('heading', { level: 2, name: 'Choose your match' })).toBeTruthy();
+      expect(screen.getByRole('button', { name: 'Start game' })).not.toBeDisabled();
+      expect(screen.queryByRole('button', { name: 'New puzzle' })).toBeNull();
+      expect(screen.queryByText('Loading puzzle…')).toBeNull();
+
+      // Options still load on the pre-screen (Start with a pick needs them)…
+      await waitFor(() => expect(mockFetchFilterOptions).toHaveBeenCalled());
+      // …but the match itself must not be requested before Start.
+      expect(mockFetchRandomMatch).not.toHaveBeenCalled();
+    });
+
+    it('forces the panel open with its toggle hidden until the game starts', async () => {
+      render(<MissingElevenPage />);
+
+      expect(screen.queryByRole('button', { name: /^Filters/ })).toBeNull();
+      const region = screen.getByRole('region', { name: 'Filters' });
+      expect(region).toBeVisible();
+      await waitFor(() =>
+        expect(within(region).getByRole('checkbox', { name: /FC Porto \(7\)/ })).toBeTruthy(),
+      );
+    });
+
+    it('starts the game: URL first, exactly one fetch, pre-screen gone', async () => {
+      mirrorReplace();
+      const user = userEvent.setup();
+      render(<MissingElevenPage />);
+      await waitFor(() => expect(screen.getByRole('checkbox', { name: /FC Porto \(7\)/ })).toBeTruthy());
+      await user.click(screen.getByRole('checkbox', { name: /FC Porto \(7\)/ }));
+      await user.click(screen.getByRole('button', { name: 'Start game' }));
+
+      await waitFor(() => expect(mockFetchRandomMatch).toHaveBeenCalledTimes(1));
+      expect(mockFetchRandomMatch).toHaveBeenCalledWith(
+        expect.objectContaining({ teamIds: [31] }),
+      );
+      // D4-class ordering: the URL write lands before the board's fetch.
+      expect(mockReplace.mock.invocationCallOrder[0]).toBeLessThan(
+        mockFetchRandomMatch.mock.invocationCallOrder[0],
+      );
+      expect(String(mockReplace.mock.calls[0][0])).toContain('teamIds=31');
+
+      await screen.findByRole('button', { name: 'New puzzle' });
+      // Exactly one — the board-remount FilterUrlSync read was idempotent.
+      expect(mockFetchRandomMatch).toHaveBeenCalledTimes(1);
+      expect(mockReplace.mock.calls).toHaveLength(1);
+      expect(screen.queryByRole('button', { name: 'Start game' })).toBeNull();
+      expect(screen.queryByRole('region', { name: 'Filters' })).toBeNull(); // panel closed in-game
+    });
+
+    it('starts with an empty draft: URL stays empty and one fetch still fires', async () => {
+      mirrorReplace();
+      const user = userEvent.setup();
+      render(<MissingElevenPage />);
+
+      await user.click(screen.getByRole('button', { name: 'Start game' }));
+
+      await waitFor(() => expect(mockFetchRandomMatch).toHaveBeenCalledTimes(1));
+      expect(mockReplace).toHaveBeenCalledWith('/missing-eleven', { scroll: false });
+      await screen.findByRole('button', { name: 'New puzzle' });
+      expect(mockFetchRandomMatch).toHaveBeenCalledTimes(1);
+      expect(screen.queryByRole('button', { name: 'Start game' })).toBeNull();
+    });
+
+    it('draft edits on the pre-screen start nothing', async () => {
+      const user = userEvent.setup();
+      render(<MissingElevenPage />);
+      await waitFor(() => expect(screen.getByRole('checkbox', { name: /FC Porto \(7\)/ })).toBeTruthy());
+      await user.click(screen.getByRole('checkbox', { name: /FC Porto \(7\)/ }));
+
+      expect(screen.getByRole('button', { name: 'Start game' })).not.toBeDisabled();
+      expect(mockFetchRandomMatch).not.toHaveBeenCalled();
+      expect(mockReplace).not.toHaveBeenCalled();
+    });
+
+    it('Clear all on the pre-screen clears the draft without starting', async () => {
+      const user = userEvent.setup();
+      render(<MissingElevenPage />);
+      await waitFor(() => expect(screen.getByRole('checkbox', { name: /FC Porto \(7\)/ })).toBeTruthy());
+      await user.click(screen.getByRole('checkbox', { name: /FC Porto \(7\)/ }));
+      await user.click(screen.getByRole('button', { name: 'Clear all' }));
+
+      await waitFor(() => expect(screen.getByRole('checkbox', { name: /FC Porto \(7\)/ })).not.toBeChecked());
+      expect(screen.getByRole('button', { name: 'Start game' })).toBeTruthy();
+      expect(mockFetchRandomMatch).not.toHaveBeenCalled();
+      expect(mockReplace).not.toHaveBeenCalled();
+    });
+
+    it('auto-starts a deep-linked URL with no pre-screen', async () => {
+      setUrl('teamIds=7');
+      render(<MissingElevenPage />);
+
+      await waitFor(() =>
+        expect(mockFetchRandomMatch).toHaveBeenLastCalledWith(
+          expect.objectContaining({ teamIds: [7] }),
+        ),
+      );
+      expect(screen.queryByRole('button', { name: 'Start game' })).toBeNull();
+      await screen.findByRole('button', { name: 'New puzzle' });
+    });
+  });
+  ```
+
+- [ ] **Step 6.6: Run it and confirm red.**
+
+  ```bash
+  cd frontend && npx vitest run app/missing-eleven/page.test.tsx
+  ```
+
+  Expected: the seven `pre-screen gate` cases fail (no `Start game` button exists yet); the 19 existing cases still pass — the gate has not been implemented, so the old auto-start behaviour is still in force.
+
+- [ ] **Step 6.7: Implement the gate in `frontend/app/missing-eleven/page.tsx`.**
+
+  Four additions plus one branch, all before the error branch:
+
+  1. Import the router hooks alongside the React imports:
+
+  ```tsx
+  import { usePathname, useRouter } from 'next/navigation';
+  ```
+
+  2. Declare the gate right after the `filtersOpen` state (line ~48):
+
+  ```tsx
+  // Entry gate: the URL is the single source of truth. An empty URL is the
+  // pre-screen; any params mean the game has begun (a deep link). Initialized
+  // false so the server's HTML and the first client render agree — the
+  // pre-screen — then flipped once from the real location after hydration.
+  // Never read window at render time (hydration mismatch) and never call
+  // useSearchParams at page level (Next 16's missing-suspense-with-csr-bailout
+  // is a build failure; FilterUrlSync under Suspense is the only reader).
+  // Reload recomputes this from the URL: no session or storage flag exists.
+  const [started, setStarted] = useState(false);
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- one-shot gate init after hydration; same pattern as FilterPanel's re-sync
+    setStarted(new URLSearchParams(window.location.search).size > 0);
+  }, []);
+  ```
+
+  3. The start handler, directly below it (`router` / `pathname` from the imports in 1):
+
+  ```tsx
+  const router = useRouter();
+  const pathname = usePathname();
+
+  // Start (pre-screen only): write the URL FIRST so the board's FilterUrlSync
+  // mount-read sees the finished URL — D4-class ordering; reversing this wipes
+  // the started filters the same way v1.1.3's D4 did. Both state updates
+  // batch into one commit, so the fetch effect below runs once for this start.
+  const handleStart = useCallback((next: GameFilterParams) => {
+    const query = filtersToParams(next).toString();
+    router.replace(query ? `${pathname}?${query}` : pathname, { scroll: false });
+    setStarted(true);
+    setFilters(next);
+  }, [router, pathname, setFilters]);
+  ```
+
+  4. Gate the existing fetch effect (lines 135–139):
+
+  ```tsx
+  useEffect(() => {
+    if (!started) return; // pre-screen: zero match requests until Start
+    if (fetchedKeyRef.current === filterKey) return;
+    fetchedKeyRef.current = filterKey;
+    loadMatch();
+  }, [started, filterKey, loadMatch]);
+  ```
+
+  The comment above the effect (lines 131–134) gains one sentence: `Before the first start the guard returns early — the pre-screen fetches nothing; Start changes both deps in one commit, and the ref keeps that single.`
+
+  5. Wire the shell (lines 232–245) — `open` is forced while unstarted, and `onStart` is only present before the first start:
+
+  ```tsx
+      <FilterPanel
+        open={!started || filtersOpen}
+        onToggleOpen={handleToggleFiltersOpen}
+        filters={filters}
+        options={filterOptions}
+        optionsLoading={optionsLoading}
+        optionsError={optionsError}
+        onApply={setFilters}
+        onStart={started ? undefined : handleStart}
+      />
+  ```
+
+  6. Insert the pre-screen branch **before** the error branch (`if (state.error)`, line 248). While unstarted there is no match, no error, and no board, so nothing else may render:
+
+  ```tsx
+  // Entry gate: before the first start there is no match, no error, and no
+  // board — only the panel (forced open, Start inside) and the placeholder.
+  // The board branch owns its own "Missing Eleven" h1; only one renders.
+  if (!started) {
+    return shell(
+      <div className="mx-auto flex w-full max-w-6xl flex-col items-center px-4 py-24 text-center md:px-6">
+        <header className="w-full pb-8">
+          <h1 className="font-display text-[clamp(40px,4.6vw,50px)] uppercase leading-[0.92] tracking-[-0.02em] text-ink">
+            Missing Eleven
+          </h1>
+        </header>
+        {/* An empty slot on the tactics board: dashed like a chalk outline,
+            the arrow pointing up at the filters that fill it. */}
+        <div className="w-full max-w-md rounded-xl border-2 border-dashed border-ink/25 px-6 py-10">
+          <p aria-hidden="true" className="text-2xl leading-none text-ink/40">↑</p>
+          <h2 className="mt-3 font-display text-2xl uppercase tracking-[0.08em] text-ink">
+            Choose your match
+          </h2>
+          <p className="mt-3 text-sm text-ink/65">
+            Pick a team or an opponent in the filters above — or start with any match.
+          </p>
+          <p className="mt-4 text-xs uppercase tracking-[0.15em] text-ink/45">
+            Press Start game when you&rsquo;re ready
+          </p>
+        </div>
+      </div>,
+    );
+  }
+  ```
+
+  `&rsquo;` rather than a raw apostrophe: `eslint-config-next` enables `react/no-unescaped-entities`, which flags `'` in JSX text. The placeholder uses only tokens the page already uses (`font-display`, `ink`, `paper` scale); no new class, font, or dependency.
+
+- [ ] **Step 6.8: Re-anchor the existing page tests the gate invalidated.**
+
+  Inventory — every test below assumed "empty URL auto-starts". Their contracts are unchanged; only their fixture moves to a deep link (`criterion 19`), or their assertion inverts to the new gate:
+
+  1. `it('does not fetch again when an equal filter set is re-dispatched')` — start from a deep link and re-dispatch an equal deep link; the contract (equal filter set → no refetch) is identical:
+
+  ```tsx
+  it('does not fetch again when an equal filter set is re-dispatched', async () => {
+    setUrl('teamIds=7');
+    const { rerender } = render(<MissingElevenPage />);
+    await waitFor(() =>
+      expect(mockFetchRandomMatch).toHaveBeenLastCalledWith(
+        expect.objectContaining({ teamIds: [7] }),
+      ),
+    );
+    const callsAfterMount = mockFetchRandomMatch.mock.calls.length;
+    expect(callsAfterMount).toBeGreaterThan(0);
+
+    // 'daily=1' is not a filter key: 'teamIds=7&daily=1' parses to the same
+    // filter set — the reducer no-op keeps the canonical key, and therefore
+    // the fetch, unchanged.
+    setUrl('teamIds=7&daily=1');
+    rerender(<MissingElevenPage />);
+
+    expect(mockFetchRandomMatch.mock.calls.length).toBe(callsAfterMount);
+  });
+  ```
+
+  The `waitFor` on the `teamIds=[7]` call (rather than on `New puzzle`) is what makes the count deterministic: it waits until the deep link's FilterUrlSync dispatch has already triggered its fetch, so nothing can increase the count after it is captured.
+
+  2. `it('renders a neutral empty message when fetchRandomMatch resolves null')` — add `setUrl('teamIds=7');` as the first line (without it the gate never opens and the fetch never runs).
+
+  3. `it('renders an error when fetchRandomMatch throws')` — add `setUrl('teamIds=7');` as the first line, same reason.
+
+  4. The whole `describe('missing-eleven page filter panel')` block exercises in-game behaviour (`criterion 19`), so anchor it once in its `beforeEach`:
+
+  ```tsx
+  beforeEach(() => {
+    setUrl('teamIds=7'); // these tests exercise in-game behaviour, not the gate
+    mockFetchFilterOptions.mockResolvedValue(clubOptions);
+  });
+  ```
+
+  (`setUrl` order is safe: the file-level `beforeEach` runs first and resets to `''`, so this line wins. The two tests that call `setUrl` themselves — `clears all filters…` and the two that pass `teamIds=31` before Apply — still override it.)
+
+  No other test changes: the remaining wiring tests already pass `setUrl('teamIds=7')` (or another query) and therefore auto-start exactly as before.
+
+- [ ] **Step 6.9: Verify green, then run everything.**
+
+  ```bash
+  cd frontend && npx vitest run app/missing-eleven/
+  cd frontend && npm run test
+  ```
+
+  Expected: the whole `app/missing-eleven/` directory green — `page.test.tsx` at 19 existing + 7 new cases, `FilterUrlSync` suite untouched and green — and the full suite green with its total count measured (record it for Task 7).
+
+- [ ] **Step 6.10: Commit.**
+
+  ```bash
+  git add frontend/src/components/FilterPanel.tsx frontend/src/components/FilterPanel.test.tsx frontend/app/missing-eleven/page.tsx frontend/app/missing-eleven/page.test.tsx
+  git commit -m "feat: add the entry-gate pre-screen to the missing-eleven page"
+  ```
+
+---
+
+### Task 7: Re-validate the patch end to end
+
+**Files:**
+- Modify: `CHANGELOG.md` (root — the v1.1.3 section added by Task 5)
+
+**Interfaces:**
+- Consumes: everything from Task 6.
+- Produces: the v1.1.3 changelog updated with the pre-screen's validation evidence.
+
+**Steps:**
+
+- [ ] **Step 7.1: Run the full frontend suite with coverage.**
+
+  ```bash
+  cd frontend && npm run test:coverage
+  ```
+
+  Record the measured file count, test count, and coverage percentages — they go into the changelog below. If the runner fails writing to `/tmp` (the machine has leaked coverage scratch files before), retry with `TMPDIR="$HOME/.cache/footplay-tmp"` prefixed to the command.
+
+- [ ] **Step 7.2: Run a production build.**
+
+  ```bash
+  cd frontend && npm run build
+  ```
+
+  Required, not optional: the page tree changed again. Pass signal — clean output, `/missing-eleven` prerendered, no `missing-suspense-with-csr-bailout`. The gate deliberately reads `window.location` in an effect instead of calling `useSearchParams` at page level, and this command is what proves that choice.
+
+- [ ] **Step 7.3: Types and lint.**
+
+  ```bash
+  cd frontend && npx tsc --noEmit
+  cd frontend && npm run lint
+  ```
+
+  Both must produce no output beyond the pre-existing warning in `GameComplete.test.tsx`. If `npm run lint` reports the `react-hooks/set-state-in-effect` directive from Step 6.7 as *unused*, remove just that directive line (keep the comment) and re-run; if the rule fires instead, the directive is already in place.
+
+- [ ] **Step 7.4: Run the grep gates.**
+
+  ```bash
+  grep -rn "localStorage\|sessionStorage" frontend/app/missing-eleven/   # no output — criterion 20: the URL is the only flag
+  grep -n "useSearchParams" frontend/app/missing-eleven/page.tsx          # no output — FilterUrlSync under Suspense stays the only reader
+  grep -n "length\|filter(" frontend/src/components/ClubMultiSelect.tsx  # rendering only, no count arithmetic
+  grep -rln "checkbox" frontend/src/components                           # only ClubMultiSelect + FilterPanel composing it
+  git diff --stat -- backend/                                            # empty — frontend-only patch
+  grep -n "include:" frontend/vitest.config.ts                           # unchanged from v1.1.1
+  ```
+
+- [ ] **Step 7.5: Append the evidence to the root changelog and commit.**
+
+  In `CHANGELOG.md`, inside the existing `## v1.1.3 — Team & Opponent filters` section: add the first bullet to `### Added`, and the two bullets below the existing ones in `### Validation`. Replace every `«…»` with the value printed by the matching command in Steps 7.1–7.4.
+
+  Added:
+
+  ```markdown
+  - **Entry-gate pre-screen** — an empty URL no longer auto-loads a match: the
+    page renders the filter panel (forced open, toggle hidden, primary button
+    reading **Start game**) and a placeholder that points at it. `started` is
+    a page-level flag recomputed from `location.search` on every load, so the
+    URL stays the single source of truth and no session or storage flag
+    exists. Start commits the draft, writes the URL *before* the board mounts
+    (D4-class ordering — `FilterUrlSync`'s mount read stays idempotent), then
+    opens the gate: exactly one match fetch, zero before it. Any URL with
+    params auto-starts exactly as before, and once running, Apply, Play again,
+    Retry, and surrender are untouched — the gate changes entry, not play.
+  ```
+
+  Validation:
+
+  ```markdown
+  - Pre-screen append: `npm run test` measured at «N» files / «M» tests, all
+    green — page suite «P» (7 new gate cases; 3 existing cases re-anchored
+    from the empty URL to a deep-link fixture so their original contract is
+    still asserted) and `FilterPanel` «F» (5 start-mode cases). Coverage
+    «S»% statements / «B»% branches / «L»% lines.
+  - `npm run build` clean — no `missing-suspense-with-csr-bailout`, the gate
+    reading `window.location` in an effect rather than `useSearchParams` at
+    page level; `npx tsc --noEmit` and `npm run lint` clean (pre-existing
+    `GameComplete.test.tsx` warning aside). Grep gates: no
+    `localStorage`/`sessionStorage` under `missing-eleven/`, no page-level
+    `useSearchParams`, no count arithmetic, `backend/` diff empty. The gate's
+    jsdom contracts: an empty mount fetches nothing; Start writes the URL
+    before the board's first fetch and fires exactly one request (empty draft
+    included); a deep-linked fixture starts with no pre-screen; draft edits
+    and Clear all start nothing. Browser click-through remains a manual
+    oracle.
+  ```
+
+  ```bash
+  git add CHANGELOG.md
+  git commit -m "docs: append pre-screen validation evidence to the v1.1.3 changelog"
+  ```
+
 ## Acceptance criteria
 
 1. This patch renders **Team and Opponent only**. Competition, Season, and the empty state belong to v1.1.4; their absence here is correct, not incomplete.
