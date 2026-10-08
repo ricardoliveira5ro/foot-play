@@ -227,18 +227,17 @@ app runs unchanged on empty columns, degrading per §3.1.
 
 ## 4. v1.1.x — Filters
 
-### 4.1 The four filters
+### 4.1 The three filters
 
 | Filter | Control | Options | Meaning |
 |---|---|---|---|
 | Team | Multi-select, searchable | Clubs + National teams, grouped | The team you guess |
-| Opponent | Multi-select, searchable | Same list | The team they face |
 | Competition | Multi-select | 28 competitions | The competition |
 | Season | Range (from / to) | 2013–2025 | Inclusive season bounds |
 
-**Team and Opponent are separate dimensions.** Team is the team whose lineup you
-are guessing; Opponent is who they are playing against. They are not two views of
-the same thing, and selecting a team does not imply an opponent.
+**The Opponent filter was removed during v1.1.3** — see §4.3. Team is the team
+whose lineup you are guessing; who they face is gameplay (the opponent board and
+the opponent bonus), not a filter dimension.
 
 ### 4.2 Semantics
 
@@ -262,6 +261,7 @@ re-litigated:
 | Rejected | Why |
 |---|---|
 | Greying out options with 0 results | It destroys the whole point of the empty state — it hides the problem rather than explaining it. **Not a cost argument:** v1.1.1 pays the query cost anyway for the post-filter counts (§4.4, §4.5), so the rejection is on UX grounds alone. |
+| Opponent filter | It shipped in early v1.1.3 drafts and was removed **in the same patch** — confusing and redundant UX (spec Tasks 14–15). The removal is vertical: no UI, no URL key, no SQL, no `opponents` response key; legacy `?opponentIds=` bookmarks converge to the current contract. Gameplay's opponent surfaces (opponent board, opponent bonus) are untouched — they are not a filter. |
 | Home / away filter | Needs a fourth dimension and a new concept in the UI for a distinction most players do not care about. |
 | Result filter (e.g. "only games I won") | Meaningless without a user — there is no "I". |
 | Minimum-goals filter | Depends on event data that is currently 100% empty (§1.1), and adds a numeric input for a marginal gain. |
@@ -272,7 +272,7 @@ re-litigated:
 |---|---|---|
 | v1.1.1 | `hasCompleteLineups` predicate; filter-options endpoint returning runtime option lists **and POST-filter counts** (§4.4, §4.5) + autocomplete `name`/`displayName` fix + **widen the frontend vitest include and delete the dead `frontend/vitest.config.mts`** (R7, §8) | v1.0.x |
 | v1.1.2 | Filter state encoded in URL query params | v1.1.1 |
-| v1.1.3 | Team + Opponent multi-selects, searchable, grouped | v1.1.2 |
+| v1.1.3 | Team multi-select, searchable, grouped, **collapsible section** + **entry-gate pre-screen** (filters chosen before the match loads) + **no filter surface in-game** (New puzzle, Play Again, and the error state all loop back through the pre-screen) + **Opponent filter removed end to end** (§4.3) | v1.1.2 |
 | v1.1.4 | Competition multi-select + Season range + empty state | v1.1.3 |
 
 Two constraints carry real weight here:
@@ -702,7 +702,7 @@ local "sensible" answer propagates into shipped behaviour.
 | Multiplayer, leaderboards | Requires persistence and identity — both excluded above |
 | Curated team whitelist | **No change.** The owner is expanding the dataset themselves, separately |
 | Own-goal attribution | **Not a separate work item.** Follows the O4 default — attribute to the `player_id` on the event row — and is revisited in v1.0.1 if the measured event label disagrees (§9, O4) |
-| `/missing-eleven` player naming and player rating | **Decided out of v1.x, not merely absent.** No patch table in this roadmap assigns it: §3 (v1.0.x), §4.4 (v1.1.x), §5.6 (v1.2.x), §6.3 (v1.3.x) and §7 (v1.4.x) each ship something else, and none of them mentions naming or rating. An earlier draft routed it to "v1.1.3", which is wrong twice over — §4.4 defines v1.1.3 as the Team/Opponent multi-selects, and no patch assigns this work at all. **The reason it is decided out is that it is unowned and outside v1.x scope — not that it was assessed and rejected on merit.** Adopting it later requires **a new patch with its own plan**, not a slot added to an existing patch: an existing patch does not do this work, so a task assigned to one would enter an implementer's queue with no plan behind it |
+| `/missing-eleven` player naming and player rating | **Decided out of v1.x, not merely absent.** No patch table in this roadmap assigns it: §3 (v1.0.x), §4.4 (v1.1.x), §5.6 (v1.2.x), §6.3 (v1.3.x) and §7 (v1.4.x) each ship something else, and none of them mentions naming or rating. An earlier draft routed it to "v1.1.3", which is wrong twice over — §4.4 defines v1.1.3 as the Team multi-select, and no patch assigns this work at all. **The reason it is decided out is that it is unowned and outside v1.x scope — not that it was assessed and rejected on merit.** Adopting it later requires **a new patch with its own plan**, not a slot added to an existing patch: an existing patch does not do this work, so a task assigned to one would enter an implementer's queue with no plan behind it |
 
 ## 11. Sequencing constraints
 

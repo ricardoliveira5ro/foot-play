@@ -11,7 +11,6 @@ const mockFetchFilterOptions = vi.mocked(fetchFilterOptions);
 
 const baseFilters: GameFilterParams = {
   teamIds: null,
-  opponentIds: null,
   competitionIds: null,
   seasonFrom: null,
   seasonTo: null,
@@ -19,7 +18,6 @@ const baseFilters: GameFilterParams = {
 
 const sampleOptions: FilterOptionsResponse = {
   teams: [],
-  opponents: [],
   competitions: [],
   seasons: [],
   total: 0,

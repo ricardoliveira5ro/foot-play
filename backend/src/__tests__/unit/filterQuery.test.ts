@@ -3,7 +3,6 @@ import {
   allFiltersWhere,
   competitionWhere,
   filtersExcluding,
-  opponentWhere,
   seasonWhere,
   teamWhere,
   type GameFilterParams,
@@ -11,7 +10,6 @@ import {
 
 const emptyFilters: GameFilterParams = {
   teamIds: null,
-  opponentIds: null,
   competitionIds: null,
   seasonFrom: null,
   seasonTo: null,
@@ -20,7 +18,6 @@ const emptyFilters: GameFilterParams = {
 describe('filter query builders', () => {
   it('returns empty SQL for unfiltered dimensions', () => {
     expect(teamWhere([]).text).toBe('');
-    expect(opponentWhere([]).text).toBe('');
     expect(competitionWhere([]).text).toBe('');
     expect(seasonWhere(null, null).text).toBe('');
   });
@@ -61,7 +58,6 @@ describe('filter query builders', () => {
   it('combines all dimensions and omits only the requested facet', () => {
     const filters: GameFilterParams = {
       teamIds: [1],
-      opponentIds: [2],
       competitionIds: ['LL'],
       seasonFrom: 2020,
       seasonTo: 2024,
@@ -69,13 +65,21 @@ describe('filter query builders', () => {
     const all = allFiltersWhere(filters);
     const withoutTeam = filtersExcluding(filters, 'team');
 
-    expect(all.values).toEqual([1, 2, 'LL', 2020, 2024]);
+    expect(all.values).toEqual([1, 'LL', 2020, 2024]);
     expect(all.text).toContain('targetTeamId');
-    expect(all.text).toContain('opponentTeamId');
     expect(all.text).toContain('competitionId');
     expect(all.text).toContain('season');
-    expect(withoutTeam.values).toEqual([2, 'LL', 2020, 2024]);
+    // The Opponent dimension was removed — no clause may mention its column.
+    expect(all.text).not.toContain('opponentTeamId');
+    expect(withoutTeam.values).toEqual(['LL', 2020, 2024]);
     expect(withoutTeam.text).not.toContain('targetTeamId');
+  });
+
+  it('builds no opponent SQL even when a legacy object carries opponentIds', () => {
+    const legacy = { ...emptyFilters, opponentIds: [2] } as unknown as GameFilterParams;
+
+    expect(allFiltersWhere(legacy).text).not.toContain('opponentTeamId');
+    expect(filtersExcluding(legacy, 'team').text).not.toContain('opponentTeamId');
   });
 
   it('returns empty SQL when all filters are unset', () => {

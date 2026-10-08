@@ -19,7 +19,6 @@ export { hasCompleteLineups } from '../lib/lineupCompleteness';
 
 const EMPTY_GAME_FILTERS: GameFilterParams = {
   teamIds: null,
-  opponentIds: null,
   competitionIds: null,
   seasonFrom: null,
   seasonTo: null,

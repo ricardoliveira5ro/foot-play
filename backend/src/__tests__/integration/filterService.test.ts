@@ -6,7 +6,6 @@ import type { GameFilterParams } from '../../lib/filterQuery';
 
 const EMPTY_FILTERS: GameFilterParams = {
   teamIds: null,
-  opponentIds: null,
   competitionIds: null,
   seasonFrom: null,
   seasonTo: null,
@@ -30,11 +29,13 @@ describe('getFilterOptions', () => {
     await seed();
   });
 
-  it('returns all four dimensions plus a total for the empty filter set in one grouped query', async () => {
+  it('returns every dimension plus a total for the empty filter set in one grouped query', async () => {
     const querySpy = vi.spyOn(prisma, '$queryRaw');
     const options = await getFilterOptions(EMPTY_FILTERS);
 
-    expect(Object.keys(options).sort()).toEqual(['competitions', 'opponents', 'seasons', 'teams', 'total']);
+    expect(Object.keys(options).sort()).toEqual(['competitions', 'seasons', 'teams', 'total']);
+    // The Opponent dimension was removed from the contract entirely.
+    expect(options).not.toHaveProperty('opponents');
     expect(options.total).toBe(5);
     expect(querySpy).toHaveBeenCalledTimes(1);
     querySpy.mockRestore();
@@ -49,12 +50,6 @@ describe('getFilterOptions', () => {
       { id: 4, name: 'Test Other', count: 0, isNationalTeam: false },
       { id: 2, name: 'Test United', count: 0, isNationalTeam: false },
     ]);
-    expect(options.opponents.map(({ id, count }) => ({ id, count }))).toEqual([
-      { id: 1, count: 0 },
-      { id: 3, count: 2 },
-      { id: 4, count: 0 },
-      { id: 2, count: 3 },
-    ]);
   });
 
   it('never returns an incomplete game in any count', async () => {
@@ -62,7 +57,6 @@ describe('getFilterOptions', () => {
 
     expect(options.total).toBe(5);
     expect(options.teams.reduce((sum, option) => sum + option.count, 0)).toBe(5);
-    expect(options.opponents.reduce((sum, option) => sum + option.count, 0)).toBe(5);
   });
 
   it('applies seasonFrom and seasonTo inclusively', async () => {
@@ -77,19 +71,20 @@ describe('getFilterOptions', () => {
 
     expect(options.total).toBe(4);
     expect(options.teams.reduce((sum, option) => sum + option.count, 0)).toBe(5);
-    expect(options.opponents.find(({ id }) => id === 2)?.count).toBe(2);
-    expect(options.opponents.find(({ id }) => id === 3)?.count).toBe(2);
   });
 
   it('returns numeric zero counts when nothing matches', async () => {
     const options = await getFilterOptions({
       ...EMPTY_FILTERS,
       teamIds: [999],
-      opponentIds: [999],
     });
 
     expect(options.total).toBe(0);
-    for (const option of [...options.teams, ...options.opponents, ...options.competitions, ...options.seasons]) {
+    // Facet exclusion: the teams facet omits the team dimension, so its
+    // counts mirror the unfiltered universe; every other facet narrows to
+    // nothing under a team id no game matches.
+    expect(options.teams.reduce((sum, option) => sum + option.count, 0)).toBe(5);
+    for (const option of [...options.competitions, ...options.seasons]) {
       expect(option.count).toBe(0);
     }
   });

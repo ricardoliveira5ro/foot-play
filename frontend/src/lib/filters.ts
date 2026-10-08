@@ -18,10 +18,6 @@ export function matchesGameFilters(filters: GameFilterParams, game: unknown): bo
     return false;
   }
 
-  const opponentIds = activeList(filters.opponentIds);
-  const opponentId = numeric(metadata.opponentId ?? metadata.opponentTeamId ?? record.opponentTeamId) ?? awayId;
-  if (opponentIds && (opponentId === null || !opponentIds.includes(opponentId))) return false;
-
   const competitionIds = activeList(filters.competitionIds);
   const competitionId = stringValue(metadata.competitionId ?? record.competitionId);
   if (competitionIds && (competitionId === null || !competitionIds.includes(competitionId))) return false;
@@ -34,7 +30,6 @@ export function matchesGameFilters(filters: GameFilterParams, game: unknown): bo
 
 export function hasActiveFilters(filters: GameFilterParams): boolean {
   return activeList(filters.teamIds) !== null
-    || activeList(filters.opponentIds) !== null
     || activeList(filters.competitionIds) !== null
     || filters.seasonFrom !== null
     || filters.seasonTo !== null;
@@ -43,7 +38,6 @@ export function hasActiveFilters(filters: GameFilterParams): boolean {
 /** Counts active dimensions, not the number of selected values. */
 export function countActiveFilters(filters: GameFilterParams): number {
   return Number(activeList(filters.teamIds) !== null)
-    + Number(activeList(filters.opponentIds) !== null)
     + Number(activeList(filters.competitionIds) !== null)
     + Number(filters.seasonFrom !== null || filters.seasonTo !== null);
 }

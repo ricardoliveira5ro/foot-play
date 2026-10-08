@@ -2,23 +2,26 @@ import type { GameFilterParams } from '../../types';
 
 const FILTER_KEYS = [
   'teamIds',
-  'opponentIds',
   'competitionIds',
   'seasonFrom',
   'seasonTo',
 ] as const;
 
-// The five URL keys owned by the filter set. Additive export for the
+// The four URL keys owned by the filter set. Additive export for the
 // delete-then-merge in FilterUrlSync; derived from FILTER_KEYS so the two
 // can never drift.
 export const FILTER_PARAM_KEYS: readonly string[] = Object.freeze([...FILTER_KEYS]);
+
+// Keys from removed dimensions. FilterUrlSync deletes these from the URL on
+// every canonical write so bookmarks predating the removal converge to the
+// current contract instead of being preserved as unknown params.
+export const LEGACY_FILTER_KEYS: readonly string[] = Object.freeze(['opponentIds']);
 
 const COMPETITION_ID = /^[A-Za-z0-9_-]{1,32}$/;
 
 export function paramsToFilters(params: URLSearchParams): GameFilterParams {
   return {
     teamIds: parseIdList(params.get('teamIds')),
-    opponentIds: parseIdList(params.get('opponentIds')),
     competitionIds: parseStringList(params.get('competitionIds')),
     seasonFrom: parseSeason(params.get('seasonFrom')),
     seasonTo: parseSeason(params.get('seasonTo')),
@@ -28,7 +31,6 @@ export function paramsToFilters(params: URLSearchParams): GameFilterParams {
 export function filtersToParams(filters: GameFilterParams): URLSearchParams {
   const params = new URLSearchParams();
   if (filters.teamIds?.length) params.set('teamIds', filters.teamIds.join(','));
-  if (filters.opponentIds?.length) params.set('opponentIds', filters.opponentIds.join(','));
   if (filters.competitionIds?.length) params.set('competitionIds', filters.competitionIds.join(','));
   if (filters.seasonFrom !== null) params.set('seasonFrom', String(filters.seasonFrom));
   if (filters.seasonTo !== null) params.set('seasonTo', String(filters.seasonTo));
@@ -40,7 +42,6 @@ export function isValidGameFilters(value: unknown): value is GameFilterParams {
   const filters = value as Record<string, unknown>;
   if (Object.keys(filters).sort((a, b) => a.localeCompare(b)).join(',') !== [...FILTER_KEYS].sort((a, b) => a.localeCompare(b)).join(',')) return false;
   return validIdArray(filters.teamIds)
-    && validIdArray(filters.opponentIds)
     && validCompetitionArray(filters.competitionIds)
     && validSeason(filters.seasonFrom)
     && validSeason(filters.seasonTo);

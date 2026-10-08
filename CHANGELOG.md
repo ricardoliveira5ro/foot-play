@@ -8,6 +8,229 @@ from, and release notes are taken from the entry itself.
 
 ---
 
+## v1.1.3 — Team filters
+
+_2026-10-07 · Spec: `docs/v1/v1.1/plan-v1.1.3-team-filters.md`_
+
+### Added
+
+- **Club filter helpers** (`src/lib/clubFilters.ts`) — pure, separately
+  tested `toClubOptions` (joins server counts to names without sorting or
+  dropping unresolvable entries), `groupClubOptions` (clubs vs national
+  teams, input order preserved), `filterClubOptions` (case-insensitive
+  substring search over NFD-normalised text, so `medellin` matches
+  `Medellín`), and `toggleId` (set-toggle that returns `null` for the empty
+  selection the API expects).
+- **`ClubMultiSelect`** — the single searchable, grouped, counted checkbox
+  control used for the Team dimension. Counts are rendered exactly as the
+  server sent them: no arithmetic, no `options.length` fallback, so toggling
+  can never change another option's number. The option universe is always
+  the complete unfiltered list — a selected or zero-count club stays
+  visible, enabled, and selectable. Search is deferred for responsiveness;
+  loading and no-match states announce via `role="status"`; every option is
+  a labelled `input[type=checkbox]` with a unique `id`/`htmlFor` pair.
+- **`FilterPanel`** — a collapsible draft-then-apply panel. Every edit
+  (checkbox, search) lands in local `draft`; `onApply` fires **only** from
+  Apply and Clear all, so the applied counts — keyed to the applied filter
+  set — cannot change under the cursor (R5). The panel body is always
+  mounted (hidden when closed) so draft and search text survive; the
+  trigger is a real `button` with `aria-expanded`/`aria-controls` and shows
+  the active dimension count (`Filters (N)`); Apply is disabled while the
+  draft equals the applied set.
+- **Panel mounted on `/missing-eleven`** — the page wraps a shell (container
+  + `FilterPanel`) around the error, loading, and board branches, so the
+  panel never unmounts across a fetch while the game content swaps beneath
+  it. `FilterUrlSync` deliberately stays in the board branch only: its
+  mount-time URL re-read is what keeps Play again and Retry in step with
+  the URL after a `NEW_GAME` reset, and hoisting it broke both flows
+  (recorded as controller decision D4 in `.superpowers/sdd/progress.md`).
+- **Entry-gate pre-screen** — an empty URL no longer auto-loads a match: the
+  page renders the filter panel (forced open, toggle hidden, primary button
+  reading **Start game**) and a placeholder that points at it. `started` is
+  a page-level flag recomputed from `location.search` on every load, so the
+  URL stays the single source of truth and no session or storage flag
+  exists. Start commits the draft, writes the URL *before* the board mounts
+  (D4-class ordering — `FilterUrlSync`'s mount read stays idempotent), then
+  opens the gate: exactly one match fetch, zero before it. Any URL with
+  params auto-starts exactly as before, and Retry and surrender keep
+  behaving exactly as they did — the gate changes entry, not play.
+  `Clear all` also gained a direct draft reset so it visibly clears a
+  draft-only selection when the applied set is already empty (the
+  pre-screen's default state).
+- **Collapsible filter sections** — each dimension inside the Filters panel
+  is now its own disclosure (`FilterSection`), collapsed by default
+  everywhere, the pre-screen included. The header shows the draft selection
+  as `Label (N)` (matching `Filters (N)`); bodies stay mounted while
+  collapsed, so search text and selections survive; Apply / Start game /
+  Clear all sit outside the sections and stay reachable no matter what is
+  collapsed. Disclosure state is component-local — it survives opening and
+  closing the panel and resets on reload (no storage). `ClubMultiSelect`
+  gained `hideLegend` so the section header owns the visible label while
+  the fieldset keeps its accessible name.
+- **In-game filter panel removed** — while the game runs there is no
+  Filters toggle, no panel, no checkboxes: the board is the only surface.
+  The panel lives on the pre-screen alone (forced open, toggle hidden),
+  and every route back to it takes the same loop: the sidebar **New
+  puzzle**, the game-complete **Play Again**, and the error state's new
+  **Change filters** button (the fix for what would otherwise be a dead
+  end — an error you could only retry). Each resets the board, clears the
+  URL (any params mean "started"), and lands on the pre-screen without
+  fetching. The applied filters survive the round trip: `NEW_GAME` wipes
+  them along with everything else, so the return handler reapplies them
+  immediately, and the panel reopens with the selection intact, sections
+  collapsed. The fetch-key ref is re-armed on return, so Start after a
+  return fetches even under identical filters. Mid-game Apply disappears
+  with the panel — filter changes happen only from the pre-screen.
+- **Selected-value chips on section headers** — every draft selection now
+  appears as a named chip in its own row **below** the section header:
+  `Team (1)` keeps its full-width header, with *FC Porto*
+  and an X underneath, so a value can be undone without expanding the
+  section and hunting the checkbox. Chips sit outside the disclosure
+  button (never inside it — nested buttons are invalid HTML) and the chip
+  row wraps onto more lines rather than capping selections behind a
+  "+N more" counter. The X edits the draft
+  only — no Apply, no fetch, no URL write — through the same toggle
+  semantics as the checkbox, and keyboard focus returns to the section
+  header after removal (the X unmounts with its chip). A draft id with no
+  matching option renders as `#id` (stale deep links) instead of
+  vanishing; start mode removes chips the same way without ever starting
+  the game.
+
+### Removed
+
+- **The Opponent filter dimension, end to end** — the panel renders no
+  Opponent section, `GameFilterParams` carries four fields (teamIds,
+  competitionIds, seasonFrom, seasonTo), and `GET /api/matches/filter-options`
+  returns `teams`, `competitions`, `seasons`, `total` (no `opponents` key; the
+  runtime guard dropped it too). The backend stops parsing `?opponentIds=`
+  and builds no opponent SQL — the param is simply unknown and ignored, so
+  `?opponentIds=999` behaves as unfiltered instead of matching nothing.
+  Removed because the dimension proved confusing and redundant UX (spec
+  Tasks 14–15). Legacy bookmarks converge rather than strand: the key parses
+  to nothing (the pre-screen gate starts the game unfiltered), and
+  `FilterUrlSync` deletes a stale `opponentIds` param on the first canonical
+  write via the new `LEGACY_FILTER_KEYS` export. Gameplay keeps its opponent
+  untouched — `Game.opponentTeamId`, the seed, the opponent board, shirts,
+  tabs, and scoring are all unchanged; only the filter is gone.
+
+### Validation
+
+- `npm run test` — **22 files, 350 tests, all green** (measured; v1.1.2
+  shipped 19 files / 281 tests). New suites: `clubFilters` 26,
+  `ClubMultiSelect` 16, `FilterPanel` 18; the page suite grew from 10 to 19
+  with all ten pre-existing tests unchanged.
+- `npm run test:coverage` — 98.66% statements / 97.63% branches / 99.46%
+  lines (674 statements).
+- `npm run build` — clean on Next.js 16.3.4 (Turbopack); `/missing-eleven`
+  static-prerendered, no `missing-suspense-with-csr-bailout`.
+- `npx tsc --noEmit` and `npm run lint` — clean (one pre-existing warning
+  in `GameComplete.test.tsx`).
+- Grep gates: `ClubMultiSelect.tsx` contains no count arithmetic (`.length`
+  only for search state); `checkbox` is rendered only by `ClubMultiSelect`
+  (the panel composes it); `@/components/...` imports resolve under the
+  same alias the App Router uses; `backend/` diff empty; the Vitest
+  `include` is unchanged from v1.1.1.
+- Live smoke (backend on `:4000`, `next dev` on `:3000`):
+  - `GET /api/matches/filter-options` → 200, 479 teams and 479 opponents,
+    every option carrying an integer server-side `count`.
+  - `GET …/filter-options?teamIds=131` → 200, universe still 479, and
+    FC Barcelona keeps its non-zero count (622) — the selected facet is not
+    narrowed away.
+  - `GET /api/matches/random?teamIds=131` → 200 with a match;
+    `?teamIds=67453` (count 0) → 404, which `requestRandomMatch` maps to
+    `null` → the page renders its neutral "No playable matches are
+    available." message, never "Something went wrong."
+  - Deep-link, messy-query, plain, and no-match URLs all serve 200.
+  - Diacritics present in the live option list (`Académica Coimbra`,
+    `Atlético de Madrid`) with the matching normalisation unit-tested.
+- Interactive contracts asserted in jsdom (the browser spot-check of the
+  same steps remains a manual oracle): toggling a checkbox fires no fetch
+  and no URL write; Apply rewrites `?teamIds=…` and refetches; the applied
+  selection is checked again on reopen; search text and selection survive
+  an Apply → refetch round trip; OR-within-a-dimension keeps earlier
+  selections.
+- Pre-screen append: `npm run test` measured at **22 files, 363 tests, all
+  green** — page suite 26 (7 new gate cases; 3 existing cases re-anchored
+  from the empty URL to a deep-link fixture and the 9-case panel describe
+  anchored once in its `beforeEach` on `daily=1`, a non-filter param that
+  opens the gate while parsing to the empty set their original contract
+  assumes) and `FilterPanel` 24 (5 start-mode cases plus the Clear-all
+  draft-reset contract the gate exposed). Coverage 98.67% statements /
+  97.67% branches / 99.46% lines (680 statements).
+- `npm run build` clean — no `missing-suspense-with-csr-bailout`, the gate
+  reading `window.location` in an effect rather than `useSearchParams` at
+  page level; `npx tsc --noEmit` and `npm run lint` clean (pre-existing
+  `GameComplete.test.tsx` warning aside). Grep gates: no
+  `localStorage`/`sessionStorage` under `missing-eleven/`, no page-level
+  `useSearchParams` (comment-only mention), no count arithmetic, `backend/`
+  diff empty, Vitest `include` unchanged. The gate's jsdom contracts: an
+  empty mount fetches nothing; Start writes the URL before the board's
+  first fetch and fires exactly one request (empty draft included); a
+  deep-linked fixture starts with no pre-screen; draft edits and Clear all
+  start nothing. Browser click-through remains a manual oracle.
+- Sections append: `npm run test` measured at **22 files, 370 tests, all
+  green** — `FilterPanel` 31 (the 7-case `FilterPanel sections` suite plus
+  expand-first re-anchors of the existing interactions) and the page suite
+  26 (both sections collapsed asserted in-game and on the pre-screen; every
+  checkbox interaction expands its section first). Coverage 98.69%
+  statements / 97.54% branches / 98.33% functions / 99.47% lines (690
+  statements); build, `tsc`, and lint clean (pre-existing
+  `GameComplete.test.tsx` warning aside). The old `getByText('Team')`
+  panel assertions became role queries — `getByText` does not filter
+  `hidden` elements, so the collapsed sections' legends made them ambiguous.
+- In-game removal append: `npm run test` measured at **22 files, 366 tests,
+  all green** — page suite 21 (the 10-case in-game panel describe replaced
+  by 4 contract cases: no panel while playing, New puzzle → pre-screen
+  without fetching, Start after return refetching the same filters, Play
+  Again → pre-screen, plus the error state's Change-filters route back)
+  and `FilterPanel` 32 (start mode runs without an `onToggleOpen` handler
+  at all). Coverage 98.69% statements / 97.54% branches / 98.33% functions
+  / 99.47% lines (681/690 statements); build, `tsc`, and lint clean
+  (pre-existing `GameComplete.test.tsx` warning aside). Deep-link mounts
+  fetch twice — the gate starts before `FilterUrlSync`'s board-mount read
+  lands the URL filters, a pre-existing branch-layout behavior — so the
+  count-based tests now baseline after the second fetch instead of racing
+  it.
+- Chips append: `npm run test` measured at **22 files, 374 tests, all
+  green** — `FilterPanel` 39 (the 7-case `FilterPanel selected chips`
+  suite: chip below a full-width header with the X outside the disclosure
+  button, draft-only removal re-disarming Apply, independent multi-removal,
+  opponent labelling, `#id` fallback, focus handoff, start mode) and the
+  page suite 22 (+1 pre-screen integration: chip removal writes neither
+  the fetch nor the URL). Coverage 98.71% statements / 97.58% branches /
+  98.38% functions / 99.48% lines; build, `tsc`, and lint clean
+  (pre-existing `GameComplete.test.tsx` warning aside). The strict
+  header-name regex (`^Team( \(\d+\))?$`) still resolves in both suites —
+  the chips stayed outside the disclosure button.
+- Opponent removal append (Tasks 14–15): rows above that mention the
+  `opponents` key, "479 opponents", or the Opponent dimension predate this
+  removal and describe intermediate states of the unreleased patch.
+  Frontend `npx vitest run` measured at **22 files, 375 tests, all green**
+  (+1 legacy URL-strip case; opponent-chip case replaced by no-Opponent
+  absence cases); coverage 98.69% statements / 97.49% branches / 98.36%
+  functions / 99.47% lines. Backend `npm test` measured at **23 files, 336
+  tests, all green**; coverage 99.85% / 99.23% / 100% / 99.82% (95%
+  thresholds). `npx tsc --noEmit` exit 0 and `npm run lint` 0 errors in
+  both packages (pre-existing `GameComplete.test.tsx` warning aside);
+  `npm run build` clean. Absence greps: no `opponentIds`/`opponents`
+  outside gameplay, seed-domain code, the `LEGACY_FILTER_KEYS` convergence
+  entry, and the tests asserting the absence; no `opponentWhere` anywhere;
+  Prisma schema diff empty. Contract probes: `?opponentIds=999` on
+  `filter-options` still returns the unfiltered total; the response key
+  list is `['competitions', 'seasons', 'teams', 'total']`; the spec file
+  was renamed `plan-v1.1.3-team-opponent-filters.md` →
+  `plan-v1.1.3-team-filters.md` (v1.1.3 unreleased) with this entry and
+  `.superpowers/sdd/progress.md` re-pointed.
+
+### Notes
+
+- Competition and Season lists and the real empty state belong to v1.1.4;
+  their absence here is by design.
+- Changelog lives at the root again (the scoped
+  `docs/v1/v1.1/CHANGELOG-*.md` convention was retired in 950b42c).
+
+---
+
 ## v1.1.2 — Filter URL state
 
 _2026-10-07 · Spec: `docs/v1/v1.1/plan-v1.1.2-filter-url-state.md`_

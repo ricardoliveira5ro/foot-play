@@ -18,7 +18,6 @@ const sameStrings = (a: string[] | null, b: string[] | null): boolean => {
 
 export function filtersEqual(a: GameFilterParams, b: GameFilterParams): boolean {
   return sameIds(a.teamIds, b.teamIds)
-    && sameIds(a.opponentIds, b.opponentIds)
     && sameStrings(a.competitionIds, b.competitionIds)
     && a.seasonFrom === b.seasonFrom
     && a.seasonTo === b.seasonTo;

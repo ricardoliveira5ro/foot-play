@@ -10,7 +10,6 @@ describe('filtersEqual', () => {
   it('is true for identical filters', () => {
     const filters = {
       teamIds: [1, 2],
-      opponentIds: [3],
       competitionIds: ['PL', 'CL'],
       seasonFrom: 2020,
       seasonTo: 2024,
@@ -21,7 +20,6 @@ describe('filtersEqual', () => {
   it('is false when any single dimension differs', () => {
     const base = {
       teamIds: [1],
-      opponentIds: [2],
       competitionIds: ['PL'],
       seasonFrom: 2020,
       seasonTo: 2024,
@@ -29,8 +27,6 @@ describe('filtersEqual', () => {
 
     // teamIds differs
     expect(filtersEqual(base, { ...base, teamIds: [2] })).toBe(false);
-    // opponentIds differs
-    expect(filtersEqual(base, { ...base, opponentIds: [3] })).toBe(false);
     // competitionIds differs
     expect(filtersEqual(base, { ...base, competitionIds: ['CL'] })).toBe(false);
     // seasonFrom differs
@@ -42,14 +38,12 @@ describe('filtersEqual', () => {
   it('ignores id order: [1,2] equals [2,1]', () => {
     const a = {
       teamIds: [1, 2],
-      opponentIds: [3, 4],
       competitionIds: ['PL', 'CL'],
       seasonFrom: 2020,
       seasonTo: 2024,
     };
     const b = {
       teamIds: [2, 1],
-      opponentIds: [4, 3],
       competitionIds: ['CL', 'PL'],
       seasonFrom: 2020,
       seasonTo: 2024,
@@ -60,7 +54,6 @@ describe('filtersEqual', () => {
   it('does not mutate its arguments', () => {
     const a = {
       teamIds: [3, 1, 2],
-      opponentIds: [5, 4],
       competitionIds: ['CL', 'PL'],
       seasonFrom: 2020,
       seasonTo: 2024,
@@ -68,7 +61,6 @@ describe('filtersEqual', () => {
     const aCopy = JSON.parse(JSON.stringify(a));
     const b = {
       teamIds: [2, 3, 1],
-      opponentIds: [4, 5],
       competitionIds: ['PL', 'CL'],
       seasonFrom: 2020,
       seasonTo: 2024,
@@ -84,14 +76,12 @@ describe('filtersEqual', () => {
   it('distinguishes null from an empty array', () => {
     const withNull = {
       teamIds: null,
-      opponentIds: null,
       competitionIds: null,
       seasonFrom: null,
       seasonTo: null,
     };
     const withEmpty = {
       teamIds: [],
-      opponentIds: [],
       competitionIds: [],
       seasonFrom: null,
       seasonTo: null,
@@ -102,14 +92,12 @@ describe('filtersEqual', () => {
   it('distinguishes seasonFrom 2019 from seasonTo 2019', () => {
     const a = {
       teamIds: null,
-      opponentIds: null,
       competitionIds: null,
       seasonFrom: 2019,
       seasonTo: null,
     };
     const b = {
       teamIds: null,
-      opponentIds: null,
       competitionIds: null,
       seasonFrom: null,
       seasonTo: 2019,

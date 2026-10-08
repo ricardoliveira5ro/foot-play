@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** The filter panel becomes complete — Competition and Season join Team and Opponent, and a filter combination that matches no games produces an explanatory empty state instead of an error. The empty state is driven by the `total` that v1.1.1's single grouped query already returns, which is what makes R5's "total" field load-bearing rather than decorative.
+**Goal:** The filter panel becomes complete — Competition and Season join Team, and a filter combination that matches no games produces an explanatory empty state instead of an error. The empty state is driven by the `total` that v1.1.1's single grouped query already returns, which is what makes R5's "total" field load-bearing rather than decorative.
 
 **Architecture:** Two new controls, both pure and both following the v1.1.3 draft-then-apply contract, plus one presentational `FilterEmptyState`. `CompetitionMultiSelect` reuses the same checkbox-list shape as `ClubMultiSelect` but without search or grouping, because 28 options in alphabetical order need neither. `SeasonRange` is a two-bound numeric control that pushes the opposite bound rather than allowing an inverted range. The empty state is a sibling of the game board, selected by `filterOptions.total === 0 && hasActiveFilters(filters)` — deliberately **not** by a 404, so that "your filter matched nothing" and "the server is down" can never render the same thing.
 
@@ -12,7 +12,7 @@
 
 ## Global Constraints
 
-- **This patch renders Competition, Season, and the empty state. It does not change the Team/Opponent behaviour** except to add a per-dimension clear affordance. Any regression in v1.1.3's counts, search, or grouping is a defect here.
+- **This patch renders Competition, Season, and the empty state. It does not change the Team behaviour** except to add a per-dimension clear affordance. Any regression in v1.1.3's counts, search, or grouping is a defect here.
 - **The empty state is keyed on `filterOptions.total === 0`, not on the match request failing.** `fetchRandomMatch` returning `null` and the options request reporting `total: 0` are two independent confirmations of the same fact; the options number is used because it arrives from the single grouped query and is exact by construction. A 404 could equally mean a routing bug, a proxy failure, or a database outage, and collapsing any of those into "no games match your filters" is precisely the "absent, not wrong" inversion the roadmap forbids.
 - **`total` counts games with **all** filters applied. It is not a per-dimension number and must not be presented as one.** The empty-state copy should say the *combination* matched nothing, not that any one filter is at fault.
 - **A 404 or a network failure must still render the error state, not the empty state.** The two states are visually and textually distinct, and each has its own test. If a future change makes them share a branch, the user is told their filter is at fault when the server is down.
@@ -21,7 +21,7 @@
 - **`seasonFrom > seasonTo` yields zero results and is explained — it is never silently normalised.** v1.1.1 and v1.1.2 both preserve an inverted range. `SeasonRange` additionally makes it unreachable by UI interaction: moving one bound past the other pushes the other with it. So the only way to reach the inverted state is a hand-edited URL, and when that happens the empty state explains it specifically.
 - **`paramsToFilters` clamps out-of-range bounds to `null` per dimension** (v1.1.1 Task 8). So `?seasonFrom=1999` reaches the app as "no lower bound", not as an error and not as 1999. The `SeasonRange` control must therefore render `null` as "any", and a user who typed 1999 sees the box empty. That is the specified behaviour; do not "fix" it by re-throwing the value into the input.
 - **The season bounds are a range, not two independent filters.** There is no `seasonFrom` XOR `seasonTo` path in the UI: leaving one box empty means "unbounded on that side", which the backend renders as no condition at all. The control must communicate that an empty box is not a zero and not a wildcard the user has to think about — use a placeholder like "Any" and an explicit `aria-label`.
-- **Draft-then-apply continues to hold.** Season and Competition changes, like Team and Opponent, update the draft and are committed only by Apply. Changing a season bound must not trigger a match fetch. The same Task 3 test from v1.1.3 keeps this honest; add the season-specific version.
+- **Draft-then-apply continues to hold.** Season and Competition changes, like Team, update the draft and are committed only by Apply. Changing a season bound must not trigger a match fetch. The same Task 3 test from v1.1.3 keeps this honest; add the season-specific version.
 - **Counts for the competition and season dimensions obey the same R5 facet exclusion as the club dimensions.** With a competition selected, the competition list must not collapse to `0` for the selected entry. This is v1.1.1 Task 5's invariant, already tested backend-side; add the live check to the smoke test.
 - **New components go in `frontend/src/components/`.** Same reasoning as v1.1.3: `@/components/X` must resolve in Vitest without a per-file alias.
 - **Accessibility:** `<fieldset>`/`<legend>` for the competition group; the two season inputs each get a real `<label>` and `aria-label` stating which bound it is; the empty state is a `role="status"` region so it is announced when it replaces the board.
@@ -266,7 +266,7 @@
   it('does not offer Clear all when no filter is active', ...);
   ```
 
-  *"does not blame any single filter"* is the one with a real product decision inside it. With four dimensions in an AND, the honest statement is that the **combination** is too narrow. A copy line that says "no games for Benfica" is wrong whenever the season bound is what emptied the result, which is most of the time. Assert on the copy string so a future edit cannot regress it into a single-dimension claim.
+  *"does not blame any single filter"* is the one with a real product decision inside it. With three dimensions in an AND, the honest statement is that the **combination** is too narrow. A copy line that says "no games for Benfica" is wrong whenever the season bound is what emptied the result, which is most of the time. Assert on the copy string so a future edit cannot regress it into a single-dimension claim.
 
   *"does not mention the season range otherwise"* matters because the copy must not imply the season filter covers the partial 2026 season, per Global Constraints.
 
@@ -329,8 +329,8 @@
   Add to `frontend/src/components/FilterPanel.test.tsx`:
 
   ```tsx
-  it('renders all four dimensions when open', ...);
-  it('renders Club sections for Team and National teams for Opponent only', ...);
+  it('renders all three dimensions when open', ...);
+  it('renders the club list grouped into Clubs and National teams', ...);
   it('does not group the competition list', ...);
   it('renders the season bounds with the current applied values', ...);
   it('does not call onApply when a competition is toggled', ...);
@@ -461,7 +461,7 @@
   cd frontend && npm run build
   ```
 
-- [ ] **Step 6.2: Live-smoke all four dimensions.**
+- [ ] **Step 6.2: Live-smoke all three dimensions.**
 
   ```bash
   curl -s 'http://localhost:3000/api/matches/filter-options'
@@ -496,7 +496,7 @@
 
 ## Acceptance criteria
 
-1. This patch renders **Competition, Season, and the empty state**. It does not change the Team/Opponent behaviour frozen in v1.1.3; the v1.1.3 suites stay green untouched.
+1. This patch renders **Competition, Season, and the empty state**. It does not change the Team behaviour frozen in v1.1.3; the v1.1.3 suites stay green untouched.
 2. The empty state is keyed on `filterOptions.total === 0`, **not** on the match request failing. A successful response whose `total` is zero shows the empty state; an empty state reached because of an error is a defect.
 3. A 404 or a network failure still renders the **error** state, not the empty state. The two are distinguished by the request outcome, and the tests cover both.
 4. `total` counts games that pass the **completeness predicate**, so a zero here means "no complete game matches", never "no game exists at all".
@@ -537,9 +537,9 @@
 | **The empty state is shown for the wrong reason** — a network failure or 404 renders "no games match" when the truth is that the app cannot reach the backend. | The empty state is keyed on a successful response with `total === 0` (criteria 2–3), and both branches are asserted in `page.test.tsx`. Keying on request failure would be the defect. |
 | **An inverted season range is silently normalised**, so `seasonFrom > seasonTo` shows games the user did not ask for instead of explaining the problem. | Zero results plus an explanation is the required behaviour (criterion 8); the swap-and-render approach is ruled out explicitly because it answers a different question than the one asked. |
 | **A partial 2026 season is offered as a filter**, so users select a competition-year that appears empty. | The bound is frozen at 2025 in the constraints, the option list is asserted against it, and the grep gate makes a stray `2026` visible in the two files that could introduce it. |
-| **One bad bound discards the whole filter set**, so a single malformed `seasonFrom` silently clears Team and Opponent too. | Clamping is **per dimension** (criterion 9), asserted by a test that supplies one out-of-range bound alongside valid club selections. |
+| **One bad bound discards the whole filter set**, so a single malformed `seasonFrom` silently clears Team too. | Clamping is **per dimension** (criterion 9), asserted by a test that supplies one out-of-range bound alongside valid club selections. |
 | **A facet collapses to zeros** for competition or season, making an applied filter impossible to widen. | R5 applies to the new dimensions exactly as it does to the club dimensions (criterion 10), and the panel test covers both new controls. |
-| **The panel's behaviour for Team/Opponent regresses** while the new controls are wired in. | v1.1.3 is frozen and its suites are re-run as a gate (criterion 1); a change to `ClubMultiSelect` is out of scope for this patch. |
+| **The panel's behaviour for Team regresses** while the new controls are wired in. | v1.1.3 is frozen and its suites are re-run as a gate (criterion 1); a change to `ClubMultiSelect` is out of scope for this patch. |
 | **The empty state becomes a dead end** on a filter combination the user cannot easily unpick. | Escapability is a criterion, not an enhancement (criterion 5), asserted through the clear action rather than inferred from markup. |
 
 **Escalate before proceeding if:** the `total` v1.1.1 returns cannot be distinguished from a failed request at the point the page decides which state to render — for example if a partial response omits `total`. That would mean the empty state has no sound key, and the fix belongs upstream in v1.1.1's response contract rather than in a client-side guess here.

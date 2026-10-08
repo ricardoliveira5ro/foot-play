@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Let a player narrow 10,219 matches down to one they can actually finish — by team, opponent, competition, and season — with every option labelled by how many games it would leave, and with "nothing matches" presented as an explained outcome instead of a blank board.
+**Goal:** Let a player narrow 10,219 matches down to one they can actually finish — by team, competition, and season — with every option labelled by how many games it would leave, and with "nothing matches" presented as an explained outcome instead of a blank board.
 
 **Architecture:** Four patches, strictly ordered, each of which makes the next one possible. v1.1.1 makes selecting an unplayable game **structurally impossible** and ships the endpoint that returns runtime option lists *with* post-filter counts in a single grouped query. v1.1.2 makes the URL the single source of truth for the filter set, with the counts fixed at the moment a filter set is applied. v1.1.3 and v1.1.4 only render: they consume a frozen wire format and a frozen state contract, and neither touches the backend.
 
@@ -20,7 +20,7 @@
 |---|---|---|---|
 | **v1.1.1** — `plan-v1.1.1-filter-foundation.md` | `hasCompleteLineups()` and a re-usable completeness SQL predicate, applied to random-match selection so the 530 unplayable games are unreachable. `GET /api/matches/filter-options` returning runtime option lists **and** post-filter counts from **one** grouped statement. Autocomplete `name`/`displayName` symmetry fix (R6). R7: the frontend vitest `include` is widened to enumerate `src/**`, `components/**`, `tests/**` **and `app/**`**, and the shadowed `frontend/vitest.config.mts` is deleted. Frozen `GameFilterParams` in `frontend/types/index.ts` + the pure URL helpers in `frontend/src/lib/filterParams.ts` and the pure predicates in `frontend/src/lib/filters.ts`. **No filter control is rendered.** | `backend/src/lib/lineupCompleteness.ts`, `backend/src/lib/filterQuery.ts`, `backend/src/services/filterService.ts`, 4 backend test files, `frontend/src/lib/filterParams.ts`, `frontend/src/lib/filters.ts`, 2 frontend test files | v1.0.x |
 | **v1.1.2** — `plan-v1.1.2-filter-url-state.md` | `GameState.filters` + `SET_FILTERS`, a `FilterUrlSync` bridge that is the app's only `useSearchParams` reader and sits below a `<Suspense>` boundary, and a `useFilterOptions` hook with a stale-response guard. A deep link loads the filters in its URL. **Still no filter control.** | `frontend/src/lib/filtersEqual.ts`, `frontend/src/lib/useFilterOptions.ts`, `frontend/app/missing-eleven/FilterUrlSync.tsx`, 4 frontend test files | v1.1.1 |
-| **v1.1.3** — `plan-v1.1.3-team-opponent-filters.md` | `ClubMultiSelect` — one control, used twice — and `FilterPanel` with a draft-then-apply selection model. Searchable, grouped into Clubs and National teams, every option carrying its count. | `frontend/src/lib/clubFilters.ts`, `frontend/src/components/ClubMultiSelect.tsx`, `frontend/src/components/FilterPanel.tsx`, 3 frontend test files | v1.1.2 |
+| **v1.1.3** — `plan-v1.1.3-team-filters.md` | `ClubMultiSelect` and `FilterPanel` with a draft-then-apply selection model — searchable, grouped into Clubs and National teams, every option carrying its count; collapsible section, entry-gate pre-screen, no in-game panel, selected-value chips. The **Opponent dimension is removed end to end** (UI, URL key, SQL, response key) with legacy `?opponentIds=` bookmarks converging. | `frontend/src/lib/clubFilters.ts`, `frontend/src/components/ClubMultiSelect.tsx`, `frontend/src/components/FilterPanel.tsx`, 3 frontend test files | v1.1.2 |
 | **v1.1.4** — `plan-v1.1.4-competition-season-empty-state.md` | `CompetitionMultiSelect`, `SeasonRange`, and `FilterEmptyState` — the last dimension and the last missing outcome. | `frontend/src/lib/competitionFilters.ts`, `frontend/src/components/CompetitionMultiSelect.tsx`, `frontend/src/components/SeasonRange.tsx`, `frontend/src/components/FilterEmptyState.tsx`, 4 frontend test files | v1.1.3 |
 
 **Rollback chain is strict and one-directional:** v1.1.4 → v1.1.3 → v1.1.2 → v1.1.1 → v1.0.x. Every revert is a code revert with **no data repair and no reverse migration**, because v1.1 adds no schema change at all. v1.1.1 is the only patch that touches the backend, and its sole data-facing change is a read predicate.
@@ -42,13 +42,13 @@ playable game set
       │             fetchRandomMatch(filters)  ← v1.1.1
       v
       └──► v1.1.1  ONE grouped statement  ──────────────────────────►  FilterOptionsResponse
-                   teams / opponents / competitions / seasons          { id, count, isNationalTeam }
+                   teams / competitions / seasons                      { id, count, isNationalTeam }
                    + total, all from one database snapshot            { id, count }
                                                                             { season, count }
       │                                    (option universe is UNFILTERED,
       │                                     only the counts are filtered)
       v
-v1.1.2   FilterUrlSync  ◄── ?teamIds=&opponentIds=&competitionIds=&seasonFrom=&seasonTo=…
+v1.1.2   FilterUrlSync  ◄── ?teamIds=&competitionIds=&seasonFrom=&seasonTo=…
       │      │  read                                    write
       │      ▼                                          ▲
       │   GameState.filters  ◄──── SET_FILTERS ──────────┘
@@ -68,8 +68,8 @@ FilterEmptyState   when filterOptions.total === 0 && hasActiveFilters(filters)
 **1. The completeness rule is written exactly once, and it cannot be a Prisma `where`.**
 A game is playable only when **both** sides have exactly 11 `starting_lineup` appearances, correlated to *that game's own* `homeClubId` / `awayClubId`. Prisma 7 cannot express this: `AppearanceListRelationFilter` is `{ every, some, none }` with no count comparison (`backend/src/generated/prisma/models/Appearance.ts:466-470`), and `AppearanceWhereInput` has `gameId` / `clubId` as plain `IntFilter`s that cannot reach the parent `Game` (`backend/src/generated/prisma/models/Game.ts:334`). So `completeLineupsWhere()` returns a `Prisma.Sql` fragment, not `Prisma.GameWhereInput` — the name is preserved, the return type is corrected. This is a **flagged deviation from the frozen contract**, detailed in the v1.1.1 plan, and it is the one thing in v1.1 that needs `lead`'s ratification before Task 4 is started.
 
-**2. All five numbers come from one statement, and the option universe is deliberately unfiltered.**
-§4.5 requires the per-option counts and the total to be computed in a *single grouped query* at the moment the filter set is applied. Four separate `groupBy` calls would each observe a different database snapshot, and a count inconsistent with the results is worse than no count. So v1.1.1 builds one statement with five CTEs and returns a single `json_build_object` row. Each facet's CTE **excludes its own dimension's filter**, so a selected option still shows a non-zero count instead of a self-referential `0`. Separately, the option *lists* come from unfiltered queries: deriving them from the filtered CTE would hide exactly the zero-count options the user needs in order to escape a too-narrow filter.
+**2. All four numbers come from one statement, and the option universe is deliberately unfiltered.**
+§4.5 requires the per-option counts and the total to be computed in a *single grouped query* at the moment the filter set is applied. Four separate `groupBy` calls would each observe a different database snapshot, and a count inconsistent with the results is worse than no count. So v1.1.1 builds one statement with five CTEs and returns a single `json_build_object` row; v1.1.3's Opponent removal drops the `opponents` CTE, leaving four (`teams`, `competitions`, `seasons`, `total_base`) and four `json_build_object` keys. Each facet's CTE **excludes its own dimension's filter**, so a selected option still shows a non-zero count instead of a self-referential `0`. Separately, the option *lists* come from unfiltered queries: deriving them from the filtered CTE would hide exactly the zero-count options the user needs in order to escape a too-narrow filter.
 
 **3. Draft-then-apply is the mechanism, not a UI preference.**
 §4.5 rejects per-option counts that recompute on every toggle, because every number on screen would be stale between clicks. `useFilterOptions` keys on the *applied* set; the panel holds a draft and calls `setFilters` only from Apply. This makes "the counts do not change while the panel is open" a structural property rather than something to remember, and the invariant is asserted at both the component and page level.
@@ -101,7 +101,6 @@ export type GameWithRelations;                          // additive export of an
 
 // backend/src/lib/filterQuery.ts                                         // v1.1.1
 export function teamWhere(ids: number[]): Prisma.Sql;
-export function opponentWhere(ids: number[]): Prisma.Sql;
 export function competitionWhere(ids: string[]): Prisma.Sql;
 export function seasonWhere(from: number | null, to: number | null): Prisma.Sql;
 export function allFiltersWhere(filters: GameFilters): Prisma.Sql;
@@ -111,7 +110,6 @@ export function filtersExcluding(filters: GameFilters, omit: Dimension): Prisma.
 export interface FilterOptionGroup { id: number; count: number; isNationalTeam: boolean }
 export interface FilterOptionsResponse {
   teams: FilterOptionGroup[];
-  opponents: FilterOptionGroup[];
   competitions: { id: string; count: number }[];
   seasons: { season: number; count: number }[];
   total: number;
@@ -123,7 +121,6 @@ export async function getFilterOptions(filters: GameFilters): Promise<FilterOpti
 // frontend/types/index.ts  (additive: the filter types join the wire shapes)  // v1.1.1
 export type GameFilterParams = {
   teamIds: number[] | null;
-  opponentIds: number[] | null;
   competitionIds: string[] | null;
   seasonFrom: number | null;
   seasonTo: number | null;
@@ -198,7 +195,7 @@ Gates 6–12 are cheap greps that catch the ways this feature can silently viola
 - **A result filter** such as "only games I won" (§4.3, rejected: there is no "I").
 - **A minimum-goals filter** (§4.3, rejected: depends on event data that is currently 100% empty, per §1.1).
 - **Hardcoded or client-derived option lists.** §4.2 requires every option list to be read from the database at runtime, so an owner's dataset expansion flows through with no release.
-- **The `/missing-eleven` naming and rating work — and it is nobody's job in v1.x.** An earlier draft of the v1.0 overview's "Out of scope" section assigned this to "v1.1.3", which contradicted §4.4, where v1.1.3 is the Team/Opponent multi-selects. **This is now decided at the source**: the roadmap's **§10 Out of scope** table records it as excluded from v1.x, because no patch table (§3, §4.4, §5.6, §6.3, §7) assigns naming or rating to any patch. It is unowned by decision, not unowned by oversight — adopting it needs a **new patch with its own plan**, not a slot in an existing one, and a v1.1 implementer should not pick it up on the strength of a stale cross-reference.
+- **The `/missing-eleven` naming and rating work — and it is nobody's job in v1.x.** An earlier draft of the v1.0 overview's "Out of scope" section assigned this to "v1.1.3", which contradicted §4.4, where v1.1.3 is the Team multi-select. **This is now decided at the source**: the roadmap's **§10 Out of scope** table records it as excluded from v1.x, because no patch table (§3, §4.4, §5.6, §6.3, §7) assigns naming or rating to any patch. It is unowned by decision, not unowned by oversight — adopting it needs a **new patch with its own plan**, not a slot in an existing one, and a v1.1 implementer should not pick it up on the strength of a stale cross-reference.
 - **Any `Appearance` or `Game` index, and any migration.** v1.1.1 needs only the `@@index([gameId])` that already exists (`backend/prisma/schema.prisma:83`).
 - **Difficulty modes, multipliers, or clue scoring** (v1.2.x). v1.2 must render and score correctly with filters present but never applied.
 - **The shareable daily link** (v1.3). v1.1.2 builds the URL mechanism it reuses; v1.1 deliberately preserves unrelated query params so `?daily=` can coexist with the filter keys.
@@ -208,7 +205,7 @@ Gates 6–12 are cheap greps that catch the ways this feature can silently viola
 
 ## Handoff to v1.2 and v1.3
 
-1. **`GameFilterParams` and the five URL keys** — v1.3's shareable daily link composes with these. `FILTER_PARAM_KEYS` plus the delete-then-merge in `FilterUrlSync` is the mechanism that keeps `?daily=` alive across a filter write; reuse it rather than re-deriving the query string.
+1. **`GameFilterParams` and the four URL keys** — v1.3's shareable daily link composes with these. `FILTER_PARAM_KEYS` plus the delete-then-merge in `FilterUrlSync` is the mechanism that keeps `?daily=` alive across a filter write; reuse it rather than re-deriving the query string. (`LEGACY_FILTER_KEYS` handles one-time cleanup of the removed `opponentIds` key; do not add to it without a deprecation record.)
 2. **`useFilterOptions`'s key-is-`filtersToParams(...)` pattern** — any future refetch-on-change hook needs the same canonical-string keying, or it will refetch on every equal-but-new object.
 3. **The count contract** — counts are static values for the applied filter set, and `total` counts the whole AND. A v1.2 screen that wants "how many games will this leave" reads `FilterOptionsResponse`; it must not derive a number from another number.
 4. **The completeness predicate is a hard prerequisite, not an optimisation** — 530 of 10,219 games are unplayable. Any future feature that selects a game (a daily link in v1.3, a share in v1.4) must go through `getRandomMatch` or carry `completeLineupsWhere()` itself.
@@ -224,7 +221,7 @@ Gates 6–12 are cheap greps that catch the ways this feature can silently viola
 | **`completeLineupsWhere` cannot be a `Prisma.GameWhereInput`** | The frozen signature is unimplementable; shipping a weaker predicate would be a silent correctness hole | Decision 1, plus a flagged escalation — **v1.1.1 Task 4 does not start until `lead` ratifies** |
 | R8 — empty filter results are common | 13 of 28 competitions have ≤35 games; 4 have exactly one season. A narrow combination looks like a bug | Decision 4: the empty state is driven by `total`, is escapable, and is tested against the error state |
 | R9 — one curated team has zero qualifying games | A 0-count option on day one | §4.5: rendered with its count visible and **not** disabled; gates 9 and 10 forbid the alternative |
-| Five correlated subqueries per `Game` row across five CTEs | Slow counts on a 4 GB box as the dataset grows | `@@index([gameId])` already exists; one statement, one round trip. Revisit only if a measurement shows it matters — **do not add an index**, R4 forbids it here |
+| Four correlated subqueries per `Game` row across four CTEs | Slow counts on a 4 GB box as the dataset grows | `@@index([gameId])` already exists; one statement, one round trip. Revisit only if a measurement shows it matters — **do not add an index**, R4 forbids it here |
 | A second `useSearchParams` reader appears | The `Suspense` boundary is defeated and `next build` fails | Decision 1 in the v1.1.2 plan; gate 11 |
 | Two URL writers appear | Echo loop, history spam, filters that fight the user | One owner (`FilterUrlSync`); v1.1.2 Global Constraints forbid a second |
 | Counts drift from results between writes | A count that lies | One statement, one snapshot; the R5 invariant is asserted both in the backend test and in the live smoke |

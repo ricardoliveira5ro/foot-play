@@ -16,7 +16,6 @@ export interface FilterOptionGroup {
 
 export interface FilterOptionsResponse {
   teams: FilterOptionGroup[];
-  opponents: FilterOptionGroup[];
   competitions: { id: string; name: string; count: number }[];
   seasons: { season: number; count: number }[];
   total: number;
@@ -34,7 +33,6 @@ interface RawCompetitionCount {
 
 interface RawFilterCounts {
   teams: RawCountOption[];
-  opponents: RawCountOption[];
   competitions: RawCompetitionCount[];
   seasons: { season: number; count: number }[];
   total: number;
@@ -46,11 +44,6 @@ export async function getFilterOptions(filters: GameFilterParams): Promise<Filte
       SELECT g."targetTeamId" AS k, COUNT(*)::int AS c
       FROM "Game" g
       WHERE ${completeLineupsWhere()} ${filtersExcluding(filters, 'team')}
-      GROUP BY 1
-    ), opponents AS (
-      SELECT g."opponentTeamId" AS k, COUNT(*)::int AS c
-      FROM "Game" g
-      WHERE ${completeLineupsWhere()} ${filtersExcluding(filters, 'opponent')}
       GROUP BY 1
     ), competitions AS (
       SELECT g."competitionId" AS k, COUNT(*)::int AS c
@@ -73,10 +66,6 @@ export async function getFilterOptions(filters: GameFilterParams): Promise<Filte
       'teams', COALESCE((
         SELECT json_agg(json_build_object('id', t.k, 'count', t.c) ORDER BY t.k)
         FROM teams t
-      ), '[]'::json),
-      'opponents', COALESCE((
-        SELECT json_agg(json_build_object('id', o.k, 'count', o.c) ORDER BY o.k)
-        FROM opponents o
       ), '[]'::json),
       'competitions', COALESCE((
         SELECT json_agg(json_build_object('id', c.k, 'count', c.c) ORDER BY c.k)
@@ -109,7 +98,6 @@ export async function getFilterOptions(filters: GameFilterParams): Promise<Filte
   if (!counts) throw new Error('Filter counts query returned no result row');
 
   const teamCounts = new Map(counts.teams.map(({ id, count }) => [id, count]));
-  const opponentCounts = new Map(counts.opponents.map(({ id, count }) => [id, count]));
   const competitionCounts = new Map(counts.competitions.map(({ id, count }) => [id, count]));
 
   return {
@@ -117,12 +105,6 @@ export async function getFilterOptions(filters: GameFilterParams): Promise<Filte
       id: club.clubId,
       name: club.name,
       count: teamCounts.get(club.clubId) ?? 0,
-      isNationalTeam: club.isNationalTeam ?? false,
-    })),
-    opponents: clubs.map((club) => ({
-      id: club.clubId,
-      name: club.name,
-      count: opponentCounts.get(club.clubId) ?? 0,
       isNationalTeam: club.isNationalTeam ?? false,
     })),
     competitions: competitions.map((competition) => ({

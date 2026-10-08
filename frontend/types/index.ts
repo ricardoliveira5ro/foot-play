@@ -77,7 +77,6 @@ export type PlayerSearchResponse = PlayerSearchResult[];
 /** URL and API filter state. Null means the dimension is not selected. */
 export interface GameFilterParams {
   teamIds: number[] | null;
-  opponentIds: number[] | null;
   competitionIds: string[] | null;
   seasonFrom: number | null;
   seasonTo: number | null;
@@ -85,7 +84,6 @@ export interface GameFilterParams {
 
 export const EMPTY_FILTERS: Readonly<GameFilterParams> = Object.freeze({
   teamIds: null,
-  opponentIds: null,
   competitionIds: null,
   seasonFrom: null,
   seasonTo: null,
@@ -112,7 +110,6 @@ export interface TeamOption {
 
 export interface FilterOptionsResponse {
   teams: TeamOption[];
-  opponents: TeamOption[];
   competitions: FilterOption[];
   seasons: SeasonOption[];
   total: number;

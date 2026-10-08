@@ -45,7 +45,6 @@ export default router;
 function parseGameFilterParams(query: Record<string, unknown>): GameFilterParams {
   return {
     teamIds: parseIdList(query.teamIds),
-    opponentIds: parseIdList(query.opponentIds),
     competitionIds: parseCompetitionIds(query.competitionIds),
     seasonFrom: parseSeason(query.seasonFrom),
     seasonTo: parseSeason(query.seasonTo),

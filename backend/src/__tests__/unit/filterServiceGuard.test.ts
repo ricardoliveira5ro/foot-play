@@ -13,7 +13,6 @@ import { getFilterOptions } from '../../services/filterService';
 
 const EMPTY_FILTERS = {
   teamIds: null,
-  opponentIds: null,
   competitionIds: null,
   seasonFrom: null,
   seasonTo: null,

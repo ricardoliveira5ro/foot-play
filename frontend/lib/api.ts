@@ -80,11 +80,6 @@ function isFilterOptionsResponse(value: unknown): value is FilterOptionsResponse
       && typeof option.name === 'string'
       && typeof option.isNationalTeam === 'boolean'
       && isCount(option.count))
-    && Array.isArray(result.opponents)
-    && result.opponents.every((option) => typeof option.id === 'number'
-      && typeof option.name === 'string'
-      && typeof option.isNationalTeam === 'boolean'
-      && isCount(option.count))
     && Array.isArray(result.competitions)
     && result.competitions.every((option) => typeof option.id === 'string'
       && typeof option.name === 'string'

@@ -11,12 +11,15 @@ describe('paramsToFilters', () => {
     expect(paramsToFilters(new URLSearchParams('daily=1'))).toEqual(EMPTY_FILTERS);
   });
 
-  it('parses comma-separated team and opponent ids', () => {
-    expect(paramsToFilters(new URLSearchParams('teamIds=1,2&opponentIds=3'))).toEqual({
+  it('parses comma-separated team ids', () => {
+    expect(paramsToFilters(new URLSearchParams('teamIds=1,2'))).toEqual({
       ...EMPTY_FILTERS,
       teamIds: [1, 2],
-      opponentIds: [3],
     });
+  });
+
+  it('ignores a legacy opponentIds key left over from the removed dimension', () => {
+    expect(paramsToFilters(new URLSearchParams('opponentIds=3'))).toEqual(EMPTY_FILTERS);
   });
 
   it('tolerates whitespace and repeated commas in a list', () => {
@@ -79,23 +82,21 @@ describe('filtersToParams', () => {
     expect(filtersToParams(EMPTY_FILTERS).toString()).toBe('');
   });
 
-  it('serialises all five dimensions', () => {
+  it('serialises all four dimensions', () => {
     const filters: GameFilterParams = {
       teamIds: [1, 2],
-      opponentIds: [3],
       competitionIds: ['LA-LIGA'],
       seasonFrom: 2018,
       seasonTo: 2022,
     };
     expect(filtersToParams(filters).toString()).toBe(
-      'teamIds=1%2C2&opponentIds=3&competitionIds=LA-LIGA&seasonFrom=2018&seasonTo=2022',
+      'teamIds=1%2C2&competitionIds=LA-LIGA&seasonFrom=2018&seasonTo=2022',
     );
   });
 
   it('round-trips through paramsToFilters', () => {
     const filters: GameFilterParams = {
       teamIds: [7, 9],
-      opponentIds: [12],
       competitionIds: ['PL'],
       seasonFrom: 2019,
       seasonTo: 2025,
@@ -108,8 +109,12 @@ describe('isValidGameFilters', () => {
   it('accepts EMPTY_FILTERS and a fully populated object', () => {
     expect(isValidGameFilters(EMPTY_FILTERS)).toBe(true);
     expect(isValidGameFilters({
-      teamIds: [1], opponentIds: [2], competitionIds: ['LL'], seasonFrom: 2013, seasonTo: 2025,
+      teamIds: [1], competitionIds: ['LL'], seasonFrom: 2013, seasonTo: 2025,
     })).toBe(true);
+  });
+
+  it('rejects a legacy object that still carries opponentIds', () => {
+    expect(isValidGameFilters({ ...EMPTY_FILTERS, opponentIds: [2] })).toBe(false);
   });
 
   it('rejects a non-array teamIds, a non-integer id, and an out-of-range season', () => {
