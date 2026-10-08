@@ -1,6 +1,7 @@
 'use client';
 
 import { Suspense, useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
+import { usePathname, useRouter } from 'next/navigation';
 import { useGameState, MAX_ATTEMPTS } from '@/lib/gameState';
 import { fetchRandomMatch, submitGuess as submitGuessApi, fetchReveal, revealOnePlayer } from '@/lib/api';
 import { filtersToParams } from '@/lib/filterParams';
@@ -46,6 +47,34 @@ export default function MissingElevenPage() {
   // filter state: keying it would remount the panel and reset its draft.
   const [filtersOpen, setFiltersOpen] = useState(false);
   const handleToggleFiltersOpen = useCallback(() => setFiltersOpen((open) => !open), []);
+
+  // Entry gate: the URL is the single source of truth. An empty URL is the
+  // pre-screen; any params mean the game has begun (a deep link). Initialized
+  // false so the server's HTML and the first client render agree — the
+  // pre-screen — then flipped once from the real location after hydration.
+  // Never read window at render time (hydration mismatch) and never call
+  // useSearchParams at page level (Next 16's missing-suspense-with-csr-bailout
+  // is a build failure; FilterUrlSync under Suspense is the only reader).
+  // Reload recomputes this from the URL: no session or storage flag exists.
+  const [started, setStarted] = useState(false);
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- one-shot gate init after hydration; same pattern as FilterPanel's re-sync
+    setStarted(new URLSearchParams(window.location.search).size > 0);
+  }, []);
+
+  const router = useRouter();
+  const pathname = usePathname();
+
+  // Start (pre-screen only): write the URL FIRST so the board's FilterUrlSync
+  // mount-read sees the finished URL — D4-class ordering; reversing this wipes
+  // the started filters the same way v1.1.3's D4 did. Both state updates
+  // batch into one commit, so the fetch effect below runs once for this start.
+  const handleStart = useCallback((next: GameFilterParams) => {
+    const query = filtersToParams(next).toString();
+    router.replace(query ? `${pathname}?${query}` : pathname, { scroll: false });
+    setStarted(true);
+    setFilters(next);
+  }, [router, pathname, setFilters]);
 
   const [confirmingSurrender, setConfirmingSurrender] = useState(false);
   const confirmTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -132,11 +161,15 @@ export default function MissingElevenPage() {
   // key changes (a deep link's filters arrive via FilterUrlSync's read
   // dispatch). The fetched-key ref keeps the mount load singular; a later
   // filter change refetches through this same path instead of a second one.
+  // Before the first start the guard returns early — the pre-screen fetches
+  // nothing; Start changes both deps in one commit, and the ref keeps that
+  // single.
   useEffect(() => {
+    if (!started) return; // pre-screen: zero match requests until Start
     if (fetchedKeyRef.current === filterKey) return;
     fetchedKeyRef.current = filterKey;
     loadMatch();
-  }, [filterKey, loadMatch]);
+  }, [started, filterKey, loadMatch]);
 
   // Fetch revealed names when the game completes (both teams in parallel)
   useEffect(() => {
@@ -232,17 +265,47 @@ export default function MissingElevenPage() {
   const shell = (content: ReactNode) => (
     <div className="mx-auto w-full max-w-6xl px-4 py-6 md:px-6 md:py-8">
       <FilterPanel
-        open={filtersOpen}
+        open={!started || filtersOpen}
         onToggleOpen={handleToggleFiltersOpen}
         filters={filters}
         options={filterOptions}
         optionsLoading={optionsLoading}
         optionsError={optionsError}
         onApply={setFilters}
+        onStart={started ? undefined : handleStart}
       />
       {content}
     </div>
   );
+
+  // Entry gate: before the first start there is no match, no error, and no
+  // board — only the panel (forced open, Start inside) and the placeholder.
+  // The board branch owns its own "Missing Eleven" h1; only one renders.
+  if (!started) {
+    return shell(
+      <div className="mx-auto flex w-full max-w-6xl flex-col items-center px-4 py-24 text-center md:px-6">
+        <header className="w-full pb-8">
+          <h1 className="font-display text-[clamp(40px,4.6vw,50px)] uppercase leading-[0.92] tracking-[-0.02em] text-ink">
+            Missing Eleven
+          </h1>
+        </header>
+        {/* An empty slot on the tactics board: dashed like a chalk outline,
+            the arrow pointing up at the filters that fill it. */}
+        <div className="w-full max-w-md rounded-xl border-2 border-dashed border-ink/25 px-6 py-10">
+          <p aria-hidden="true" className="text-2xl leading-none text-ink/40">↑</p>
+          <h2 className="mt-3 font-display text-2xl uppercase tracking-[0.08em] text-ink">
+            Choose your match
+          </h2>
+          <p className="mt-3 text-sm text-ink/65">
+            Pick a team or an opponent in the filters above — or start with any match.
+          </p>
+          <p className="mt-4 text-xs uppercase tracking-[0.15em] text-ink/45">
+            Press Start game when you&rsquo;re ready
+          </p>
+        </div>
+      </div>,
+    );
+  }
 
   // Error state
   if (state.error) {

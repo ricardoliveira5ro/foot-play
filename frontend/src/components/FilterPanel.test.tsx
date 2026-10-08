@@ -33,11 +33,15 @@ interface PanelConfig {
   optionsError?: string | null;
   onApply?: (next: GameFilterParams) => void;
   onToggleOpen?: () => void;
+  onStart?: (next: GameFilterParams) => void;
 }
 
 function renderPanel(config: PanelConfig = {}) {
   const onApply = config.onApply ?? vi.fn();
   const onToggleOpen = config.onToggleOpen ?? vi.fn();
+  // undefined unless configured — passing onStart to an Apply-mode panel
+  // would silently flip it into start mode and assert the wrong contract.
+  const onStart = config.onStart;
   const base = {
     open: config.open ?? false,
     onToggleOpen,
@@ -46,12 +50,14 @@ function renderPanel(config: PanelConfig = {}) {
     optionsLoading: config.optionsLoading ?? false,
     optionsError: config.optionsError ?? null,
     onApply,
+    ...(onStart ? { onStart } : {}),
   };
   const view = render(<FilterPanel {...base} />);
   return {
     ...view,
     onApply,
     onToggleOpen,
+    onStart,
     rerenderPanel: (next: PanelConfig = {}) =>
       view.rerender(
         <FilterPanel
@@ -141,6 +147,17 @@ describe('FilterPanel', () => {
     const panel = renderPanel({ open: true, filters: filtersOf({ teamIds: [294], opponentIds: [31] }) });
     await user.click(screen.getByRole('button', { name: 'Clear all' }));
     expect(panel.onApply).toHaveBeenCalledWith(EMPTY_FILTERS);
+  });
+
+  it('Clear all clears a draft even when the applied set is already empty', async () => {
+    // The pre-screen case: nothing applied yet, so onApply(EMPTY) is a no-op
+    // upstream and the draft re-sync never fires — the button must clear the
+    // visible draft itself or "Clear all" clears nothing the user can see.
+    const user = userEvent.setup();
+    renderPanel({ open: true });
+    await user.click(screen.getByRole('checkbox', { name: 'SL Benfica (42)' }));
+    await user.click(screen.getByRole('button', { name: 'Clear all' }));
+    expect(screen.getByRole('checkbox', { name: 'SL Benfica (42)' })).not.toBeChecked();
   });
 
   it('does not re-read counts while the draft is being edited', async () => {
@@ -263,5 +280,46 @@ describe('FilterPanel', () => {
     expect(screen.getByRole('searchbox', { name: /Search Team/ })).toHaveValue('porto');
     expect(screen.getByRole('button', { name: /^Filters/ })).toHaveAttribute('aria-expanded', 'true');
     expect(screen.getByRole('button', { name: 'Apply' })).toBeDisabled(); // draft re-synced to applied
+  });
+});
+
+describe('FilterPanel start mode', () => {
+  it('reads "Start game" instead of "Apply"', () => {
+    renderPanel({ open: true, onStart: vi.fn() });
+    expect(screen.getByRole('button', { name: 'Start game' })).toBeTruthy();
+    expect(screen.queryByRole('button', { name: 'Apply' })).toBeNull();
+  });
+
+  it('never disables Start game, even when the draft equals the applied filters', () => {
+    renderPanel({ open: true, filters: filtersOf({ teamIds: [294] }), onStart: vi.fn() });
+    // Apply is armed by a change; Start is always armed — starting with
+    // nothing selected (or with the deep-link set as-is) is legal.
+    expect(screen.getByRole('button', { name: 'Start game' })).not.toBeDisabled();
+  });
+
+  it('calls onStart with the draft and nothing else when Start game is pressed', async () => {
+    const user = userEvent.setup();
+    const panel = renderPanel({ open: true, onStart: vi.fn() });
+    await user.click(screen.getByRole('checkbox', { name: 'SL Benfica (42)' }));
+    expect(panel.onStart).not.toHaveBeenCalled();           // toggling starts nothing
+    await user.click(screen.getByRole('button', { name: 'Start game' }));
+    expect(panel.onStart).toHaveBeenCalledTimes(1);
+    expect(panel.onStart).toHaveBeenCalledWith(filtersOf({ teamIds: [294] }));
+    expect(panel.onApply).not.toHaveBeenCalled();           // start is not an apply
+    expect(panel.onToggleOpen).not.toHaveBeenCalled();      // the page decides when it closes
+  });
+
+  it('hides the panel toggle in start mode so Start cannot become unreachable', () => {
+    renderPanel({ open: true, onStart: vi.fn() });
+    expect(screen.queryByRole('button', { name: /^Filters/ })).toBeNull();
+    expect(screen.getByRole('region', { name: 'Filters' })).toBeVisible();
+  });
+
+  it('still routes Clear all through onApply in start mode', async () => {
+    const user = userEvent.setup();
+    const panel = renderPanel({ open: true, filters: filtersOf({ teamIds: [294] }), onStart: vi.fn() });
+    await user.click(screen.getByRole('button', { name: 'Clear all' }));
+    expect(panel.onApply).toHaveBeenCalledWith(EMPTY_FILTERS);
+    expect(panel.onStart).not.toHaveBeenCalled();
   });
 });

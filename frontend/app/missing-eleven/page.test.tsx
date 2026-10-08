@@ -31,6 +31,19 @@ const mockPush = vi.fn();
 
 function setUrl(query: string) {
   mockUseSearchParams.mockReturnValue(new URLSearchParams(query) as never);
+  // The gate reads window.location.search on mount, so the test location
+  // must mirror the mocked params — in the real app the two are one thing.
+  window.history.replaceState(null, '', query ? `/missing-eleven?${query}` : '/missing-eleven');
+}
+
+// Keep window.location (and the useSearchParams mock) in step with what
+// router.replace writes, exactly as the real router does — the Start test
+// asserts the D4-class ordering this produces.
+function mirrorReplace() {
+  mockReplace.mockImplementation((href: string) => {
+    const url = new URL(href, 'http://localhost');
+    setUrl(url.search.replace(/^\?/, ''));
+  });
 }
 
 function player(token: string, nameLength = 5): LineupPlayer {
@@ -73,6 +86,18 @@ const emptyOptions: FilterOptionsResponse = {
   competitions: [],
   seasons: [],
   total: 0,
+};
+
+// Shared by the panel and pre-screen describes: options with real counts.
+const clubOptions: FilterOptionsResponse = {
+  teams: [
+    { id: 31, name: 'FC Porto', isNationalTeam: false, count: 7 },
+    { id: 294, name: 'SL Benfica', isNationalTeam: false, count: 42 },
+  ],
+  opponents: [{ id: 5, name: 'Nacional', isNationalTeam: true, count: 3 }],
+  competitions: [],
+  seasons: [],
+  total: 101,
 };
 
 beforeEach(() => {
@@ -125,16 +150,20 @@ describe('missing-eleven page filter wiring', () => {
   });
 
   it('does not fetch again when an equal filter set is re-dispatched', async () => {
+    setUrl('teamIds=7');
     const { rerender } = render(<MissingElevenPage />);
     await waitFor(() =>
-      expect(screen.getByRole('button', { name: 'New puzzle' })).toBeTruthy(),
+      expect(mockFetchRandomMatch).toHaveBeenLastCalledWith(
+        expect.objectContaining({ teamIds: [7] }),
+      ),
     );
     const callsAfterMount = mockFetchRandomMatch.mock.calls.length;
     expect(callsAfterMount).toBeGreaterThan(0);
 
-    // 'daily=1' parses to the same empty filter set: the reducer no-op keeps
-    // the canonical key — and therefore the fetch — unchanged.
-    setUrl('daily=1');
+    // 'daily=1' is not a filter key: 'teamIds=7&daily=1' parses to the same
+    // filter set — the reducer no-op keeps the canonical key, and therefore
+    // the fetch, unchanged.
+    setUrl('teamIds=7&daily=1');
     rerender(<MissingElevenPage />);
 
     expect(mockFetchRandomMatch.mock.calls.length).toBe(callsAfterMount);
@@ -217,6 +246,7 @@ describe('missing-eleven page filter wiring', () => {
   });
 
   it('renders a neutral empty message when fetchRandomMatch resolves null', async () => {
+    setUrl('teamIds=7'); // the gate needs a started URL; the contract is unchanged
     mockFetchRandomMatch.mockResolvedValue(null);
     render(<MissingElevenPage />);
 
@@ -228,6 +258,7 @@ describe('missing-eleven page filter wiring', () => {
   });
 
   it('renders an error when fetchRandomMatch throws', async () => {
+    setUrl('teamIds=7'); // the gate needs a started URL; the contract is unchanged
     mockFetchRandomMatch.mockRejectedValue(new Error('Network down'));
     render(<MissingElevenPage />);
 
@@ -237,21 +268,15 @@ describe('missing-eleven page filter wiring', () => {
 });
 
 describe('missing-eleven page filter panel', () => {
-  const clubOptions: FilterOptionsResponse = {
-    teams: [
-      { id: 31, name: 'FC Porto', isNationalTeam: false, count: 7 },
-      { id: 294, name: 'SL Benfica', isNationalTeam: false, count: 42 },
-    ],
-    opponents: [{ id: 5, name: 'Nacional', isNationalTeam: true, count: 3 }],
-    competitions: [],
-    seasons: [],
-    total: 101,
-  };
-
   const toggleButton = () => screen.getByRole('button', { name: /^Filters/ });
   const portoCheckbox = () => screen.getByRole('checkbox', { name: /FC Porto/ });
 
   beforeEach(() => {
+    // These tests exercise in-game behaviour with an EMPTY applied set (their
+    // original contract). 'daily=1' is not a filter key: it opens the gate
+    // (non-empty location) while parsing to the empty filter set, so drafts
+    // start empty and no FilterUrlSync re-dispatch refetches mid-test.
+    setUrl('daily=1');
     mockFetchFilterOptions.mockResolvedValue(clubOptions);
   });
 
@@ -402,5 +427,114 @@ describe('missing-eleven page filter panel', () => {
 
     expect(screen.getByRole('searchbox', { name: 'Search Team' })).toHaveValue('porto');
     await waitFor(() => expect(portoCheckbox()).toBeChecked());
+  });
+});
+
+describe('missing-eleven pre-screen gate', () => {
+  beforeEach(() => {
+    mockFetchFilterOptions.mockResolvedValue(clubOptions);
+  });
+
+  it('renders the pre-screen on an empty URL and fetches no match', async () => {
+    render(<MissingElevenPage />);
+
+    expect(screen.getByRole('heading', { level: 1, name: 'Missing Eleven' })).toBeTruthy();
+    expect(screen.getByRole('heading', { level: 2, name: 'Choose your match' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Start game' })).not.toBeDisabled();
+    expect(screen.queryByRole('button', { name: 'New puzzle' })).toBeNull();
+    expect(screen.queryByText('Loading puzzle…')).toBeNull();
+
+    // Options still load on the pre-screen (Start with a pick needs them)…
+    await waitFor(() => expect(mockFetchFilterOptions).toHaveBeenCalled());
+    // …but the match itself must not be requested before Start.
+    expect(mockFetchRandomMatch).not.toHaveBeenCalled();
+  });
+
+  it('forces the panel open with its toggle hidden until the game starts', async () => {
+    render(<MissingElevenPage />);
+
+    expect(screen.queryByRole('button', { name: /^Filters/ })).toBeNull();
+    const region = screen.getByRole('region', { name: 'Filters' });
+    expect(region).toBeVisible();
+    await waitFor(() =>
+      expect(within(region).getByRole('checkbox', { name: /FC Porto \(7\)/ })).toBeTruthy(),
+    );
+  });
+
+  it('starts the game: URL first, exactly one fetch, pre-screen gone', async () => {
+    mirrorReplace();
+    const user = userEvent.setup();
+    render(<MissingElevenPage />);
+    await waitFor(() => expect(screen.getByRole('checkbox', { name: /FC Porto \(7\)/ })).toBeTruthy());
+    await user.click(screen.getByRole('checkbox', { name: /FC Porto \(7\)/ }));
+    await user.click(screen.getByRole('button', { name: 'Start game' }));
+
+    await waitFor(() => expect(mockFetchRandomMatch).toHaveBeenCalledTimes(1));
+    expect(mockFetchRandomMatch).toHaveBeenCalledWith(
+      expect.objectContaining({ teamIds: [31] }),
+    );
+    // D4-class ordering: the URL write lands before the board's fetch.
+    expect(mockReplace.mock.invocationCallOrder[0]).toBeLessThan(
+      mockFetchRandomMatch.mock.invocationCallOrder[0],
+    );
+    expect(String(mockReplace.mock.calls[0][0])).toContain('teamIds=31');
+
+    await screen.findByRole('button', { name: 'New puzzle' });
+    // Exactly one — the board-remount FilterUrlSync read was idempotent.
+    expect(mockFetchRandomMatch).toHaveBeenCalledTimes(1);
+    expect(mockReplace.mock.calls).toHaveLength(1);
+    expect(screen.queryByRole('button', { name: 'Start game' })).toBeNull();
+    expect(screen.queryByRole('region', { name: 'Filters' })).toBeNull(); // panel closed in-game
+  });
+
+  it('starts with an empty draft: URL stays empty and one fetch still fires', async () => {
+    mirrorReplace();
+    const user = userEvent.setup();
+    render(<MissingElevenPage />);
+
+    await user.click(screen.getByRole('button', { name: 'Start game' }));
+
+    await waitFor(() => expect(mockFetchRandomMatch).toHaveBeenCalledTimes(1));
+    expect(mockReplace).toHaveBeenCalledWith('/missing-eleven', { scroll: false });
+    await screen.findByRole('button', { name: 'New puzzle' });
+    expect(mockFetchRandomMatch).toHaveBeenCalledTimes(1);
+    expect(screen.queryByRole('button', { name: 'Start game' })).toBeNull();
+  });
+
+  it('draft edits on the pre-screen start nothing', async () => {
+    const user = userEvent.setup();
+    render(<MissingElevenPage />);
+    await waitFor(() => expect(screen.getByRole('checkbox', { name: /FC Porto \(7\)/ })).toBeTruthy());
+    await user.click(screen.getByRole('checkbox', { name: /FC Porto \(7\)/ }));
+
+    expect(screen.getByRole('button', { name: 'Start game' })).not.toBeDisabled();
+    expect(mockFetchRandomMatch).not.toHaveBeenCalled();
+    expect(mockReplace).not.toHaveBeenCalled();
+  });
+
+  it('Clear all on the pre-screen clears the draft without starting', async () => {
+    const user = userEvent.setup();
+    render(<MissingElevenPage />);
+    await waitFor(() => expect(screen.getByRole('checkbox', { name: /FC Porto \(7\)/ })).toBeTruthy());
+    await user.click(screen.getByRole('checkbox', { name: /FC Porto \(7\)/ }));
+    await user.click(screen.getByRole('button', { name: 'Clear all' }));
+
+    await waitFor(() => expect(screen.getByRole('checkbox', { name: /FC Porto \(7\)/ })).not.toBeChecked());
+    expect(screen.getByRole('button', { name: 'Start game' })).toBeTruthy();
+    expect(mockFetchRandomMatch).not.toHaveBeenCalled();
+    expect(mockReplace).not.toHaveBeenCalled();
+  });
+
+  it('auto-starts a deep-linked URL with no pre-screen', async () => {
+    setUrl('teamIds=7');
+    render(<MissingElevenPage />);
+
+    await waitFor(() =>
+      expect(mockFetchRandomMatch).toHaveBeenLastCalledWith(
+        expect.objectContaining({ teamIds: [7] }),
+      ),
+    );
+    expect(screen.queryByRole('button', { name: 'Start game' })).toBeNull();
+    await screen.findByRole('button', { name: 'New puzzle' });
   });
 });
