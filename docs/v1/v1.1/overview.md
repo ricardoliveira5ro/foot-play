@@ -29,7 +29,7 @@
 > Team, Competition, and Season are all filterable, and a combination that
 > matches no complete game renders an explained empty state (keyed on
 > `filterOptions.total === 0`) that is distinct from the error state. See
-> [`CHANGELOG-v1.1.4.md`](./CHANGELOG-v1.1.4.md) for the recorded validation.
+> [`CHANGELOG.md`](../../../CHANGELOG.md) for the recorded validation.
 
 ---
 
