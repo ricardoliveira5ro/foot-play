@@ -20,6 +20,11 @@ interface FilterSectionProps {
   chips?: SelectionChip[];
   /** Removes one id from the draft — same toggle semantics as the checkbox. */
   onRemoveChip?: (id: number) => void;
+  /**
+   * Clears this dimension's draft only. Never applies. Rendered as an
+   * accessible "Clear {label}" button when the dimension has a selection.
+   */
+  onClear?: () => void;
   /** Search + checkbox list; always mounted, hidden while collapsed. */
   children: ReactNode;
 }
@@ -44,6 +49,7 @@ export default function FilterSection({
   onToggleExpanded,
   chips = [],
   onRemoveChip,
+  onClear,
   children,
 }: Readonly<FilterSectionProps>) {
   const bodyId = useId();
@@ -55,6 +61,13 @@ export default function FilterSection({
     // keyboard user does not drop to <body>.
     headerRef.current?.focus();
   };
+
+  const clearDimension = () => {
+    onClear?.();
+    headerRef.current?.focus();
+  };
+
+  const showChipRow = chips.length > 0 || (onClear !== undefined && count > 0);
 
   return (
     <div>
@@ -74,7 +87,7 @@ export default function FilterSection({
           {expanded ? '▲' : '▼'}
         </span>
       </button>
-      {chips.length > 0 && (
+      {showChipRow && (
         <div className="mt-2 flex flex-wrap items-center gap-2">
           {chips.map((chip) => (
             <span
@@ -92,6 +105,16 @@ export default function FilterSection({
               </button>
             </span>
           ))}
+          {onClear !== undefined && count > 0 && (
+            <button
+              type="button"
+              onClick={clearDimension}
+              aria-label={`Clear ${label}`}
+              className="rounded-md border border-ink/15 px-2 py-1 text-xs font-medium text-ink/60 transition-colors hover:text-ink focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-flare"
+            >
+              Clear
+            </button>
+          )}
         </div>
       )}
       <div id={bodyId} hidden={!expanded} className="mt-2">

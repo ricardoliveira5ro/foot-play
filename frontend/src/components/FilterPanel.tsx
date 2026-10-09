@@ -1,9 +1,16 @@
 'use client';
 
-import { useEffect, useId, useState } from 'react';
+import { useEffect, useId, useState, type ReactNode } from 'react';
 import ClubMultiSelect from './ClubMultiSelect';
+import CompetitionMultiSelect from './CompetitionMultiSelect';
+import SeasonRange from './SeasonRange';
 import FilterSection from './FilterSection';
 import { toClubOptions, toggleId } from '@/lib/clubFilters';
+import {
+  normaliseSeasonRange,
+  toCompetitionOptions,
+  toggleCompetition as toggleCompetitionId,
+} from '@/lib/competitionFilters';
 import { hasActiveFilters, countActiveFilters } from '@/lib/filters';
 import { filtersEqual } from '@/lib/filtersEqual';
 import { EMPTY_FILTERS, type FilterOptionsResponse, type GameFilterParams } from '@/types';
@@ -66,6 +73,8 @@ export default function FilterPanel({
   // and closing the panel while the page is mounted, and resets on reload.
   const [openSections, setOpenSections] = useState<Record<string, boolean>>({
     team: false,
+    competition: false,
+    season: false,
   });
   const toggleSection = (id: string) =>
     setOpenSections((current) => ({ ...current, [id]: !current[id] }));
@@ -89,8 +98,44 @@ export default function FilterPanel({
   const teamOptions = toClubOptions(teams, clubNames);
   const nameFor = (id: number) => clubNames.get(id) ?? `#${id}`;
 
+  // Competition names come straight from the wire shapes; the map exists only
+  // so the shared option builder has a single name source.
+  const competitions = options?.competitions ?? [];
+  const competitionNames = new Map<string, string>(
+    competitions.map((competition) => [competition.id, competition.name]),
+  );
+  const competitionOptions = toCompetitionOptions(competitions, competitionNames);
+
   const toggleTeam = (id: number) =>
     setDraft((current) => ({ ...current, teamIds: toggleId(current.teamIds, id) }));
+
+  const toggleCompetition = (id: string) =>
+    setDraft((current) => ({
+      ...current,
+      competitionIds: toggleCompetitionId(current.competitionIds, id),
+    }));
+
+  // The moved bound wins: raising `from` past `to` pushes `to` up, and
+  // lowering `to` below `from` pushes `from` down — an inverted range is
+  // unreachable by interaction. Both are draft-only edits.
+  const changeSeasonFrom = (value: number | null) =>
+    setDraft((current) => {
+      const range = normaliseSeasonRange(value, current.seasonTo, 'from');
+      return { ...current, seasonFrom: range.from, seasonTo: range.to };
+    });
+
+  const changeSeasonTo = (value: number | null) =>
+    setDraft((current) => {
+      const range = normaliseSeasonRange(current.seasonFrom, value, 'to');
+      return { ...current, seasonFrom: range.from, seasonTo: range.to };
+    });
+
+  // Per-dimension clears edit the draft only — never onApply. Each touches
+  // exactly one dimension so the others survive.
+  const clearTeam = () => setDraft((current) => ({ ...current, teamIds: null }));
+  const clearCompetition = () => setDraft((current) => ({ ...current, competitionIds: null }));
+  const clearSeason = () =>
+    setDraft((current) => ({ ...current, seasonFrom: null, seasonTo: null }));
 
   const apply = () => {
     if (onStart) {
@@ -110,15 +155,24 @@ export default function FilterPanel({
     onApply({ ...EMPTY_FILTERS });
   };
 
-  // One entry per dimension — v1.1.4 adds Competition/Season by appending
-  // here, and the section machinery (header, count, disclosure) comes along.
-  const sections = [
+  // One entry per dimension — the section machinery (header, count,
+  // disclosure, per-dimension clear) comes along for each.
+  const sections: Array<{
+    id: string;
+    label: string;
+    count: number;
+    chips?: { id: number; name: string }[];
+    onRemoveChip?: (id: number) => void;
+    onClear: () => void;
+    body: ReactNode;
+  }> = [
     {
       id: 'team',
       label: 'Team',
       count: draft.teamIds?.length ?? 0,
       chips: (draft.teamIds ?? []).map((id) => ({ id, name: nameFor(id) })),
       onRemoveChip: toggleTeam,
+      onClear: clearTeam,
       body: (
         <ClubMultiSelect
           legend="Team"
@@ -128,6 +182,36 @@ export default function FilterPanel({
           onToggle={toggleTeam}
           loading={optionsLoading}
           hideLegend
+        />
+      ),
+    },
+    {
+      id: 'competition',
+      label: 'Competition',
+      count: draft.competitionIds?.length ?? 0,
+      onClear: clearCompetition,
+      body: (
+        <CompetitionMultiSelect
+          options={competitionOptions}
+          selected={draft.competitionIds}
+          onToggle={toggleCompetition}
+          loading={optionsLoading}
+        />
+      ),
+    },
+    {
+      id: 'season',
+      label: 'Season',
+      count: draft.seasonFrom !== null || draft.seasonTo !== null ? 1 : 0,
+      onClear: clearSeason,
+      body: (
+        <SeasonRange
+          from={draft.seasonFrom}
+          to={draft.seasonTo}
+          onFromChange={changeSeasonFrom}
+          onToChange={changeSeasonTo}
+          seasons={options?.seasons ?? []}
+          loading={optionsLoading}
         />
       ),
     },
@@ -177,6 +261,7 @@ export default function FilterPanel({
               onToggleExpanded={() => toggleSection(section.id)}
               chips={section.chips}
               onRemoveChip={section.onRemoveChip}
+              onClear={section.onClear}
             >
               {section.body}
             </FilterSection>
