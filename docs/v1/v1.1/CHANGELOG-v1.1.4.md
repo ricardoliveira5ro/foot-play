@@ -77,6 +77,28 @@ No backend, schema, API, or dependency change.
    screen, `displayError = state.error ?? optionsError`, so "the server is
    down" never reads as "no games match".
 
+## Follow-up (post-ship): selected-value chips for Competition and Season
+
+The first cut wired only Team for the named-chip affordance that
+`FilterSection` already supported, so Competition and Season showed a bare
+`Clear` button and no removable per-selection chips. This follow-up closes that
+gap so all three dimensions behave the same.
+
+- **Competition** now renders one chip per selected competition, each with an
+  `×` that removes just that id from the draft (no Apply), matching Team.
+- **Season** is a range, not a list, so it renders a **single** chip —
+  `2023–2024`, `From 2023`, or `To 2024` — whose `×` clears the range. The
+  separate `Clear` button was removed for Season: on a single chip it was a
+  duplicate of the `×`. Team and Competition keep their `Clear` button because
+  they can hold many chips.
+- `FilterSection`'s `SelectionChip.id` and `onRemoveChip` were widened from
+  `number` to `string | number` (competition ids are strings); no other
+  component consumes `SelectionChip`.
+
+Touch points: `frontend/src/components/FilterSection.tsx`,
+`frontend/src/components/FilterPanel.tsx`, and `FilterPanel.test.tsx`. No
+change to the URL, game state, API, or the v1.1.3 `ClubMultiSelect`.
+
 ## Validation
 
 Measured on the implementation branch (not asserted against a fixed count):

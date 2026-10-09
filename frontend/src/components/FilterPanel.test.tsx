@@ -610,7 +610,7 @@ describe('FilterPanel competition and season dimensions', () => {
     );
   });
 
-  it('clears only the season dimension from a per-dimension clear', async () => {
+  it('clears only the season dimension from its chip X', async () => {
     const user = userEvent.setup();
     const panel = renderPanel({
       open: true,
@@ -620,7 +620,7 @@ describe('FilterPanel competition and season dimensions', () => {
     expect(screen.getByRole('checkbox', { name: 'SL Benfica (42)' })).toBeChecked();
     expect(screen.getByRole('checkbox', { name: 'Premier League (30)' })).toBeChecked();
 
-    await user.click(screen.getByRole('button', { name: 'Clear Season' }));
+    await user.click(screen.getByRole('button', { name: 'Remove 2020–2022 from Season' }));
 
     expect(screen.getByLabelText('Season from')).toHaveValue(null);
     expect(screen.getByLabelText('Season to')).toHaveValue(null);
@@ -672,5 +672,83 @@ describe('FilterPanel competition and season dimensions', () => {
     expect(panel.onApply).toHaveBeenCalledWith(
       filtersOf({ teamIds: [294], seasonFrom: 2020 }),
     );
+  });
+});
+
+describe('FilterPanel competition and season chips', () => {
+  it('shows a competition chip below the header and removes it from the draft only', async () => {
+    const user = userEvent.setup();
+    const panel = renderPanel({ open: true, filters: filtersOf({ competitionIds: ['PL'] }) });
+    await expandSection(user, 'Competition');
+
+    expect(sectionHeader('Competition')).toHaveTextContent('Competition (1)');
+    const remove = screen.getByRole('button', { name: 'Remove Premier League from Competition' });
+    // The chip lives below the disclosure button, never inside it.
+    expect(sectionHeader('Competition').contains(remove)).toBe(false);
+
+    await user.click(remove);
+
+    expect(screen.queryByRole('button', { name: 'Remove Premier League from Competition' })).toBeNull();
+    expect(screen.getByRole('checkbox', { name: 'Premier League (30)' })).not.toBeChecked();
+    expect(panel.onApply).not.toHaveBeenCalled();
+  });
+
+  it('shows one chip per selected competition and removes them independently', async () => {
+    const user = userEvent.setup();
+    renderPanel({ open: true, filters: filtersOf({ competitionIds: ['PL', 'LL'] }) });
+    await expandSection(user, 'Competition');
+
+    expect(sectionHeader('Competition')).toHaveTextContent('Competition (2)');
+    expect(screen.getByRole('button', { name: 'Remove Premier League from Competition' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Remove La Liga from Competition' })).toBeTruthy();
+
+    await user.click(screen.getByRole('button', { name: 'Remove La Liga from Competition' }));
+
+    expect(screen.queryByRole('button', { name: 'Remove La Liga from Competition' })).toBeNull();
+    expect(screen.getByRole('button', { name: 'Remove Premier League from Competition' })).toBeTruthy();
+    expect(screen.getByRole('checkbox', { name: 'La Liga (20)' })).not.toBeChecked();
+  });
+
+  it('falls back to the raw id for a competition the universe does not list', () => {
+    renderPanel({ open: true, filters: filtersOf({ competitionIds: ['ZZ'] }) });
+    expect(screen.getByRole('button', { name: 'Remove #ZZ from Competition' })).toBeTruthy();
+  });
+
+  it('shows one range chip for a two-bound season and no separate Clear button', async () => {
+    const user = userEvent.setup();
+    const panel = renderPanel({
+      open: true,
+      filters: filtersOf({ seasonFrom: 2023, seasonTo: 2024 }),
+    });
+    await expandSection(user, 'Season');
+
+    expect(sectionHeader('Season')).toHaveTextContent('Season (1)');
+    expect(screen.getByRole('button', { name: 'Remove 2023–2024 from Season' })).toBeTruthy();
+    expect(screen.queryByRole('button', { name: 'Clear Season' })).toBeNull();
+
+    await user.click(screen.getByRole('button', { name: 'Remove 2023–2024 from Season' }));
+
+    expect(screen.getByLabelText('Season from')).toHaveValue(null);
+    expect(screen.getByLabelText('Season to')).toHaveValue(null);
+    expect(panel.onApply).not.toHaveBeenCalled();
+  });
+
+  it('labels a lone season bound as From or To', () => {
+    const panel = renderPanel({ open: true, filters: filtersOf({ seasonFrom: 2013 }) });
+    expect(screen.getByRole('button', { name: 'Remove From 2013 from Season' })).toBeTruthy();
+
+    panel.rerenderPanel({ filters: filtersOf({ seasonTo: 2025 }) });
+    expect(screen.getByRole('button', { name: 'Remove To 2025 from Season' })).toBeTruthy();
+  });
+
+  it('hands focus to the section header after a competition chip removal', async () => {
+    const user = userEvent.setup();
+    renderPanel({ open: true, filters: filtersOf({ competitionIds: ['PL'] }) });
+    await expandSection(user, 'Competition');
+    const header = sectionHeader('Competition');
+
+    await user.click(screen.getByRole('button', { name: 'Remove Premier League from Competition' }));
+
+    expect(document.activeElement).toBe(header);
   });
 });

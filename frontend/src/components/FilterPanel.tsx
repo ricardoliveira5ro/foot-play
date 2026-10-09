@@ -105,6 +105,21 @@ export default function FilterPanel({
     competitions.map((competition) => [competition.id, competition.name]),
   );
   const competitionOptions = toCompetitionOptions(competitions, competitionNames);
+  const competitionNameFor = (id: string) => competitionNames.get(id) ?? `#${id}`;
+
+  // Season is one range, not a list, so it renders as a single chip: both
+  // bounds read "2023–2024", a lone lower bound "From 2023", a lone upper
+  // bound "To 2024". One X clears the whole range (there is no separate
+  // Clear button for this section — it would be the same action twice).
+  const seasonChips = (applied: GameFilterParams) => {
+    const { seasonFrom, seasonTo } = applied;
+    if (seasonFrom !== null && seasonTo !== null) {
+      return [{ id: 'season', name: `${seasonFrom}–${seasonTo}` }];
+    }
+    if (seasonFrom !== null) return [{ id: 'season', name: `From ${seasonFrom}` }];
+    if (seasonTo !== null) return [{ id: 'season', name: `To ${seasonTo}` }];
+    return [];
+  };
 
   const toggleTeam = (id: number) =>
     setDraft((current) => ({ ...current, teamIds: toggleId(current.teamIds, id) }));
@@ -161,9 +176,9 @@ export default function FilterPanel({
     id: string;
     label: string;
     count: number;
-    chips?: { id: number; name: string }[];
-    onRemoveChip?: (id: number) => void;
-    onClear: () => void;
+    chips?: { id: string | number; name: string }[];
+    onRemoveChip?: (id: string | number) => void;
+    onClear?: () => void;
     body: ReactNode;
   }> = [
     {
@@ -171,7 +186,7 @@ export default function FilterPanel({
       label: 'Team',
       count: draft.teamIds?.length ?? 0,
       chips: (draft.teamIds ?? []).map((id) => ({ id, name: nameFor(id) })),
-      onRemoveChip: toggleTeam,
+      onRemoveChip: (id) => toggleTeam(Number(id)),
       onClear: clearTeam,
       body: (
         <ClubMultiSelect
@@ -189,6 +204,11 @@ export default function FilterPanel({
       id: 'competition',
       label: 'Competition',
       count: draft.competitionIds?.length ?? 0,
+      chips: (draft.competitionIds ?? []).map((id) => ({
+        id,
+        name: competitionNameFor(id),
+      })),
+      onRemoveChip: (id) => toggleCompetition(String(id)),
       onClear: clearCompetition,
       body: (
         <CompetitionMultiSelect
@@ -203,7 +223,8 @@ export default function FilterPanel({
       id: 'season',
       label: 'Season',
       count: draft.seasonFrom !== null || draft.seasonTo !== null ? 1 : 0,
-      onClear: clearSeason,
+      chips: seasonChips(draft),
+      onRemoveChip: clearSeason,
       body: (
         <SeasonRange
           from={draft.seasonFrom}
