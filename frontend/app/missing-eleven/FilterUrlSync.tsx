@@ -3,6 +3,7 @@
 import { useEffect, useRef } from 'react';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { filtersToParams, paramsToFilters, FILTER_PARAM_KEYS, LEGACY_FILTER_KEYS } from '@/lib/filterParams';
+import { hasActiveFilters } from '@/lib/filters';
 import type { GameFilterParams } from '@/types';
 
 interface Props {
@@ -26,28 +27,83 @@ export default function FilterUrlSync({ applied, onFilters }: Props): null {
   // sound and needs no cast. Do not add one.
   const key = searchParams.toString();
   const readyRef = useRef(false);
+  // The latest URL key, read by the write effect without making the write
+  // depend on `key`. See note below.
+  const keyRef = useRef(key);
+  // Tracks whether this mount has ever seen a non-empty `applied`. Used to tell
+  // the two "empty applied, populated URL" situations apart — see the write.
+  const observedAppliedRef = useRef(false);
 
   // 1. read: report the URL's filters. Effects run child-first, so this
   // dispatch happens before the page's own effects in the same commit — but
   // the dispatched state only lands on the next render, which is why the
   // write below stays locked until the read has completed a full commit.
   useEffect(() => {
-    onFilters(paramsToFilters(new URLSearchParams(key)));
+    keyRef.current = key;
+    const parsed = paramsToFilters(new URLSearchParams(key));
+    // Stale-empty guard. Start writes the URL before it flips `started`, but
+    // Next commits a client `router.replace` asynchronously: the board (and
+    // this component) can mount while `useSearchParams` still reports the
+    // *previous* — often empty — URL. Adopting that empty URL would wipe the
+    // filters Start just applied and bounce the URL back and forth. This
+    // component only renders on the board, where active `applied` filters are
+    // the norm, so an empty URL while `applied` is active can only be a
+    // not-yet-committed write — never a real clear. (Clearing happens on the
+    // pre-screen or the empty state, where this component is unmounted.)
+    //
+    // This must be a value guard, not a one-shot "first read" flag: React
+    // StrictMode invokes effects twice on mount in development, and the second
+    // invocation would slip past a one-shot flag and re-adopt the stale URL.
+    if (!hasActiveFilters(parsed) && hasActiveFilters(applied)) return;
+    onFilters(parsed);
+    // `applied` is read only for the stale-URL guard; listing it would
+    // re-dispatch on every applied change and fight the user's own edits.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [key, onFilters]);
 
   // 2. write: reflect the applied filters, merging over the live query.
+  //
+  // This effect must fire on a change in `applied` ONLY — never on a change in
+  // `key`. If it also keyed on `key`, then an external URL change (a router
+  // navigation, or Start's deferred `router.replace`) would run the write in
+  // the same commit as the read, before the read's dispatch has re-rendered
+  // the page. The write would then see the *previous* `applied` against the
+  // new key and rewrite the URL backwards; the read would bounce it forward
+  // again — an infinite navigation loop. Reading the live key from a ref keeps
+  // the merge over unrelated params (?daily=) correct without subscribing to
+  // URL changes.
   useEffect(() => {
+    // Record that the applied set has carried filters at least once, before the
+    // readiness gate: on a deep link the first render is `applied: EMPTY` with
+    // filters already in the URL, and this is what distinguishes that from a
+    // real clear (which can only follow a non-empty applied).
+    if (hasActiveFilters(applied)) observedAppliedRef.current = true;
     if (!readyRef.current) return; // never write before the first read
-    const next = new URLSearchParams(key);
+    const currentKey = keyRef.current;
+    // On a deep link `applied` starts EMPTY while the URL already carries
+    // filters. StrictMode's double effect invocation can run this write before
+    // the read's dispatch has re-rendered the page; stripping the URL then
+    // flickers a server round-trip and can feed the loop. Skip that first write
+    // — it is not a clear, because we have never yet observed a non-empty
+    // applied. A genuine clear happens after the applied set goes non-empty,
+    // so `observedAppliedRef` is already true by then.
+    if (
+      !hasActiveFilters(applied) &&
+      !observedAppliedRef.current &&
+      hasActiveFilters(paramsToFilters(new URLSearchParams(currentKey)))
+    ) {
+      return;
+    }
+    const next = new URLSearchParams(currentKey);
     for (const k of FILTER_PARAM_KEYS) next.delete(k);
     // Bookmark convergence: keys from removed dimensions must be actively
     // stripped, not left behind as unknown params forever.
     for (const k of LEGACY_FILTER_KEYS) next.delete(k);
     for (const [k, v] of filtersToParams(applied)) next.set(k, v);
     const href = next.size ? `${pathname}?${next}` : pathname;
-    if (href === (key ? `${pathname}?${key}` : pathname)) return; // already canonical
+    if (href === (currentKey ? `${pathname}?${currentKey}` : pathname)) return; // already canonical
     router.replace(href, { scroll: false });
-  }, [applied, key, router, pathname]);
+  }, [applied, router, pathname]);
 
   // 3. unlock writes — declared last so it runs after both effects above in
   // the first commit. Setting `readyRef` inside the read effect would let the

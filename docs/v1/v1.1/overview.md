@@ -25,6 +25,12 @@
 
 **Rollback chain is strict and one-directional:** v1.1.4 → v1.1.3 → v1.1.2 → v1.1.1 → v1.0.x. Every revert is a code revert with **no data repair and no reverse migration**, because v1.1 adds no schema change at all. v1.1.1 is the only patch that touches the backend, and its sole data-facing change is a read predicate.
 
+> **Status: complete.** All four patches have landed. v1.1.4 closed the line —
+> Team, Competition, and Season are all filterable, and a combination that
+> matches no complete game renders an explained empty state (keyed on
+> `filterOptions.total === 0`) that is distinct from the error state. See
+> [`CHANGELOG.md`](../../../CHANGELOG.md) for the recorded validation.
+
 ---
 
 ## Data flow

@@ -8,6 +8,91 @@ from, and release notes are taken from the entry itself.
 
 ---
 
+## v1.1.4 — Competition, Season, and the empty state
+
+_2026-10-09 · Spec: `docs/v1/v1.1/plan-v1.1.4-competition-season-empty-state.md`_
+
+### Added
+
+- **`CompetitionMultiSelect`** — the Competition dimension reuses the v1.1.3
+  checkbox-list contract in a compact, search-free shape (28 options,
+  alphabetical) with the same draft-then-apply model. Options and counts come
+  straight from `FilterOptionsResponse.competitions`; the selected option keeps
+  a non-zero count (R5 facet exclusion).
+- **`SeasonRange`** — a single two-bound control over `seasonFrom` / `seasonTo`.
+  Moving one bound past the other pushes it, so an inverted range is unreachable
+  by interaction; a hand-edited inverted URL is left intact and explained by the
+  empty state rather than silently swapped. The option universe is 2013–2025 as
+  returned by the server — no 2026 (partial season) and no `null` are
+  synthesised.
+- **`FilterEmptyState`** — a presentational `role="status"` region selected by
+  `filterOptions.total === 0 && !optionsLoading && hasActiveFilters(filters)`.
+  It offers **Clear all filters** (a fast escape to an unfiltered board) and
+  **Adjust filters** (back to the pre-screen with the selection intact), and is
+  keyed on a successful `total`, never on a failed match request, so the error
+  state stays distinct.
+- **Per-dimension clear** — `FilterSection` gained an optional `onClear` that
+  renders a labelled clear button next to that dimension's chips.
+- **Selected-value chips for Competition and Season** (follow-up) — Team already
+  supported per-selection chips; the follow-up brought the other two dimensions
+  in line. Competition renders one chip per selected id; Season is a range, so
+  it renders a single chip (`2023–2024`, `From 2023`, or `To 2024`) whose `×`
+  clears the range, and its separate `Clear` button was dropped as a duplicate
+  of that `×`. `FilterSection`'s `SelectionChip.id` / `onRemoveChip` were
+  widened from `number` to `string | number` (competition ids are strings).
+
+### Fixed
+
+- **`FilterUrlSync` read↔write feedback loop** — after a game, selecting a
+  season range (repro: 2019–2019) and pressing Start made the page fetch the
+  same game forever, repeating
+  `GET /api/matches/random?seasonFrom=2019&seasonTo=2019`,
+  `GET /api/matches/filter-options?…`, and a full `GET /missing-eleven`. Next
+  commits a client `router.replace` asynchronously, so the board — and
+  `FilterUrlSync` with it — could mount while `useSearchParams` still reported
+  the previous (empty) URL; the write effect listed `key` in its deps, so the
+  URL change ran the write still holding the old `applied`, rewriting the
+  address bar backwards while the read bounced it forward. The write now runs
+  only on `applied` and reads the live key from a ref; a value-based stale-URL
+  guard (not a one-shot flag — React StrictMode invokes effects twice on mount
+  in dev) stops an empty URL from lowering a non-empty `applied`, and a matching
+  guard stops a deep link's first empty-`applied` write from stripping the URL.
+  `page.test.tsx` mirrors `replace` synchronously, which is why 32 passing page
+  tests never caught it; the new
+  `frontend/app/missing-eleven/page.loop.test.tsx` models the async commit under
+  `StrictMode` (deep link, New-puzzle→Start, pre-screen→Start) and fails on the
+  pre-fix code.
+
+### Validation
+
+- `npm run test:coverage` — **27 files, 458 tests, all green**; statements
+  98.98% (779/787) / branches 97.8% (624/638) / functions 98.63% (216/219) /
+  lines 99.54% (651/654). New suites: `competitionFilters` 18,
+  `CompetitionMultiSelect` 11, `SeasonRange` 12, `FilterEmptyState` 11,
+  `page.loop` 3.
+- `npm run build` — clean on Next.js 16.3.4 (Turbopack); `/missing-eleven`
+  static-prerendered, no `missing-suspense-with-csr-bailout`.
+- `npx tsc --noEmit` and `npm run lint` — clean (one pre-existing warning in
+  `GameComplete.test.tsx`).
+- Live smoke (backend API, real database): `GET /api/matches/filter-options` →
+  `total: 9689`, seasons **2013–2025** (no 2026, no null), 28 competitions, 479
+  teams; inverted `?seasonFrom=2024&seasonTo=2020` → `total: 0` (the empty-state
+  key); narrow `?competitionIds=COPA&seasonFrom=2013&seasonTo=2013` → `total: 0`;
+  R5 facet exclusion `?competitionIds=L1` → `total: 442` with L1 still reporting
+  `count: 442`; `GET /missing-eleven` served `200` with the pre-screen rendered.
+
+### Notes
+
+- The docs-scoped `CHANGELOG-v1.1.4.md` was **not** kept: the changelog lives at
+  the root again (the `docs/v1/v1.1/CHANGELOG-*.md` convention was retired in
+  950b42c), so this entry is the release note.
+- No backend, schema, API, or dependency change. v1.1.3's `ClubMultiSelect` is
+  untouched.
+- Closes the v1.1 filter line: Team, Competition, and Season are all filterable,
+  and a no-match combination renders an explained, escapable empty state.
+
+---
+
 ## v1.1.3 — Team filters
 
 _2026-10-07 · Spec: `docs/v1/v1.1/plan-v1.1.3-team-filters.md`_
