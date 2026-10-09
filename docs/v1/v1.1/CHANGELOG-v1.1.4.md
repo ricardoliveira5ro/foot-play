@@ -99,6 +99,38 @@ Touch points: `frontend/src/components/FilterSection.tsx`,
 `frontend/src/components/FilterPanel.tsx`, and `FilterPanel.test.tsx`. No
 change to the URL, game state, API, or the v1.1.3 `ClubMultiSelect`.
 
+## Follow-up (post-ship): FilterUrlSync read↔write feedback loop
+
+**Symptom.** After a game, selecting a season range (repro: 2019–2019) and
+pressing Start made the page fetch the same game forever — the network log
+repeated `GET /api/matches/random?seasonFrom=2019&seasonTo=2019`,
+`GET /api/matches/filter-options?…`, and a full `GET /missing-eleven`.
+
+**Root cause.** Next commits a client `router.replace` asynchronously, so the
+board — and `FilterUrlSync` with it — could mount while `useSearchParams` still
+reported the *previous* (empty) URL. `FilterUrlSync`'s write effect listed
+`key` in its dependency array, so the URL change ran the write in the same
+commit as the read, still holding the old `applied` value: it rewrote the
+address bar backwards, the read bounced it forward again, and the two effects
+oscillated. `page.test.tsx` mirrors `router.replace` synchronously, which is
+why 32 passing page tests never caught it.
+
+**Fix** (`frontend/app/missing-eleven/FilterUrlSync.tsx`):
+
+1. The write effect no longer depends on `key`. It runs only when `applied`
+   changes and reads the live key from a ref (still merging over unrelated
+   params such as `?daily=`). A URL change is the read's job alone.
+2. A first-read guard: an empty URL must not lower a non-empty `applied` when
+   the component first mounts, because that empty URL is the not-yet-committed
+   state Start is about to replace. A genuine empty deep link parses to
+   `EMPTY` with `applied` already `EMPTY`, so nothing is lost.
+
+**Regression test** (`frontend/app/missing-eleven/page.loop.test.tsx`): models
+the async `router.replace` commit against the real page. On the pre-fix code the
+New-puzzle→Start case made 38 match requests and dozens of `router.replace`
+calls; on the fix it makes exactly one. The suite mirroring replace
+synchronously stays untouched.
+
 ## Validation
 
 Measured on the implementation branch (not asserted against a fixed count):
