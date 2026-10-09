@@ -5,6 +5,7 @@ import { usePathname, useRouter } from 'next/navigation';
 import { useGameState, MAX_ATTEMPTS } from '@/lib/gameState';
 import { fetchRandomMatch, submitGuess as submitGuessApi, fetchReveal, revealOnePlayer } from '@/lib/api';
 import { filtersToParams } from '@/lib/filterParams';
+import { hasActiveFilters } from '@/lib/filters';
 import { useFilterOptions } from '@/lib/useFilterOptions';
 import MatchInfo from '@/components/MatchInfo';
 import TacticBoard from '@/components/TacticBoard';
@@ -12,9 +13,11 @@ import WordleModal from '@/components/WordleModal';
 import GameComplete from '@/components/GameComplete';
 import ScoreCounter from '@/components/ScoreCounter';
 import FilterPanel from '@/components/FilterPanel';
+import FilterEmptyState from '@/components/FilterEmptyState';
 import { computeTotalScore } from '@/lib/scoring';
 import FilterUrlSync from './FilterUrlSync';
 import type { ShirtData, RevealPlayer, GameFilterParams } from '@/types';
+import { EMPTY_FILTERS } from '@/types';
 import type { ShirtGameData } from '@/lib/gameState';
 
 function describeError(cause: unknown): string {
@@ -38,7 +41,7 @@ export default function MissingElevenPage() {
     setFilters,
   } = useGameState();
 
-  const { options: filterOptions, loading: optionsLoading, error: optionsError } = useFilterOptions(filters);
+  const { options: filterOptions, loading: optionsLoading, error: optionsError, reload: reloadOptions } = useFilterOptions(filters);
 
   // Stable identity: FilterUrlSync's read effect keys on this callback.
   const handleFilters = useCallback((next: GameFilterParams) => setFilters(next), [setFilters]);
@@ -139,9 +142,9 @@ export default function MissingElevenPage() {
       .then((response) => {
         if (seq !== matchSeqRef.current) return;
         if (response) startNewGame(response);
-        // null: no match under these filters — distinct from a thrown error.
-        // v1.1.4 replaces this with the real empty state.
-        else setError('No playable matches are available.');
+        // null: no match under these filters. That is not an error — the
+        // options' `total === 0` drives the explained empty state instead
+        // (v1.1.4). A thrown failure still lands in the catch below.
       })
       .catch((cause: unknown) => {
         if (seq !== matchSeqRef.current) return;
@@ -258,11 +261,41 @@ export default function MissingElevenPage() {
   }, [filters, newGame, setFilters, router, pathname]);
 
   const handleRetry = useCallback(() => {
+    reloadOptions();
     loadMatch();
-  }, [loadMatch]);
+  }, [reloadOptions, loadMatch]);
+
+  // Clear all from the empty state. The URL is the source of truth, so it must
+  // be cleared here too: the empty state does not render FilterUrlSync, and
+  // the board (which does) would otherwise re-read the stale filtered URL and
+  // bounce straight back into the empty state. Write the URL first, then the
+  // filters, matching handleStart's ordering.
+  const handleClearFilters = useCallback(() => {
+    router.replace(pathname, { scroll: false });
+    setFilters({ ...EMPTY_FILTERS });
+  }, [router, pathname, setFilters]);
 
   // Derive game complete state from gameStatus
   const isGameComplete = state.gameStatus === 'complete';
+
+  // The empty state is keyed on a *successful* options response whose `total`
+  // is zero for an active filter set — never on a failed match request. The
+  // `!optionsLoading` guard stops the empty state flashing over a good board
+  // while a new filter set's options are still in flight.
+  const showEmptyState =
+    filterOptions !== null &&
+    !optionsLoading &&
+    filterOptions.total === 0 &&
+    hasActiveFilters(filters);
+
+  const invertedSeasonRange =
+    filters.seasonFrom !== null &&
+    filters.seasonTo !== null &&
+    filters.seasonFrom > filters.seasonTo;
+
+  // An options failure is still a failure: surface it as the error state when
+  // no match is on screen, so "the server is down" never reads as "no games".
+  const displayError = state.error ?? (state.match ? null : optionsError);
 
   // Shared page chrome. The filter panel lives on the pre-screen only —
   // during the game there is no in-page filter access; New puzzle / Play
@@ -316,11 +349,11 @@ export default function MissingElevenPage() {
   }
 
   // Error state
-  if (state.error) {
+  if (displayError) {
     return shell(
       <div className="mx-auto flex w-full max-w-6xl flex-col items-center px-4 py-24 text-center md:px-6">
         <p className="text-lg font-semibold text-ink">Could not load the puzzle.</p>
-        <p className="mt-2 max-w-sm text-sm text-ink/55">{state.error}</p>
+        <p className="mt-2 max-w-sm text-sm text-ink/55">{displayError}</p>
         <div className="mt-6 flex flex-col items-center gap-3">
           <button
             type="button"
@@ -340,6 +373,21 @@ export default function MissingElevenPage() {
           </button>
         </div>
       </div>,
+    );
+  }
+
+  // Empty state: a successful options response says this combination matches
+  // zero games. Distinct from the error state above, escapable via Clear all
+  // (clears the filter set) and Adjust filters (returns to the panel with the
+  // current selection intact).
+  if (showEmptyState) {
+    return shell(
+      <FilterEmptyState
+        filters={filters}
+        invertedSeasonRange={invertedSeasonRange}
+        onClearAll={handleClearFilters}
+        onOpenFilters={handleNewPuzzle}
+      />,
     );
   }
 

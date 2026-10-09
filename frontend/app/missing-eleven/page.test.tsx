@@ -5,7 +5,8 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { useSearchParams, useRouter, usePathname } from 'next/navigation';
 import MissingElevenPage from './page';
 import { fetchRandomMatch, fetchFilterOptions, fetchReveal } from '@/lib/api';
-import type { GameResponse, LineupPlayer, FilterOptionsResponse } from '@/types';
+import { hasActiveFilters } from '@/lib/filters';
+import type { GameResponse, LineupPlayer, FilterOptionsResponse, GameFilterParams } from '@/types';
 
 vi.mock('next/navigation', () => ({
   useSearchParams: vi.fn(),
@@ -105,7 +106,7 @@ beforeEach(() => {
   mockUsePathname.mockReturnValue('/missing-eleven');
   mockUseRouter.mockReturnValue({ replace: mockReplace, push: mockPush, prefetch: vi.fn() } as never);
   mockFetchRandomMatch.mockResolvedValue(makeMatch());
-  mockFetchFilterOptions.mockResolvedValue(emptyOptions);
+  mockFetchFilterOptions.mockResolvedValue(clubOptions);
 });
 
 async function renderAndSettle() {
@@ -272,16 +273,19 @@ describe('missing-eleven page filter wiring', () => {
     );
   });
 
-  it('renders a neutral empty message when fetchRandomMatch resolves null', async () => {
+  it('shows the empty state (not an error) when fetchRandomMatch resolves null', async () => {
     setUrl('teamIds=7'); // the gate needs a started URL; the contract is unchanged
-    mockFetchRandomMatch.mockResolvedValue(null);
+    // The unfiltered gate fetch succeeds (as the real backend does), then the
+    // filtered fetch returns null — total 0 drives the empty state.
+    mockFetchRandomMatch.mockImplementation((filters) =>
+      Promise.resolve(filters && hasActiveFilters(filters) ? null : makeMatch()),
+    );
+    mockFetchFilterOptions.mockResolvedValue({ ...emptyOptions, total: 0 });
     render(<MissingElevenPage />);
 
-    await waitFor(() =>
-      expect(screen.getByText('No playable matches are available.')).toBeTruthy(),
-    );
-    // null must not fall through to the generic network-error message.
-    expect(screen.queryByText('Something went wrong.')).toBeNull();
+    await screen.findByText('No games match these filters');
+    // null must not fall through to the generic error message.
+    expect(screen.queryByText('Could not load the puzzle.')).toBeNull();
   });
 
   it('renders an error when fetchRandomMatch throws', async () => {
@@ -521,5 +525,118 @@ describe('missing-eleven pre-screen gate', () => {
     );
     expect(screen.queryByRole('button', { name: 'Start game' })).toBeNull();
     await screen.findByRole('button', { name: 'New puzzle' });
+  });
+});
+
+describe('missing-eleven empty state', () => {
+  const noOptions: FilterOptionsResponse = { ...emptyOptions, total: 0 };
+
+  // The real backend always has unfiltered games; only an over-narrow filter
+  // set returns null. Mirror that so the board can mount and read the URL.
+  const emptyMatchFor = (filters?: GameFilterParams) =>
+    Promise.resolve(filters && hasActiveFilters(filters) ? null : makeMatch());
+
+  it('shows the empty state when total is 0 and a filter is active', async () => {
+    setUrl('teamIds=7');
+    mockFetchRandomMatch.mockImplementation(emptyMatchFor);
+    mockFetchFilterOptions.mockResolvedValue(noOptions);
+    render(<MissingElevenPage />);
+
+    await screen.findByText('No games match these filters');
+  });
+
+  it('does not show the empty state when total is 0 and no filter is active', async () => {
+    setUrl('daily=1'); // started, but no filter dimension is active
+    mockFetchFilterOptions.mockResolvedValue(noOptions);
+    await renderAndSettle();
+    expect(screen.queryByText('No games match these filters')).toBeNull();
+  });
+
+  it('shows the error state, not the empty state, when the request throws', async () => {
+    setUrl('teamIds=7');
+    mockFetchRandomMatch.mockRejectedValue(new Error('Network down'));
+    mockFetchFilterOptions.mockResolvedValue(noOptions);
+    render(<MissingElevenPage />);
+
+    await screen.findByText('Network down');
+    expect(screen.queryByText('No games match these filters')).toBeNull();
+  });
+
+  it('shows the error state when optionsError is set', async () => {
+    setUrl('teamIds=7');
+    mockFetchRandomMatch.mockResolvedValue(null);
+    mockFetchFilterOptions.mockRejectedValue(new Error('Options down'));
+    render(<MissingElevenPage />);
+
+    await screen.findByText('Options down');
+    expect(screen.getByText('Could not load the puzzle.')).toBeTruthy();
+    expect(screen.queryByText('No games match these filters')).toBeNull();
+  });
+
+  it('does not flash the empty state while options are loading', async () => {
+    setUrl('teamIds=7');
+    mockFetchFilterOptions.mockReturnValue(new Promise(() => {}));
+    await renderAndSettle();
+    expect(screen.queryByText('No games match these filters')).toBeNull();
+  });
+
+  it('hides the game board while the empty state is shown', async () => {
+    setUrl('teamIds=7');
+    mockFetchRandomMatch.mockImplementation(emptyMatchFor);
+    mockFetchFilterOptions.mockResolvedValue(noOptions);
+    render(<MissingElevenPage />);
+
+    await screen.findByText('No games match these filters');
+    expect(screen.queryByRole('button', { name: 'New puzzle' })).toBeNull();
+  });
+
+  it('restores the board after Clear all', async () => {
+    mirrorReplace();
+    const user = userEvent.setup();
+    setUrl('teamIds=7');
+    mockFetchRandomMatch.mockImplementation(emptyMatchFor);
+    mockFetchFilterOptions.mockResolvedValue(noOptions);
+    render(<MissingElevenPage />);
+    await screen.findByText('No games match these filters');
+
+    // The escape hatch clears the filter set *and* the URL; the next fetch
+    // (unfiltered) succeeds and the board returns.
+    mockFetchRandomMatch.mockResolvedValue(makeMatch());
+    await user.click(screen.getByRole('button', { name: 'Clear all filters' }));
+
+    await screen.findByRole('button', { name: 'New puzzle' });
+    expect(screen.queryByText('No games match these filters')).toBeNull();
+  });
+
+  it('returns to the filters after Adjust filters, keeping the selection', async () => {
+    mirrorReplace();
+    const user = userEvent.setup();
+    setUrl('teamIds=7');
+    mockFetchRandomMatch.mockImplementation(emptyMatchFor);
+    mockFetchFilterOptions.mockResolvedValue(noOptions);
+    render(<MissingElevenPage />);
+    await screen.findByText('No games match these filters');
+
+    await user.click(screen.getByRole('button', { name: 'Adjust filters' }));
+
+    expect(screen.getByRole('button', { name: 'Start game' })).toBeTruthy();
+    expect(sectionHeader('Team')).toHaveTextContent('Team (1)');
+    expect(mockReplace).toHaveBeenCalledWith('/missing-eleven', { scroll: false });
+  });
+
+  it('explains an inverted season range in the URL', async () => {
+    setUrl('seasonFrom=2024&seasonTo=2020');
+    mockFetchRandomMatch.mockImplementation(emptyMatchFor);
+    mockFetchFilterOptions.mockResolvedValue(noOptions);
+    render(<MissingElevenPage />);
+
+    await screen.findByText(/season range starts after it ends/i);
+  });
+
+  it('does not show the empty state while a match is still on screen', async () => {
+    setUrl('teamIds=7');
+    await renderAndSettle();
+    expect(screen.getByRole('button', { name: 'New puzzle' })).toBeTruthy();
+    expect(screen.queryByText('No games match these filters')).toBeNull();
   });
 });
