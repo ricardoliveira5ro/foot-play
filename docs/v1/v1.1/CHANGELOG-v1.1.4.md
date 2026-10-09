@@ -120,16 +120,28 @@ why 32 passing page tests never caught it.
 1. The write effect no longer depends on `key`. It runs only when `applied`
    changes and reads the live key from a ref (still merging over unrelated
    params such as `?daily=`). A URL change is the read's job alone.
-2. A first-read guard: an empty URL must not lower a non-empty `applied` when
-   the component first mounts, because that empty URL is the not-yet-committed
-   state Start is about to replace. A genuine empty deep link parses to
-   `EMPTY` with `applied` already `EMPTY`, so nothing is lost.
+2. A stale-URL guard on the read: an empty URL must not lower a non-empty
+   `applied`, because that empty URL is the not-yet-committed state Start is
+   about to replace. A genuine empty deep link parses to `EMPTY` with `applied`
+   already `EMPTY`, so nothing is lost. This is a **value** guard, not a
+   one-shot "first read" flag: React StrictMode invokes effects twice on mount
+   in development, and a one-shot flag let the second pass re-adopt the stale
+   URL (this is why the first cut still looped under `next dev`).
+3. A matching guard on the write: on a deep link the first render is
+   `applied: EMPTY` with filters already in the URL, and StrictMode's second
+   write can run before the read's dispatch re-renders the page — stripping the
+   URL back to the bare path. A `observedAppliedRef` flag holds that first write
+   off without blocking a genuine clear, which can only follow a non-empty
+   `applied`.
 
 **Regression test** (`frontend/app/missing-eleven/page.loop.test.tsx`): models
-the async `router.replace` commit against the real page. On the pre-fix code the
-New-puzzle→Start case made 38 match requests and dozens of `router.replace`
-calls; on the fix it makes exactly one. The suite mirroring replace
-synchronously stays untouched.
+the async `router.replace` commit against the real page under **React
+StrictMode** (which the app runs in dev). Three cases — deep link,
+New-puzzle→Start, and pre-screen→Start with a season range — each assert a
+bounded fetch count and that no write strips the URL to the bare path. All
+three fail on the pre-fix code (the pre-screen case looped to 21+ requests and
+alternating bare/filtered URLs) and pass on the fix. `page.test.tsx` mirrors
+replace synchronously and stays untouched.
 
 ## Validation
 

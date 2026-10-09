@@ -11,8 +11,8 @@
 //
 // page.test.tsx mirrors replace synchronously, which hides the race. This file
 // models the async commit explicitly so the loop cannot regress.
-import { useSyncExternalStore } from 'react';
-import { render, screen, waitFor } from '@testing-library/react';
+import { StrictMode, useSyncExternalStore } from 'react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -80,13 +80,17 @@ import MissingElevenPage from './page';
 beforeEach(() => {
   vi.clearAllMocks();
   replacedHrefs.length = 0;
+  if (pendingCommit) {
+    clearTimeout(pendingCommit);
+    pendingCommit = null;
+  }
   store = new URLSearchParams('seasonFrom=2019&seasonTo=2019');
   window.history.replaceState(null, '', '/missing-eleven?seasonFrom=2019&seasonTo=2019');
 });
 
 describe('missing-eleven async URL commit', () => {
   it('a deep link settles without rewriting the URL back and forth', async () => {
-    render(<MissingElevenPage />);
+    render(<StrictMode><MissingElevenPage /></StrictMode>);
 
     await screen.findByRole('button', { name: 'New puzzle' });
     await new Promise((resolve) => setTimeout(resolve, 200));
@@ -99,7 +103,7 @@ describe('missing-eleven async URL commit', () => {
 
   it('New puzzle then Start does not loop the URL under identical filters', async () => {
     const user = userEvent.setup();
-    render(<MissingElevenPage />);
+    render(<StrictMode><MissingElevenPage /></StrictMode>);
     await screen.findByRole('button', { name: 'New puzzle' });
 
     await user.click(screen.getByRole('button', { name: 'New puzzle' }));
@@ -117,6 +121,40 @@ describe('missing-eleven async URL commit', () => {
     // Every write must target the applied filters — never the stripped URL.
     for (const href of replacedHrefs) {
       expect(href).toContain('seasonFrom=2019');
+    }
+  });
+
+  it('pre-screen then Start with a season, under StrictMode, settles', async () => {
+    // Start writes the URL, then flips `started`; the match resolves before
+    // Next commits the client `router.replace`, so the board (and
+    // FilterUrlSync) mounts while `useSearchParams` still reports the empty
+    // pre-screen URL. Under StrictMode the read effect runs twice, and a
+    // one-shot "first read" guard would let the second pass adopt that empty
+    // URL, wipe the started filters, and bounce the URL forever. This is the
+    // exact shape of the reported loop.
+    store = new URLSearchParams('');
+    window.history.replaceState(null, '', '/missing-eleven');
+
+    const user = userEvent.setup();
+    render(<StrictMode><MissingElevenPage /></StrictMode>);
+    await screen.findByRole('button', { name: 'Start game' });
+
+    const seasonHeader = screen.getByRole('button', { name: /^Season( \(\d+\))?$/ });
+    if (seasonHeader.getAttribute('aria-expanded') !== 'true') await user.click(seasonHeader);
+    fireEvent.change(screen.getByLabelText('Season from'), { target: { value: '2019' } });
+    fireEvent.change(screen.getByLabelText('Season to'), { target: { value: '2019' } });
+
+    (fetchRandomMatch as ReturnType<typeof vi.fn>).mockClear();
+    replacedHrefs.length = 0;
+    await user.click(screen.getByRole('button', { name: 'Start game' }));
+    await new Promise((resolve) => setTimeout(resolve, 300));
+
+    // One start fetch — no unfiltered/looped refetch.
+    expect((fetchRandomMatch as ReturnType<typeof vi.fn>).mock.calls.length).toBe(1);
+    // No write may strip the URL back to the bare path.
+    expect(replacedHrefs).not.toContain('/missing-eleven');
+    for (const href of replacedHrefs) {
+      expect(href).toContain('seasonFrom=2019&seasonTo=2019');
     }
   });
 });
