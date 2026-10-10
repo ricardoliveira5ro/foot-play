@@ -175,6 +175,7 @@ export async function fetchReveal(gameId: number, teamSide: TeamSide): Promise<R
       playerId: p.playerId,
       name: p.displayName,
       shirtNumber: p.shirtNumber,
+      token: p.token,
     }));
     return { players };
   }

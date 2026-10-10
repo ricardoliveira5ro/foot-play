@@ -147,11 +147,17 @@ export interface GuessResponse {
   name?: string;
 }
 
-/** One entry of POST /api/reveal. */
+/** One entry of POST /api/guess/reveal. */
 export interface RevealPlayer {
   playerId: number;
   name: string;
   shirtNumber: number | null;
+  /**
+   * Opaque per-game token for the shirt this player occupies. This — not
+   * `shirtNumber` — is the join key back to a shirt: `Appearance.number` is
+   * `Int?` and two players without a number in one game collide on `===`.
+   */
+  token: string;
 }
 
 /** POST /api/reveal response — all player names for game completion. */
