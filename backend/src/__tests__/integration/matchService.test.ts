@@ -198,6 +198,56 @@ describe('getRevealAppearances', () => {
   it('returns [] for a club with no appearances in the game', async () => {
     expect(await getRevealAppearances(3, 1)).toEqual([]);
   });
+
+  it('attaches the opaque per-game token to every appearance', async () => {
+    const appearances = await getRevealAppearances(1, 1);
+    expect(appearances).toHaveLength(8);
+    for (const ap of appearances) {
+      expect(ap.token).toBe(generatePlayerToken(1, ap.playerId));
+    }
+    // The token is game-scoped: the same player in another game gets another
+    // token. This is the property that makes the join safe, so it is asserted
+    // directly rather than assumed.
+    expect(appearances[0].token).not.toBe(generatePlayerToken(2, appearances[0].playerId));
+  });
+
+  it('gives two null-numbered players in one team distinct tokens (R1(a))', async () => {
+    // R1(a): `Appearance.number` is `Int?` (backend/prisma/schema.prisma:70)
+    // and `getRevealAppearances` orders with `nulls: 'last'`, so a team with
+    // two numberless players is an expected state, not an edge case. Both
+    // rows carry `number === null`, so a `shirtNumber === shirtNumber` join
+    // sends both names to the same shirt. The token is what makes them
+    // separable, and this is where that is proven at the data layer.
+    await prisma.game.create({
+      data: {
+        gameId: 10, competitionId: 'TEST-COMP', season: 2025,
+        date: new Date('2025-02-01T00:00:00Z'),
+        homeClubId: 1, awayClubId: 2, targetTeamId: 1, opponentTeamId: 2,
+        homeClubGoals: 0, awayClubGoals: 0, homeClubFormation: '4-3-3', awayClubFormation: '4-4-2',
+      },
+    });
+    await prisma.appearance.createMany({
+      data: [
+        { gameId: 10, clubId: 1, playerId: 111, number: null, type: 'starting_lineup', position: null },
+        { gameId: 10, clubId: 1, playerId: 114, number: null, type: 'starting_lineup', position: 'centre-forward' },
+        { gameId: 10, clubId: 1, playerId: 108, number: 1, type: 'starting_lineup', position: 'goalkeeper' },
+      ],
+    });
+
+    const appearances = await getRevealAppearances(10, 1);
+    const nullsLast = appearances.filter((ap) => ap.number === null);
+    expect(nullsLast).toHaveLength(2);
+    // The two rows are indistinguishable on shirt number...
+    expect(nullsLast.map((ap) => ap.number)).toEqual([null, null]);
+    // ...and separated only by the token.
+    const tokens = nullsLast.map((ap) => ap.token);
+    expect(new Set(tokens).size).toBe(2);
+    expect(tokens.sort()).toEqual(
+      [generatePlayerToken(10, 111), generatePlayerToken(10, 114)].sort(),
+    );
+
+    await seed();
+  });
 });
 
 describe('buildMatchResponse event columns', () => {

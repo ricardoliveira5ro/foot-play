@@ -8,6 +8,80 @@ from, and release notes are taken from the entry itself.
 
 ---
 
+## v1.2.1 — Token-keyed reveal
+
+_2026-10-10 · Spec: `docs/v1/v1.2/plan-v1.2.1-token-reveal.md`_
+
+### Added
+
+- **`token` on `RevealPlayer`** (`frontend/types/index.ts`) — a required
+  `string`. Required on purpose: adding it is a compile-time break at every
+  construction site, which forces the mock branch and the test fixtures to
+  supply it rather than letting a missing token ship silently.
+- **`frontend/src/lib/reveal.ts`** — `revealMatches(players, shirts)`, the
+  reveal join extracted out of the page component into a pure,
+  order-independent module. It returns the `{ token, name }` pairs to apply
+  and never mutates the shirts it is given; the caller dispatches the result.
+  The join key is the opaque per-game `token`, which is unique by construction
+  — **not** `shirtNumber`.
+- **`token` on every `/api/guess/reveal` entry** — `getRevealAppearances`
+  spreads each Prisma row and adds `token: generatePlayerToken(gameId, playerId)`,
+  and the route carries it into the response
+  (`{ players: Array<{ playerId, name, shirtNumber, token }> }`). The spread
+  keeps `number` and `player.displayName`, so the existing integration test
+  still exercises the query rather than the projection.
+
+### Fixed
+
+- **Two null-numbered players in one team collided on `===` (R1(a), live in
+  the current release).** `Appearance.number` is `Int?` and
+  `getRevealAppearances` orders with `nulls: 'last'`, so a team with two
+  numberless players is an expected state, not an edge case. The old join
+  matched on `shirtNumber`, so `null === null` sent both names to the first
+  numberless shirt and left the second shirt blank. The join now keys on
+  `token`, so each revealed player reaches the shirt that actually holds him.
+
+### Validation
+
+- Backend `npm run test` — **23 files, 338 tests, all green**. Two new service
+  tests: the emitted token on every appearance (and its game-scoping, asserted
+  directly), and the R1(a) proof (a fixture game with two `null`-numbered
+  players yields two distinct tokens). The two `/api/guess/reveal` `toEqual`
+  assertions were widened to the additive field.
+- Backend `npm run test:coverage` — statements 99.85% (689/690) / branches
+  99.23% (517/521) / functions 100% (133/133) / lines 99.82% (587/588); 95%
+  threshold satisfied on all four metrics.
+- Frontend `npm run test` — **27 files, 460 tests, all green**;
+  `src/lib/reveal.test.ts` rewritten against the real module (6 → 8 tests — the
+  previous file re-declared the logic inside the test body and asserted the old
+  bug, so it protected nothing in production).
+- `npx tsc --noEmit` and `npm run lint` — clean (one pre-existing warning in
+  `GameComplete.test.tsx`).
+- Grep gate: `grep -rn "shirtNumber ===" frontend/src frontend/app
+  frontend/components` returns nothing — the shirt-number join no longer exists
+  anywhere in the frontend.
+- No `'?'` written into a `shirtNumber` field; `frontend/src/lib/gameState.ts`
+  and the Vitest `include` are untouched.
+
+### Notes
+
+- **No mode, no mask, no clue, no score.** v1.2.1 ships alone deliberately, so
+  a reveal regression is attributable to this patch rather than to whichever
+  difficulty mode happened to land alongside it. It is the prerequisite for
+  Hard mode (roadmap §11 Rule 4): the join must be on `token` before the
+  number can be masked.
+- **One additive response field plus one pure function.** Reverting this patch
+  alone returns the app to v1.1.x behaviour, with no data repair.
+- No Prisma migration and no schema change — `token` is derived at request time
+  from `(gameId, playerId)`, exactly as `buildLineup` already does.
+  `shirtNumber` stays `number | null` everywhere, and the v1.2.3 mask is a
+  render concern that never writes `'?'` into it.
+- The token reveals nothing new: it is an HMAC of `(gameId, playerId)`,
+  unguessable without `PLAYER_TOKEN_SECRET`, and every shirt's token for that
+  game is already in the lineup payload.
+
+---
+
 ## v1.1.4 — Competition, Season, and the empty state
 
 _2026-10-09 · Spec: `docs/v1/v1.1/plan-v1.1.4-competition-season-empty-state.md`_
