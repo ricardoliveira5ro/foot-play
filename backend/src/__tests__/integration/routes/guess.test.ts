@@ -55,7 +55,12 @@ describe('POST /api/guess/reveal', () => {
     const res = await request(app).post('/api/guess/reveal').send({ gameId: 1, teamSide: 'home' });
     expect(res.status).toBe(200);
     expect(res.body.players).toHaveLength(8);
-    expect(res.body.players[0]).toEqual({ playerId: 108, name: 'Neuer', shirtNumber: 1 });
+    expect(res.body.players[0]).toEqual({
+      playerId: 108,
+      name: 'Neuer',
+      shirtNumber: 1,
+      token: generatePlayerToken(1, 108),
+    });
   });
 
   it('returns 200 with away players', async () => {
@@ -68,7 +73,12 @@ describe('POST /api/guess/reveal', () => {
     const res = await request(app).post('/api/guess/reveal').send({ gameId: 2, teamSide: 'away' });
     expect(res.status).toBe(200);
     const testPlayer = res.body.players.find((p: any) => p.playerId === 114);
-    expect(testPlayer).toEqual({ playerId: 114, name: 'Test Player', shirtNumber: null });
+    expect(testPlayer).toEqual({
+      playerId: 114,
+      name: 'Test Player',
+      shirtNumber: null,
+      token: generatePlayerToken(2, 114),
+    });
   });
 
   it('returns 400 for invalid teamSide', async () => {

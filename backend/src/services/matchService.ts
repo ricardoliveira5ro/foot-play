@@ -155,9 +155,18 @@ export async function getPlayerNameForAppearance(gameId: number, token: string):
 }
 
 export async function getRevealAppearances(gameId: number, clubId: number) {
-  return prisma.appearance.findMany({
+  const appearances = await prisma.appearance.findMany({
     where: { gameId, clubId },
     include: { player: { select: { displayName: true, name: true } } },
     orderBy: [{ number: { sort: 'asc', nulls: 'last' } }, { playerId: 'asc' }],
   });
+
+  // The spread keeps every query field the existing integration test asserts
+  // on (`number`, `player.displayName`) while adding the opaque join key the
+  // frontend now pairs names by. `number` is `Int?` and is NOT a key: two
+  // numberless players in one team collide on `===` (roadmap R1(a)).
+  return appearances.map((ap) => ({
+    ...ap,
+    token: generatePlayerToken(gameId, ap.playerId),
+  }));
 }
