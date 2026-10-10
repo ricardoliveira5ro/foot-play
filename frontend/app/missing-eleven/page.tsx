@@ -7,6 +7,7 @@ import { fetchRandomMatch, submitGuess as submitGuessApi, fetchReveal, revealOne
 import { filtersToParams } from '@/lib/filterParams';
 import { hasActiveFilters } from '@/lib/filters';
 import { useFilterOptions } from '@/lib/useFilterOptions';
+import { revealMatches } from '@/lib/reveal';
 import MatchInfo from '@/components/MatchInfo';
 import TacticBoard from '@/components/TacticBoard';
 import WordleModal from '@/components/WordleModal';
@@ -84,9 +85,8 @@ export default function MissingElevenPage() {
   });
 
   const revealTeam = useCallback((players: RevealPlayer[], shirts: ShirtGameData[]) => {
-    for (const player of players) {
-      const shirt = shirts.find(s => s.shirtNumber === player.shirtNumber && s.state !== 'correct');
-      if (shirt) revealName(shirt.token, player.name);
+    for (const { token, name } of revealMatches(players, shirts)) {
+      revealName(token, name);
     }
   }, [revealName]);
 
