@@ -2,7 +2,8 @@
 
 import { Suspense, useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
-import { useGameState, MAX_ATTEMPTS } from '@/lib/gameState';
+import { useGameState } from '@/lib/gameState';
+import { DIFFICULTY_CONFIG } from '@/lib/difficulty';
 import { fetchRandomMatch, submitGuess as submitGuessApi, fetchReveal, revealOnePlayer } from '@/lib/api';
 import { filtersToParams } from '@/lib/filterParams';
 import { hasActiveFilters } from '@/lib/filters';
@@ -232,7 +233,8 @@ export default function MissingElevenPage() {
       submitGuess(activeShirt.token, response.results, response.isCorrect, response.name);
 
       // If this was the last attempt and it failed, reveal the player's name
-      const isLastAttempt = activeShirt.guessHistory.length + 1 >= MAX_ATTEMPTS;
+      const maxAttempts = DIFFICULTY_CONFIG[state.difficulty].attempts;
+      const isLastAttempt = activeShirt.guessHistory.length + 1 >= maxAttempts;
       if (!response.isCorrect && isLastAttempt) {
         const reveal = await revealOnePlayer(state.match.game.gameId, activeShirt.token);
         revealName(activeShirt.token, reveal.name);
@@ -515,10 +517,10 @@ export default function MissingElevenPage() {
           shirtNumber={activeShirt.shirtNumber}
           position={activeShirt.position}
           guesses={guessHistory}
-          maxAttempts={MAX_ATTEMPTS}
+          maxAttempts={DIFFICULTY_CONFIG[state.difficulty].attempts}
           onGuess={handleGuess}
           onClose={handleModalClose}
-          isGameOver={guessHistory.length >= MAX_ATTEMPTS || guessHistory.some(g => g.every(r => r.result === 'CORRECT'))}
+          isGameOver={guessHistory.length >= DIFFICULTY_CONFIG[state.difficulty].attempts || guessHistory.some(g => g.every(r => r.result === 'CORRECT'))}
           isCorrect={guessHistory.some(g => g.every(r => r.result === 'CORRECT'))}
         />
       )}
