@@ -4,6 +4,7 @@ import { Suspense, useCallback, useEffect, useRef, useState, type ReactNode } fr
 import { usePathname, useRouter } from 'next/navigation';
 import { useGameState } from '@/lib/gameState';
 import { DIFFICULTY_CONFIG } from '@/lib/difficulty';
+import DifficultySelector from '@/components/DifficultySelector';
 import { fetchRandomMatch, submitGuess as submitGuessApi, fetchReveal, revealOnePlayer } from '@/lib/api';
 import { filtersToParams } from '@/lib/filterParams';
 import { hasActiveFilters } from '@/lib/filters';
@@ -41,6 +42,7 @@ export default function MissingElevenPage() {
     toggleBoard,
     filters,
     setFilters,
+    setDifficulty,
   } = useGameState();
 
   const { options: filterOptions, loading: optionsLoading, error: optionsError, reload: reloadOptions } = useFilterOptions(filters);
@@ -332,6 +334,9 @@ export default function MissingElevenPage() {
             Missing Eleven
           </h1>
         </header>
+        <div className="w-full pb-8">
+          <DifficultySelector value={state.difficulty} onChange={setDifficulty} />
+        </div>
         {/* An empty slot on the tactics board: dashed like a chalk outline,
             the arrow pointing up at the filters that fill it. */}
         <div className="w-full max-w-md rounded-xl border-2 border-dashed border-ink/25 px-6 py-10">
