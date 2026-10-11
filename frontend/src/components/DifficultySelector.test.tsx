@@ -8,28 +8,24 @@ describe('DifficultySelector', () => {
   it('renders exactly the modes that have shipped', () => {
     render(<DifficultySelector value="normal" onChange={() => {}} />);
     for (const mode of DIFFICULTIES) {
-      const radios = screen.getAllByRole('radio');
-      const hasLabel = radios.some(r => (r as HTMLInputElement).value === mode);
-      expect(hasLabel).toBe(true);
+      expect(screen.getByRole('button', { name: new RegExp(DIFFICULTY_CONFIG[mode].label, 'i') })).toBeTruthy();
     }
-    expect(screen.getAllByRole('radio')).toHaveLength(DIFFICULTIES.length);
+    expect(screen.getAllByRole('button')).toHaveLength(DIFFICULTIES.length);
   });
 
   it('marks the current mode as checked', () => {
     render(<DifficultySelector value="easy" onChange={() => {}} />);
-    const radios = screen.getAllByRole('radio');
-    const easyRadio = radios.find(r => (r as HTMLInputElement).value === 'easy') as HTMLInputElement;
-    const normalRadio = radios.find(r => (r as HTMLInputElement).value === 'normal') as HTMLInputElement;
-    expect(easyRadio.checked).toBe(true);
-    expect(normalRadio.checked).toBe(false);
+    const easyBtn = screen.getByRole('button', { name: /easy/i });
+    const normalBtn = screen.getByRole('button', { name: /normal/i });
+    expect(easyBtn).toHaveAttribute('aria-pressed', 'true');
+    expect(normalBtn).toHaveAttribute('aria-pressed', 'false');
   });
 
   it('reports the chosen mode', () => {
     const onChange = vi.fn();
     render(<DifficultySelector value="normal" onChange={onChange} />);
-    const radios = screen.getAllByRole('radio');
-    const easyRadio = radios.find(r => (r as HTMLInputElement).value === 'easy') as HTMLElement;
-    fireEvent.click(easyRadio);
+    const easyBtn = screen.getByRole('button', { name: /easy/i });
+    fireEvent.click(easyBtn);
     expect(onChange).toHaveBeenCalledWith('easy');
   });
 
