@@ -2,10 +2,11 @@
 
 import { Suspense, useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
-import { useGameState } from '@/lib/gameState';
+import { useGameState, resolvedShirtCount } from '@/lib/gameState';
 import { DIFFICULTY_CONFIG } from '@/lib/difficulty';
 import { availableClues } from '@/lib/shirtBadges';
 import DifficultySelector from '@/components/DifficultySelector';
+import FinishButton from '@/components/FinishButton';
 import { fetchRandomMatch, submitGuess as submitGuessApi, fetchReveal, revealOnePlayer } from '@/lib/api';
 import { filtersToParams } from '@/lib/filterParams';
 import { hasActiveFilters } from '@/lib/filters';
@@ -45,6 +46,8 @@ export default function MissingElevenPage() {
     setFilters,
     setDifficulty,
   } = useGameState();
+
+  const resolvedCount = resolvedShirtCount(state.targetShirts, state.opponentShirts);
 
   const { options: filterOptions, loading: optionsLoading, error: optionsError, reload: reloadOptions } = useFilterOptions(filters);
 
@@ -513,6 +516,14 @@ export default function MissingElevenPage() {
             onToggleBoard={toggleBoard}
           />
         </section>
+        {state.gameStatus === 'playing' && (
+          <FinishButton
+            difficulty={state.difficulty}
+            resolved={resolvedCount}
+            total={state.targetShirts.length + state.opponentShirts.length}
+            onFinish={() => {}}
+          />
+        )}
       </div>
 
       {/* Wordle Modal */}

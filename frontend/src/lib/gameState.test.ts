@@ -6,7 +6,7 @@ import { EMPTY_FILTERS } from '../../types';
  */
 
 import { describe, it, expect, vi, afterEach } from 'vitest';
-import { gameReducer, initialState, MAX_ATTEMPTS } from './gameState';
+import { gameReducer, initialState, MAX_ATTEMPTS, resolvedShirtCount } from './gameState';
 import type { GameState, GameAction } from './gameState';
 import { DEFAULT_DIFFICULTY, DIFFICULTY_CONFIG } from './difficulty';
 import type { GameResponse, LineupPlayer, GuessResult } from '@/types';
@@ -25,6 +25,7 @@ function player(token: string, nameLength = 5): LineupPlayer {
     assists: 0,
     redCards: 0,
     isCaptain: false,
+    hasFirstLetter: nameLength > 0,
   };
 }
 
@@ -563,6 +564,24 @@ describe('gameReducer', () => {
 
     it('keeps MAX_ATTEMPTS in step with the default mode', () => {
       expect(MAX_ATTEMPTS).toBe(DIFFICULTY_CONFIG[DEFAULT_DIFFICULTY].attempts);
+    });
+  });
+
+  describe('resolvedShirtCount', () => {
+    const blank = initialState.targetShirts[0] ?? player('t1');
+
+    it('counts resolved shirts across both boards', () => {
+      const target = [
+        { ...blank, state: 'correct' as const },
+        { ...blank, state: 'failed' as const },
+        { ...blank, state: 'default' as const },
+      ];
+      const opponent = [{ ...blank, state: 'correct' as const }];
+      expect(resolvedShirtCount(target, opponent)).toBe(3);
+    });
+
+    it('counts zero on an empty board', () => {
+      expect(resolvedShirtCount([], [])).toBe(0);
     });
   });
 });

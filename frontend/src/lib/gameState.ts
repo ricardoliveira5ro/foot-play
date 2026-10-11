@@ -441,4 +441,14 @@ export function useGameState(): UseGameStateReturn {
   };
 }
 
+/** How many shirts are settled, across both boards. Drives the Finish label. */
+export function resolvedShirtCount(
+  target: ShirtGameData[],
+  opponent: ShirtGameData[],
+): number {
+  return [...target, ...opponent].filter(
+    s => s.state === 'correct' || s.state === 'failed',
+  ).length;
+}
+
 export { MAX_ATTEMPTS };
