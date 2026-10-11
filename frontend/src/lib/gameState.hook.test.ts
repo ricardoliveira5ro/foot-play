@@ -268,4 +268,13 @@ describe('useGameState', () => {
       expect(result.current.state.gameStatus).toBe('loading');
     });
   });
+
+  describe('setDifficulty', () => {
+    it('exposes setDifficulty and the current mode', () => {
+      const { result } = renderHook(() => useGameState());
+      expect(result.current.state.difficulty).toBe('normal');
+      act(() => result.current.setDifficulty('easy'));
+      expect(result.current.state.difficulty).toBe('easy');
+    });
+  });
 });
