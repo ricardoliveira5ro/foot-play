@@ -60,6 +60,7 @@ function player(token: string, nameLength = 5): LineupPlayer {
     assists: 0,
     redCards: 0,
     isCaptain: false,
+    hasFirstLetter: nameLength > 0,
   };
 }
 

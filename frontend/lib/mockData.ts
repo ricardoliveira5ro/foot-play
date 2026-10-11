@@ -156,12 +156,13 @@ function mockToken(gameId: number, playerId: number): string {
  * running against the mock dataset. In production these come from
  * GET /api/matches/* (v1.0.2) and are seeded from game_events.csv (v1.0.1).
  */
-function mockEvents(playerId: number): Pick<MockLineupPlayer, 'goals' | 'assists' | 'redCards' | 'isCaptain'> {
+function mockEvents(playerId: number): Pick<MockLineupPlayer, 'goals' | 'assists' | 'redCards' | 'isCaptain' | 'hasFirstLetter'> {
   return {
     goals: playerId % 4 === 0 ? 1 : 0,
     assists: playerId % 7 === 0 ? 1 : 0,
     redCards: playerId % 11 === 0 ? 1 : 0,
     isCaptain: playerId % 9 === 0,
+    hasFirstLetter: true,
   };
 }
 

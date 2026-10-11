@@ -4,6 +4,7 @@ import { Suspense, useCallback, useEffect, useRef, useState, type ReactNode } fr
 import { usePathname, useRouter } from 'next/navigation';
 import { useGameState } from '@/lib/gameState';
 import { DIFFICULTY_CONFIG } from '@/lib/difficulty';
+import { availableClues } from '@/lib/shirtBadges';
 import DifficultySelector from '@/components/DifficultySelector';
 import { fetchRandomMatch, submitGuess as submitGuessApi, fetchReveal, revealOnePlayer } from '@/lib/api';
 import { filtersToParams } from '@/lib/filterParams';
@@ -245,7 +246,7 @@ export default function MissingElevenPage() {
       setError(describeError(cause));
     }
     // Modal will close via state change if correct or failed
-  }, [activeShirt, state.match, submitGuess, revealName, setError]);
+  }, [activeShirt, state.match, submitGuess, revealName, setError, state.difficulty]);
 
   // Every route back to the pre-screen — the sidebar's New puzzle, the
   // game-complete Play Again, and the error state's Change filters — resets
@@ -527,6 +528,8 @@ export default function MissingElevenPage() {
           onClose={handleModalClose}
           isGameOver={guessHistory.length >= DIFFICULTY_CONFIG[state.difficulty].attempts || guessHistory.some(g => g.every(r => r.result === 'CORRECT'))}
           isCorrect={guessHistory.some(g => g.every(r => r.result === 'CORRECT'))}
+          difficulty={state.difficulty}
+          clues={activeShirt ? availableClues(state.difficulty, activeShirt) : []}
         />
       )}
 

@@ -137,6 +137,7 @@ function buildLineup(gameId: number, appearances: GameWithRelations['appearances
       redCards: a.redCards,
       // Prisma types isCaptain as Boolean?; the wire type is boolean.
       isCaptain: a.isCaptain ?? false,
+      hasFirstLetter: displayName.trim().length > 0,
     };
   });
 }

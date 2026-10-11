@@ -374,4 +374,59 @@ describe('WordleModal', () => {
       expect(dialog).not.toHaveAttribute('open');
     });
   });
+
+  describe('clues', () => {
+    it('lists the clues the shirt actually has', () => {
+      render(
+        <WordleModal
+          nameLength={5}
+          shirtNumber={9}
+          position="ST"
+          guesses={[]}
+          onGuess={() => {}}
+          onClose={() => {}}
+          difficulty="easy"
+          clues={['first-letter', 'scorers', 'captain', 'shirt-number']}
+        />,
+      );
+      expect(screen.getByTestId('modal-clues').textContent).toContain('First letter');
+      expect(screen.getByTestId('modal-clues').textContent).toContain('Scorers');
+      expect(screen.getByTestId('modal-clues').textContent).toContain('Captain');
+    });
+
+    it('omits a clue the shirt does not have', () => {
+      render(
+        <WordleModal
+          nameLength={5}
+          shirtNumber={9}
+          position="ST"
+          guesses={[]}
+          onGuess={() => {}}
+          onClose={() => {}}
+          difficulty="normal"
+          clues={['scorers']}
+        />,
+      );
+      const line = screen.getByTestId('modal-clues').textContent ?? '';
+      expect(line).toContain('Scorers');
+      expect(line).not.toContain('First letter');
+      expect(line).not.toContain('Captain');
+    });
+
+    it('renders no clue line at all when there are no clues', () => {
+      render(
+        <WordleModal
+          nameLength={5}
+          shirtNumber={9}
+          position="ST"
+          guesses={[]}
+          onGuess={() => {}}
+          onClose={() => {}}
+          difficulty="hard"
+          clues={[]}
+        />,
+      );
+      expect(screen.queryByTestId('modal-clues')).toBeNull();
+    });
+  });
 });

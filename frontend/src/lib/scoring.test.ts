@@ -77,6 +77,7 @@ describe('computeTotalScore', () => {
       assists: 0,
       redCards: 0,
       isCaptain: false,
+      hasFirstLetter: true,
       state: 'correct',
       attempts: 1,
       guessHistory: [],

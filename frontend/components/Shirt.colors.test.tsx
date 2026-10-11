@@ -17,6 +17,7 @@ const shirt: ShirtData = {
   assists: 0,
   redCards: 0,
   isCaptain: false,
+  hasFirstLetter: true,
 };
 
 const colorsByPattern: Record<TeamColorEntry['pattern'], TeamColorEntry> = {
