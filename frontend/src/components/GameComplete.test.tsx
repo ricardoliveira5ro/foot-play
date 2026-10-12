@@ -4,7 +4,7 @@ import { describe, it, expect, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import GameComplete from './GameComplete';
-import type { Game, ShirtData } from '@/types';
+import type { Game } from '@/types';
 import type { ShirtGameData } from '@/lib/gameState';
 
 // --- Fixtures ---
