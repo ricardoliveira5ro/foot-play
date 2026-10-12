@@ -139,6 +139,7 @@ describe('missing-eleven page filter wiring', () => {
     await waitFor(() =>
       expect(mockFetchRandomMatch).toHaveBeenLastCalledWith(
         expect.objectContaining({ teamIds: [7] }),
+        "normal",
       ),
     );
     await waitFor(() =>
@@ -152,6 +153,7 @@ describe('missing-eleven page filter wiring', () => {
     await waitFor(() =>
       expect(mockFetchRandomMatch).toHaveBeenLastCalledWith(
         expect.objectContaining({ teamIds: [7] }),
+        "normal",
       ),
     );
 
@@ -161,6 +163,7 @@ describe('missing-eleven page filter wiring', () => {
     await waitFor(() =>
       expect(mockFetchRandomMatch).toHaveBeenLastCalledWith(
         expect.objectContaining({ teamIds: [9] }),
+        "normal",
       ),
     );
   });
@@ -171,6 +174,7 @@ describe('missing-eleven page filter wiring', () => {
     await waitFor(() =>
       expect(mockFetchRandomMatch).toHaveBeenLastCalledWith(
         expect.objectContaining({ teamIds: [7] }),
+        "normal",
       ),
     );
     const callsAfterMount = mockFetchRandomMatch.mock.calls.length;
@@ -192,6 +196,7 @@ describe('missing-eleven page filter wiring', () => {
     await waitFor(() =>
       expect(mockFetchRandomMatch).toHaveBeenLastCalledWith(
         expect.objectContaining({ teamIds: [7] }),
+        "normal",
       ),
     );
     // The read adopts ?teamIds=7; no write may ever drop it.
@@ -216,6 +221,7 @@ describe('missing-eleven page filter wiring', () => {
     await waitFor(() =>
       expect(mockFetchRandomMatch).toHaveBeenLastCalledWith(
         expect.objectContaining({ teamIds: [7] }),
+        "normal",
       ),
     );
 
@@ -224,6 +230,7 @@ describe('missing-eleven page filter wiring', () => {
     await waitFor(() =>
       expect(mockFetchRandomMatch).toHaveBeenLastCalledWith(
         expect.objectContaining({ teamIds: [9] }),
+        "normal",
       ),
     );
 
@@ -243,6 +250,7 @@ describe('missing-eleven page filter wiring', () => {
     await waitFor(() =>
       expect(mockFetchRandomMatch).toHaveBeenLastCalledWith(
         expect.objectContaining({ teamIds: [7] }),
+        "normal",
       ),
     );
     const callsBefore = mockFetchRandomMatch.mock.calls.length;
@@ -270,6 +278,7 @@ describe('missing-eleven page filter wiring', () => {
     await waitFor(() =>
       expect(mockFetchRandomMatch).toHaveBeenLastCalledWith(
         expect.objectContaining({ teamIds: [7] }),
+        "normal",
       ),
     );
   });
@@ -321,6 +330,7 @@ describe('missing-eleven page filter panel', () => {
     await waitFor(() =>
       expect(mockFetchRandomMatch).toHaveBeenLastCalledWith(
         expect.objectContaining({ teamIds: [7] }),
+        "normal",
       ),
     );
     const callsBefore = mockFetchRandomMatch.mock.calls.length;
@@ -336,6 +346,7 @@ describe('missing-eleven page filter panel', () => {
     );
     expect(mockFetchRandomMatch).toHaveBeenLastCalledWith(
       expect.objectContaining({ teamIds: [7] }),
+      'normal',
     );
     await screen.findByRole('button', { name: 'New puzzle' });
     const hrefs = mockReplace.mock.calls.map(([href]) => String(href));
@@ -351,6 +362,7 @@ describe('missing-eleven page filter panel', () => {
     await waitFor(() =>
       expect(mockFetchRandomMatch).toHaveBeenLastCalledWith(
         expect.objectContaining({ teamIds: [7] }),
+        "normal",
       ),
     );
     const callsBefore = mockFetchRandomMatch.mock.calls.length;
@@ -460,6 +472,7 @@ describe('missing-eleven pre-screen gate', () => {
     await waitFor(() => expect(mockFetchRandomMatch).toHaveBeenCalledTimes(1));
     expect(mockFetchRandomMatch).toHaveBeenCalledWith(
       expect.objectContaining({ teamIds: [31] }),
+      'normal',
     );
     // D4-class ordering: the URL write lands before the board's fetch.
     expect(mockReplace.mock.invocationCallOrder[0]).toBeLessThan(
@@ -473,6 +486,21 @@ describe('missing-eleven pre-screen gate', () => {
     expect(mockReplace.mock.calls).toHaveLength(1);
     expect(screen.queryByRole('button', { name: 'Start game' })).toBeNull();
     expect(screen.queryByRole('region', { name: 'Filters' })).toBeNull(); // panel closed in-game
+  });
+
+  it('sends the selected Easy mode with the match request', async () => {
+    mirrorReplace();
+    const user = userEvent.setup();
+    render(<MissingElevenPage />);
+
+    await user.click(screen.getByRole('button', { name: /Easy/ }));
+    await user.click(screen.getByRole('button', { name: 'Start game' }));
+
+    await waitFor(() => expect(mockFetchRandomMatch).toHaveBeenCalledTimes(1));
+    expect(mockFetchRandomMatch).toHaveBeenCalledWith(
+      expect.objectContaining({ teamIds: null }),
+      'easy',
+    );
   });
 
   it('starts with an empty draft: URL stays empty and one fetch still fires', async () => {
@@ -522,6 +550,7 @@ describe('missing-eleven pre-screen gate', () => {
     await waitFor(() =>
       expect(mockFetchRandomMatch).toHaveBeenLastCalledWith(
         expect.objectContaining({ teamIds: [7] }),
+        "normal",
       ),
     );
     expect(screen.queryByRole('button', { name: 'Start game' })).toBeNull();
