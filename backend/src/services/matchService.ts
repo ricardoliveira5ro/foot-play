@@ -84,7 +84,7 @@ export async function getMatchById(id: number) {
   return game as GameWithRelations | null;
 }
 
-export function buildMatchResponse(game: GameWithRelations) {
+export function buildMatchResponse(game: GameWithRelations, difficulty: 'easy' | 'normal' = 'normal') {
   return {
     game: {
       gameId: game.gameId,
@@ -98,12 +98,12 @@ export function buildMatchResponse(game: GameWithRelations) {
       homeFormation: game.homeClubFormation ?? null,
       awayFormation: game.awayClubFormation ?? null,
     },
-    homeLineup: buildLineup(game.gameId, game.appearances, game.homeClubId, game.homeClubFormation),
-    awayLineup: buildLineup(game.gameId, game.appearances, game.awayClubId, game.awayClubFormation),
+    homeLineup: buildLineup(game.gameId, game.appearances, game.homeClubId, game.homeClubFormation, difficulty),
+    awayLineup: buildLineup(game.gameId, game.appearances, game.awayClubId, game.awayClubFormation, difficulty),
   };
 }
 
-function buildLineup(gameId: number, appearances: GameWithRelations['appearances'], clubId: number, formation: string | null) {
+function buildLineup(gameId: number, appearances: GameWithRelations['appearances'], clubId: number, formation: string | null, difficulty: 'easy' | 'normal') {
   const side = appearances
     .filter((a) => a.clubId === clubId)
     .sort((a, b) => {
@@ -137,7 +137,12 @@ function buildLineup(gameId: number, appearances: GameWithRelations['appearances
       redCards: a.redCards,
       // Prisma types isCaptain as Boolean?; the wire type is boolean.
       isCaptain: a.isCaptain ?? false,
-      hasFirstLetter: displayName.trim().length > 0,
+      // The Easy clue is only present in an Easy response. Keep both the
+      // availability bit and its value out of Normal payloads.
+      hasFirstLetter: difficulty === 'easy' && displayName.trim().length > 0,
+      ...(difficulty === 'easy'
+        ? { firstLetter: normalize(displayName).charAt(0).toUpperCase() || null }
+        : {}),
     };
   });
 }

@@ -90,12 +90,14 @@ function isFilterOptionsResponse(value: unknown): value is FilterOptionsResponse
 }
 
 /** GET /api/matches/random — a random match with both full lineups. */
-export async function fetchRandomMatch(filters: GameFilterParams = EMPTY_FILTERS): Promise<GameResponse | null> {
+export async function fetchRandomMatch(filters: GameFilterParams = EMPTY_FILTERS, difficulty: 'easy' | 'normal' = 'normal'): Promise<GameResponse | null> {
   if (USE_MOCK) {
     await delay(MOCK_DELAY_MS);
-    return getMockRandomMatch(filters);
+    return getMockRandomMatch(filters, difficulty);
   }
-  return requestRandomMatch(`/api/matches/random${querySuffix(filters)}`);
+  const params = new URLSearchParams(filtersToParams(filters));
+  params.set('difficulty', difficulty);
+  return requestRandomMatch(`/api/matches/random?${params.toString()}`);
 }
 
 /** GET /api/matches/filter-options — counts and selectable filter options. */

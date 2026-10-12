@@ -8,13 +8,16 @@ import { validateNonNegativeIntParam } from '../middleware/validate';
 const router = Router();
 
 router.get('/random', asyncHandler(async (req, res) => {
+  const difficulty = parseDifficulty(req.query.difficulty);
+  if (typeof difficulty !== 'string') return res.status(400).json(difficulty);
+
   const game = await getRandomMatch(parseGameFilterParams(req.query));
 
   if (!game) {
     return res.status(404).json({ error: 'No matches available', code: 'NOT_FOUND' });
   }
 
-  const response = buildMatchResponse(game);
+  const response = buildMatchResponse(game, difficulty);
   res.json(response);
 }));
 
@@ -49,6 +52,12 @@ function parseGameFilterParams(query: Record<string, unknown>): GameFilterParams
     seasonFrom: parseSeason(query.seasonFrom),
     seasonTo: parseSeason(query.seasonTo),
   };
+}
+
+function parseDifficulty(value: unknown): 'easy' | 'normal' | { error: string; code: 'INVALID_PARAMETER' } {
+  if (value === undefined) return 'normal';
+  if (value === 'easy' || value === 'normal') return value;
+  return { error: "Query parameter 'difficulty' must be one of: easy, normal", code: 'INVALID_PARAMETER' };
 }
 
 function queryString(value: unknown): string | null {

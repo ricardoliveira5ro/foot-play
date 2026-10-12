@@ -134,7 +134,7 @@ export default function MissingElevenPage() {
     }
   }, [confirmingSurrender, state.match, state.teamSide, state.targetShirts, state.opponentShirts, revealTeam, surrender, setError]);
 
-  const filterKey = filtersToParams(filters).toString();
+  const filterKey = `${filtersToParams(filters).toString()}|difficulty=${state.difficulty}`;
   const fetchedKeyRef = useRef<string | null>(null);
   const matchSeqRef = useRef(0);
 
@@ -145,7 +145,7 @@ export default function MissingElevenPage() {
     const seq = ++matchSeqRef.current;
     setLoading(true);
     setError(null);
-    fetchRandomMatch(filters)
+    fetchRandomMatch(filters, state.difficulty)
       .then((response) => {
         if (seq !== matchSeqRef.current) return;
         if (response) startNewGame(response);
@@ -160,7 +160,7 @@ export default function MissingElevenPage() {
       .finally(() => {
         if (seq === matchSeqRef.current) setLoading(false);
       });
-  }, [filters, setLoading, setError, startNewGame]);
+  }, [filters, state.difficulty, setLoading, setError, startNewGame]);
 
   // Load once for the initial filter key, and again whenever the canonical
   // key changes (a deep link's filters arrive via FilterUrlSync's read
@@ -506,6 +506,7 @@ export default function MissingElevenPage() {
             teamName={teamName}
             formation={formation}
             shirts={shirts}
+            difficulty={state.difficulty}
             onShirtClick={handleShirtClick}
             clubId={clubId}
             activeBoard={state.activeBoard}
