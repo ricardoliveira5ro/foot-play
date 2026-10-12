@@ -1,4 +1,5 @@
 import type { ShirtData } from '@/types';
+import type { Difficulty } from '@/lib/difficulty';
 import { getTeamColors, type TeamColorEntry } from '@/lib/teamColors';
 import Pitch from './Pitch';
 import Shirt from './Shirt';
@@ -8,6 +9,7 @@ interface TacticBoardProps {
   teamName: string;
   formation: string | null;
   shirts: ShirtData[];
+  difficulty: Difficulty;
   onShirtClick?: (token: string) => void;
   clubId?: number;
   activeBoard?: 'target' | 'opponent';
@@ -19,7 +21,7 @@ interface TacticBoardProps {
 }
 
 /** Team caption + formation label above the pitch, shirts positioned inside. */
-export default function TacticBoard({ teamName, formation, shirts, onShirtClick, clubId, activeBoard, targetTeamName, opponentTeamName, targetSolved, opponentSolved, onToggleBoard }: TacticBoardProps) {
+export default function TacticBoard({ teamName, formation, shirts, difficulty, onShirtClick, clubId, activeBoard, targetTeamName, opponentTeamName, targetSolved, opponentSolved, onToggleBoard }: TacticBoardProps) {
   const colors: TeamColorEntry | undefined = clubId != null ? getTeamColors(clubId) : undefined;
 
   return (
@@ -39,7 +41,7 @@ export default function TacticBoard({ teamName, formation, shirts, onShirtClick,
       </div>
       <Pitch key={activeBoard ?? 'target'}>
         {shirts.map((shirt, index) => (
-          <Shirt key={shirt.token} shirt={shirt} index={index} onClick={onShirtClick} guessHistory={shirt.guessHistory} colors={colors} />
+          <Shirt key={shirt.token} shirt={shirt} index={index} difficulty={difficulty} onClick={onShirtClick} guessHistory={shirt.guessHistory} colors={colors} />
         ))}
       </Pitch>
     </section>

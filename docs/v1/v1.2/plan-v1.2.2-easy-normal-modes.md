@@ -2,9 +2,9 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** The player chooses a difficulty before the board loads, and the chosen mode decides the clue set and the attempt budget. `Easy` adds the first letter to `Normal`'s scorers-and-captain set; both keep six attempts and a visible shirt number (§5.1). Nothing else changes in this patch — `Hard` and `Expert` are already declared in the config so the table is written once, but the UI only offers two of them, because §5.6 ships one patch per mode and a mode offered before its rules exist is a bug report waiting to happen. Task 7 also introduces the **Finish** control, because its only input is the `opponentRequired` column this patch's Task 1 writes; in both offered modes it renders nothing, and v1.2.4 is where Expert first needs it.
+**Goal:** The player chooses a difficulty before the board loads, and the chosen mode decides the clue set, board hints, and attempt budget. `Easy` adds each player's first letter to `Normal`'s scorers-and-captain set; both keep six attempts and a visible shirt number (§5.1). The match request carries the selected mode so the backend can omit Easy-only clue data from Normal lineup responses. `Hard` and `Expert` are already declared in the config so the table is written once, but the UI only offers two of them, because §5.6 ships one patch per mode and a mode offered before its rules exist is a bug report waiting to happen. Task 7 also introduces the **Finish** control, because its only input is the `opponentRequired` column this patch's Task 1 writes; in both offered modes it renders nothing, and v1.2.4 is where Expert first needs it.
 
-**Architecture:** One new module, `frontend/src/lib/difficulty.ts`, owns the entire mode table as data. Every other decision in the patch reads that table instead of branching on the mode name: the attempt budget, the clue set, the attempt-limit check, the mode selector, the Finish control. The clue *policy* — which clues a given shirt actually has — lands in `availableClues` in `frontend/src/lib/shirtBadges.ts`, which intersects the mode's flags with the presence of data. Both are pure and unit-tested, so the mode table is verified as a table rather than as a chain of `if (mode === 'easy')` statements scattered across a component.
+**Architecture:** One new module, `frontend/src/lib/difficulty.ts`, owns the frontend mode table as data. Frontend decisions read that table for the attempt budget, clue set, attempt-limit check, selector, Finish control, and board display. The clue *policy* — which clues a given shirt actually has — lives in `availableClues` in `frontend/src/lib/shirtBadges.ts`, which intersects the mode's flags with the presence of data. The selected mode is also sent to the existing random-match endpoint. That endpoint validates `easy` or `normal`, then `buildMatchResponse` includes `firstLetter` only for Easy; Normal sets `hasFirstLetter` to false and omits `firstLetter` entirely. `Shirt` renders the first letter in the existing name slots only when the mode config allows it. The request parameter is client-controlled, so this prevents accidental clue leakage in a Normal response but does not enforce a tamper-proof game mode.
 
 **Tech Stack:** TypeScript, Next 16 / React 19, Vitest + `@testing-library/react` (frontend).
 
@@ -12,10 +12,10 @@
 
 ## Global Constraints
 
-- **The mode table is data, and it is the only place a mode name is compared.** The four-mode table is written in full in Task 1 — including `Hard` and `Expert`, whose values are final here per §5.1 — but `DIFFICULTIES` (the selector's option list) contains only `easy` and `normal` in this patch. `DIFFICULTIES` grows in v1.2.3 and v1.2.4; no other file changes to offer a new mode. This is why the config carries a `label` per mode and a `DIFFICULTIES` array exists beside it: the table and the offer list are separate concerns.
-- **No Prisma column, no migration, no new endpoint.** `GameState.difficulty` is client-side state initialised to `DEFAULT_DIFFICULTY` (`'normal'`), exactly as the locked contract specifies. Accepted tradeoff: reloading the page returns to Normal. v1.3.2 needs the mode on a *result* row, which is a different field from the mode you picked, and the roadmap assigns that field to v1.3.2 — see the handoff note in `overview.md`. Do not add a column in this patch.
+- **The frontend mode table is data; the API boundary has a narrow mode allowlist.** Frontend gameplay/display decisions read the table rather than branching on mode names. The backend validates the random-match query against the two modes shipped here and uses the selected mode only to shape the clue fields in its response. The four-mode table is written in full in Task 1 — including `Hard` and `Expert`, whose values are final here per §5.1 — but `DIFFICULTIES` (the selector's option list) contains only `easy` and `normal` in this patch. `DIFFICULTIES` grows in v1.2.3 and v1.2.4; no other file changes to offer a new mode.
+- **No Prisma column, migration, or new endpoint.** `GameState.difficulty` is client-side state initialised to `DEFAULT_DIFFICULTY` (`'normal'`), exactly as the locked contract specifies. The existing `/api/matches/random` endpoint accepts `difficulty=easy|normal` and shapes its lineup clue fields accordingly. Reloading the page returns to Normal. v1.3.2 needs the mode on a *result* row, which is a different field from the mode you picked, and the roadmap assigns that field to v1.3.2 — see the handoff note in `overview.md`. Do not add a column in this patch.
 - **The attempt budget is read from config at every call site.** `DIFFICULTY_CONFIG[difficulty].attempts` replaces `MAX_ATTEMPTS` at `frontend/src/lib/gameState.ts:154` and `frontend/app/missing-eleven/page.tsx:168,341,344`. No `attemptsFor(mode)` helper: the frozen contract exposes the table and the direct lookup is the whole idiom. The `MAX_ATTEMPTS` export is **kept**, re-expressed as `DIFFICULTY_CONFIG[DEFAULT_DIFFICULTY].attempts` so the two cannot drift, because `frontend/src/lib/gameState.test.ts:287-294` imports it and rewriting a passing test to accommodate a new constant is a worse trade than keeping a value that is now derived.
-- **`availableClues` intersects mode flags with data presence.** A flag says the mode *permits* a clue; the data says the shirt *has* one. `first-letter` requires `hasFirstLetter`, `scorers` requires `goals > 0`, `captain` requires `isCaptain === true`, and `shirt-number` is config-only because its input deliberately has no `shirtNumber` field. Returned in the fixed order `['first-letter', 'scorers', 'captain', 'shirt-number']` regardless of mode, so the order is a display contract, not an accident of object key order.
+- **`availableClues` intersects mode flags with data presence.** A flag says the mode *permits* a clue; the data says the shirt *has* one. `first-letter` requires `hasFirstLetter`, `scorers` requires `goals > 0`, `captain` requires `isCaptain === true`, and `shirt-number` is config-only because its input deliberately has no `shirtNumber` field. The backend sends `hasFirstLetter: false` in Normal and does not serialize `firstLetter`; Easy sends the actual clue letter and availability bit. Returned in the fixed order `['first-letter', 'scorers', 'captain', 'shirt-number']` regardless of mode, so the order is a display contract, not an accident of object key order.
 - **`redCards` is in the signature and never in the output.** It is accepted for structural symmetry with the appearance row, and it is decoration in every mode (§5.1, O5). No clue derived from it exists or may be added; a test asserts that a red-carded player gains no clue.
 - **`isCaptain` arrives as `boolean` and is compared with `=== true`.** The API normalises the nullable Prisma column (`a.isCaptain === true`, v1.0.2's `buildLineup`) so `null` is already `false` at the boundary. The explicit comparison in `availableClues` is the belt to that braces, and it is what makes the 227 captain-less games (§5.5) fall out as "no captain clue" instead of as an error.
 - **Games with no event data degrade silently.** A shirt with `goals: 0`, `isCaptain: false`, `hasFirstLetter: false` in `Easy` yields `['shirt-number']`, not an empty array and not a thrown error.
@@ -48,6 +48,13 @@
 | `frontend/src/components/DifficultySelector.test.tsx` | **new** — jsdom render test |
 | `frontend/src/components/WordleModal.tsx` | clue line in the header |
 | `frontend/src/components/WordleModal.test.tsx` | clue-line assertions |
+| `frontend/types/index.ts` | optional `firstLetter` lineup field |
+| `frontend/lib/api.ts` | pass selected difficulty to random-match request |
+| `frontend/lib/mockData.ts` | mode-shaped mock lineup response |
+| `frontend/components/Shirt.tsx` | render the permitted first letter in board slots |
+| `frontend/components/TacticBoard.tsx` | pass difficulty to shirts |
+| `backend/src/routes/matches.ts` | validate the random-match difficulty query |
+| `backend/src/services/matchService.ts` | omit Easy-only clue data from Normal responses |
 | `frontend/src/components/FinishButton.tsx` | **new (Task 7)** — the config-driven control plus its confirmation |
 | `frontend/src/components/FinishButton.test.tsx` | **new (Task 7)** — jsdom render tests, including the two "renders nothing" cases |
 | `frontend/app/missing-eleven/page.tsx` | render the selector, pass the mode, replace `MAX_ATTEMPTS`, render Finish (Task 7) |
@@ -857,10 +864,14 @@
 **Files:**
 - Modify: `frontend/src/components/WordleModal.tsx` (header block)
 - Modify: `frontend/src/components/WordleModal.test.tsx`
+- Modify: `frontend/components/Shirt.tsx` and `frontend/components/TacticBoard.tsx` (Easy first letter on board)
+- Modify: `frontend/app/missing-eleven/page.tsx`, `frontend/lib/api.ts`, `frontend/lib/mockData.ts`, and `frontend/types/index.ts` (mode-aware lineup request and type)
+- Modify: `backend/src/routes/matches.ts` and `backend/src/services/matchService.ts` (validate mode and shape clue response)
+- Add focused board and backend response/route assertions to the existing component and service/route tests.
 
 **Interfaces:**
 - Consumes: `availableClues` from `@/lib/shirtBadges`; a new optional `clues?: ShirtClue[]` prop, plus `difficulty?: Difficulty` defaulting to `DEFAULT_DIFFICULTY`.
-- Produces: a "Clues" line in the modal header listing the shirt's clues, so Easy and Normal are observably different. v1.0.3's icon badges, if they land later, replace this line and take the clue set from the same prop.
+- Produces: a "Clues" line in the modal header listing the shirt's clues, plus the Easy first letter shown in each unresolved shirt's board slots. The backend returns that letter only for an Easy-mode match response, so Normal's network payload does not contain it. v1.0.3's icon badges, if they land later, replace this line and take the clue set from the same prop.
 
 - [ ] **Step 6.1: Write the failing test first.**
 
@@ -994,9 +1005,9 @@
 
   That same file also states, at `:24`, that **there is no null/unknown/provenance flag** and that a nullable variant is a defect. `ShirtData extends LineupPlayer` (`frontend/types/index.ts:79`) and `ShirtGameData extends ShirtData` (`frontend/src/lib/gameState.ts:13`), so **after v1.0.2 `ShirtGameData` already carries `goals` and `isCaptain`** — v1.0.2's `buildLineup` normalises `isCaptain` with `?? false` at the boundary, which is why the `=== true` comparison in `availableClues` is a belt and not a lie. Read `docs/v1/v1.0/plan-v1.0.2-event-persistence.md` before touching the type; do not make `goals` or `isCaptain` optional and do not add `| null` to either. Doing so would break v1.0.3's icon layer, which reads the same fields, and it is the exact degradation rule v1.0.2 froze against.
 
-  **`hasFirstLetter` is the only new field in this step.** It does not exist anywhere today, and it is the one thing the clue policy needs that the lineup payload does not carry. Add it as `hasFirstLetter: boolean` in `frontend/types/index.ts`, set it in v1.0.2's `buildLineup` to `p.name.trim().length > 0` — a player whose Wordle answer is empty has no first letter to give — and default it to `false` in `frontend/lib/mockData.ts` and in the fixtures. That is the whole of the payload work: **one** new field, not three.
+  **The clue fields are mode-shaped at the existing random-match endpoint.** `hasFirstLetter` already exists in the lineup contract. Add optional `firstLetter: string | null` to `frontend/types/index.ts`; compute it from the normalized display name in `backend/src/services/matchService.ts`. Pass `state.difficulty` through `fetchRandomMatch` as `?difficulty=easy|normal`, including the mock path. In `backend/src/routes/matches.ts`, accept only `easy` or `normal` (default to Normal when omitted) and pass the result into `buildMatchResponse`. Easy responses set `hasFirstLetter` according to whether the normalized name contains a letter and include `firstLetter`; Normal responses set `hasFirstLetter: false` and omit the `firstLetter` property. Do not change `/api/matches/:id`; it uses the safe Normal-shaped response by default.
 
-  `docs/v1/v1.2/overview.md:211` already anticipated exactly this fork ("its Task 6 either adds one boolean to the lineup payload or is dropped outright"), and the answer is now settled: the payload is widened by **one** boolean, so Task 6 ships. If that single boolean turns out to require a Prisma column, an endpoint change, or any edit to a field v1.0.2 froze, **stop and ask** rather than widening further — dropping Task 6 remains a legitimate outcome, and the mode selector and the attempt budget are unaffected by it.
+  In the page, include difficulty in the fetch key so a mode change cannot reuse a response created for the other mode. Pass difficulty through `TacticBoard` to `Shirt`. The board's `LetterSlots` displays `firstLetter` at index zero only when `DIFFICULTY_CONFIG[difficulty].showFirstLetter` is true, while preserving Wordle feedback for other slots. Include the clue in the shirt's accessible label. The mode parameter is not a security boundary: a client can alter it to Easy, which is a mode that intentionally exposes this clue. Enforcing a mode against a modified client would require server-owned game/session state and is outside this patch.
 
 - [ ] **Step 6.5: Verify green and run everything.**
 
@@ -1011,13 +1022,13 @@
   cd backend  && npm run test
   ```
 
-  Expected: frontend `tsc` clean, the full suite green, and the backend suite **identical to the measurement taken at the start of this patch** — this patch touches no backend file. The pass signal is *unchanged and green*, not a count: the pre-v1.2.1 `13/175` and post-v1.2.1 `13/177` figures both belong to `cda2db0`, and v1.0.1, v1.0.2 and v1.1.1 have landed since, so the real number is already different.
+  Expected: frontend `tsc` clean, the full frontend and backend suites green, including coverage that Normal omits `firstLetter`, Easy includes it, and invalid difficulty values are rejected. Record current suite counts rather than relying on historical counts.
 
 - [ ] **Step 6.6: Commit.**
 
   ```bash
-  git add frontend/src/components/WordleModal.tsx frontend/src/components/WordleModal.test.tsx frontend/types/index.ts frontend/lib/mockData.ts frontend/app/missing-eleven/page.tsx
-  git commit -m "feat(frontend): show the resolved clue set when a shirt is open"
+  git add backend/src/routes/matches.ts backend/src/services/matchService.ts frontend/app/missing-eleven/page.tsx frontend/components/Shirt.tsx frontend/components/TacticBoard.tsx frontend/lib/api.ts frontend/lib/mockData.ts frontend/types/index.ts frontend/src/components/WordleModal.tsx frontend/src/components/WordleModal.test.tsx
+  git commit -m "feat(game): show Easy first-letter clues on the board"
   ```
 
 ---
@@ -1324,8 +1335,9 @@ behind it.
 11. `FinishButton` renders **nothing at all** when `opponentRequired` is false — asserted for `easy` and `normal` at `resolved={22}` and by a property test over `DIFFICULTIES` — and a locked control with its unresolved count when the flag is true. No mode name is compared anywhere in it.
 12. The Finish affordance is a control **plus a confirmation**: one click on `Finish` does not call `onFinish`; confirming does. It reuses the existing dialog pattern, adds no route and no screen (roadmap §5.2).
 13. `onFinish` is a documented no-op in this patch; no `FINISH_GAME` action exists, and `checkGameComplete` is untouched.
-14. Frontend: full suite green, `tsc` clean, `lint` clean. Backend: unchanged and green.
-15. Reverting this patch alone returns the app to v1.2.1 behaviour, which is identical to pre-patch except that revealed names now land on the right shirt.
+14. Frontend: full suite green, `tsc` clean, `lint` clean. Backend: full suite green, including the mode validation and response-shaping behavior.
+15. Easy displays each available first letter in the board slots; Normal does not display it and its lineup response has `hasFirstLetter: false` with no `firstLetter` property.
+16. The random-match endpoint accepts only `easy` or `normal`; omitted difficulty defaults to Normal. The `/api/matches/:id` endpoint remains Normal-shaped by default.
 
 ## Validation
 
@@ -1336,6 +1348,7 @@ behind it.
 | State + hook | `cd frontend && npx vitest run src/lib/gameState.test.ts src/lib/gameState.hook.test.ts` | no failures |
 | Selector | `cd frontend && npx vitest run src/components/DifficultySelector.test.tsx` | `4 passed (4)` |
 | Clue line | `cd frontend && npx vitest run src/components/WordleModal.test.tsx` | `21 passed (21)` |
+| Mode-aware board response | backend match response and route tests | Easy includes first-letter clues; Normal omits the value and reports unavailable; invalid modes return 400 |
 | Finish control (Task 7) | `cd frontend && npx vitest run src/components/FinishButton.test.tsx` | `5 passed (5)`; the two "renders nothing" cases passing is the correct result here |
 | Full frontend | `cd frontend && npm run test` | every file green; count recorded, not assumed |
 | Types | `cd frontend && npx tsc --noEmit` | no output |
@@ -1344,7 +1357,7 @@ behind it.
 | No mode-name branching in components | `grep -rn "=== 'easy'\|=== 'normal'\|=== 'hard'\|=== 'expert'" frontend/components frontend/src/components frontend/app` | no output |
 | Finish reads the flag | `grep -n "opponentRequired" frontend/src/components/FinishButton.tsx` | hits only, with no `=== 'expert'` beside them |
 | No premature gate | `grep -rn "FINISH_GAME" frontend/src` | no output — that action is v1.2.4's |
-| Backend untouched | `cd backend && npm run test` | every file green; count measured and recorded, not asserted |
+| Backend | `cd backend && npm run test` | every file green; count measured and recorded, not asserted |
 | New test location | `find frontend/components -name "*.test.*"` | unchanged by this patch |
 
 ## Risks
@@ -1353,10 +1366,10 @@ behind it.
 |---|---|
 | **A config field gets a typo'd name in one consumer and silently reads `undefined`.** `DIFFICULTY_CONFIG[mode].attemps` would be `undefined`, and `attempts >= undefined` is `false`, so the attempt limit would never trip. | `tsc` catches it: the type is `DifficultyConfig`, not an index signature. Keep the type explicit — do not widen it to `Record<string, ...>`. |
 | **All four modes exist in the config, so it is tempting to offer all four.** | `DIFFICULTIES` is the offer list and a test asserts its exact contents. The distinction is named in both the module and the overview. |
-| **Task 6's wiring needs one field the lineup payload does not carry** (`hasFirstLetter`), and a placeholder substituted for it would render a clue line that is always `Number`. | The placeholder variant is removed from the plan: Step 6.4 has exactly one instruction (pass the real values) and states that `goals` and `isCaptain` already exist as required non-null fields, so the only payload work is the single boolean. A test asserts the clue line renders `Scorers` and `Captain` for a shirt that has the data, which fails loudly under a placeholder. Dropping Task 6 stays a legitimate outcome, and the mode selector and the attempt budget are unaffected by it. |
+| **Easy-only letters leak into a Normal lineup response.** | The request carries a validated difficulty and the existing random-match endpoint shapes the response: Normal marks the first-letter clue unavailable and omits `firstLetter`; Easy includes it. The frontend fetch key includes the mode to avoid reusing a response across modes. This is not tamper-proof: changing the request to Easy obtains Easy clues, so enforcing mode against a modified client would need server-owned game/session state. |
 | **`shirt-number` is returned in Hard and Expert**, which reads as a contradiction. | Documented at the implementation site, and covered by the Hard/Expert test. It means "the number exists in the data", not "show it"; v1.2.3 masks it at render time. |
 | **A mode switch mid-game** would leave shirts under two different attempt budgets. | The selector is not rendered once `gameStatus === 'playing'`, and `SET_DIFFICULTY` is a no-op on the shirts by construction — asserted by the "leaves the board and the shirts untouched" test. |
 | **v1.0.3 may already own `shirtBadges.ts` and its test**, and creating either file here would clobber it — silently deleting 7 passing tests, because the suite would still be green. | Task 2 Step 2.0 is a precondition that branches on the file's presence; Steps 2.1 and 2.3 **append** in the merge case and never overwrite; Step 2.4 states the union count (`16`) explicitly so a `9` is visible as a regression rather than read as the expected value. |
 | **The Finish control ships dead in this patch** — it renders nothing in both offered modes, and its `onFinish` is a stub. A reviewer may read that as unfinished work. | It is the ratified sequencing (§5.2): introduced here because the table that drives it is here, confirmed in v1.2.3, asserted in v1.2.4. The `onFinish` stub is deliberately a no-op rather than an early `FINISH_GAME`, because two completion gates in the codebase is worse than one arriving a patch late. The 5 passing tests make it verified code, not scaffolding. |
 
-**Escalate before proceeding if:** adding `hasFirstLetter` turns out to require a Prisma column, an endpoint change, or any edit to a field v1.0.2 froze — Task 6's single new boolean is the whole permitted widening. Also escalate if `shirtBadges.ts` exists with a conflicting `availableClues` export. Both change the shape of this patch and neither is a decision to make silently.
+**Escalate before proceeding if:** the mode-shaped response requires a Prisma column, migration, or a new endpoint; this plan changes only the existing random-match query/response and adds the first-letter field to its lineup contract. Also escalate if `shirtBadges.ts` exists with a conflicting `availableClues` export. Those conditions change the shape of this patch and should not be decided silently.

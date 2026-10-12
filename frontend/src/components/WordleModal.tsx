@@ -2,6 +2,15 @@
 
 import { useEffect, useRef, useState, useCallback, useMemo } from 'react';
 import type { GuessResult } from '@/lib/wordle';
+import { DEFAULT_DIFFICULTY, DIFFICULTY_CONFIG, type Difficulty } from '../lib/difficulty';
+import type { ShirtClue } from '../lib/shirtBadges';
+
+const CLUE_LABELS: Record<ShirtClue, string> = {
+  'first-letter': 'First letter',
+  scorers: 'Scorers',
+  captain: 'Captain',
+  'shirt-number': 'Number',
+};
 
 interface WordleModalProps {
   /** The normalized length of the player's name (target to guess) */
@@ -24,6 +33,10 @@ interface WordleModalProps {
   isGameOver?: boolean;
   /** Whether the guess was correct */
   isCorrect?: boolean;
+  /** Mode in force, used to label the clue set. Defaults to Normal. */
+  difficulty?: Difficulty;
+  /** The clues this shirt shows, already resolved by `availableClues`. */
+  clues?: ShirtClue[];
 }
 
 const POSITION_LABELS: Record<string, string> = {
@@ -172,6 +185,8 @@ export default function WordleModal({
   onClose,
   isGameOver = false,
   isCorrect = false,
+  difficulty = DEFAULT_DIFFICULTY,
+  clues = [],
 }: Readonly<WordleModalProps>) {
   const gridRef = useRef<HTMLDivElement>(null);
   const dialogRef = useRef<HTMLDialogElement>(null);
@@ -405,6 +420,13 @@ export default function WordleModal({
             <p id="wordle-modal-desc" className="text-xs text-ink/55 mt-0.5">
               Guess the {getPositionLabel(position)}
             </p>
+            {clues.length > 0 && (
+              <p className="wordle-modal__clues" data-testid="modal-clues">
+                <span className="wordle-modal__clues-mode">{DIFFICULTY_CONFIG[difficulty].label}</span>
+                {' · '}
+                {clues.map((clue) => CLUE_LABELS[clue]).join(', ')}
+              </p>
+            )}
           </div>
           <button
             type="button"

@@ -30,6 +30,7 @@ function player(token: string, nameLength = 5): LineupPlayer {
     assists: 0,
     redCards: 0,
     isCaptain: false,
+    hasFirstLetter: nameLength > 0,
   };
 }
 
@@ -266,6 +267,15 @@ describe('useGameState', () => {
         result.current.setLoading(false);
       });
       expect(result.current.state.gameStatus).toBe('loading');
+    });
+  });
+
+  describe('setDifficulty', () => {
+    it('exposes setDifficulty and the current mode', () => {
+      const { result } = renderHook(() => useGameState());
+      expect(result.current.state.difficulty).toBe('normal');
+      act(() => result.current.setDifficulty('easy'));
+      expect(result.current.state.difficulty).toBe('easy');
     });
   });
 });

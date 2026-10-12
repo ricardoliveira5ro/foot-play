@@ -5,8 +5,16 @@ import type { GameResponse, ShirtData, ShirtState, TeamSide, LineupPlayer, Guess
 import { CURATED_TEAM_IDS } from '@/lib/curatedTeams';
 import { EMPTY_FILTERS } from '@/types';
 import { filtersEqual } from './filtersEqual';
+import { DEFAULT_DIFFICULTY, DIFFICULTY_CONFIG, type Difficulty } from './difficulty';
 
-const MAX_ATTEMPTS = 6;
+/**
+ * The Normal-mode attempt budget. Retained because it is the pre-v1.2
+ * default and several tests import it; it is *derived* from the config so
+ * it cannot drift from the table. Gameplay reads
+ * `DIFFICULTY_CONFIG[state.difficulty].attempts` instead — see
+ * `isLastAttempt` below.
+ */
+const MAX_ATTEMPTS = DIFFICULTY_CONFIG[DEFAULT_DIFFICULTY].attempts;
 
 // --- Types ---
 
@@ -35,11 +43,14 @@ export interface GameState {
   error: string | null;
   /** The applied filter set. Owned by the URL via `FilterUrlSync`; never mutated in place. */
   filters: GameFilterParams;
+  /** Mode chosen for this session. Drives attempts and the clue set (§5.1). */
+  difficulty: Difficulty;
 }
 
 export type GameAction =
   | { type: 'SET_MATCH'; payload: GameResponse }
   | { type: 'SELECT_TEAM'; payload: TeamSide }
+  | { type: 'SET_DIFFICULTY'; payload: Difficulty }
   | { type: 'TOGGLE_BOARD' }
   | { type: 'OPEN_SHIRT'; payload: string }
   | { type: 'CLOSE_SHIRT' }
@@ -63,6 +74,7 @@ export const initialState: GameState = {
   gameStatus: 'idle',
   error: null,
   filters: EMPTY_FILTERS,
+  difficulty: DEFAULT_DIFFICULTY,
 };
 
 // --- Helpers ---
@@ -157,7 +169,7 @@ function handleSubmitGuess(state: GameState, action: Extract<GameAction, { type:
   if (shirt.state === 'correct' || shirt.state === 'failed') return state;
 
   const newAttempts = shirt.attempts + 1;
-  const isLastAttempt = newAttempts >= MAX_ATTEMPTS;
+  const isLastAttempt = newAttempts >= DIFFICULTY_CONFIG[state.difficulty].attempts;
   const newShirtState = nextShirtState(isCorrect, isLastAttempt);
   const shouldCloseModal = newShirtState === 'correct' || newShirtState === 'failed';
 
@@ -279,6 +291,9 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
       };
     }
 
+    case 'SET_DIFFICULTY':
+      return { ...state, difficulty: action.payload };
+
     case 'SELECT_TEAM': {
       return handleSelectTeam(state, action);
     }
@@ -349,6 +364,7 @@ interface UseGameStateReturn {
   setLoading: (loading: boolean) => void;
   filters: GameFilterParams;
   setFilters: (filters: GameFilterParams) => void;
+  setDifficulty: (mode: Difficulty) => void;
 }
 
 export function useGameState(): UseGameStateReturn {
@@ -403,6 +419,8 @@ export function useGameState(): UseGameStateReturn {
     dispatch({ type: 'SET_FILTERS', payload: filters });
   }, []);
 
+  const setDifficulty = useCallback((mode: Difficulty) => dispatch({ type: 'SET_DIFFICULTY', payload: mode }), []);
+
   return {
     state,
     dispatch,
@@ -419,7 +437,18 @@ export function useGameState(): UseGameStateReturn {
     setLoading,
     filters: state.filters,
     setFilters,
+    setDifficulty,
   };
+}
+
+/** How many shirts are settled, across both boards. Drives the Finish label. */
+export function resolvedShirtCount(
+  target: ShirtGameData[],
+  opponent: ShirtGameData[],
+): number {
+  return [...target, ...opponent].filter(
+    s => s.state === 'correct' || s.state === 'failed',
+  ).length;
 }
 
 export { MAX_ATTEMPTS };

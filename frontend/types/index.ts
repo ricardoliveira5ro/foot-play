@@ -40,6 +40,10 @@ export interface LineupPlayer {
   redCards: number;
   /** Captain for this match. False when no captain row exists for the game. */
   isCaptain: boolean;
+  /** Whether the player's name has at least one letter available for a first-letter clue. */
+  hasFirstLetter: boolean;
+  /** First normalized character, exposed as the Easy mode board clue only. */
+  firstLetter?: string | null;
 }
 
 export interface Game {

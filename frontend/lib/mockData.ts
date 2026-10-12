@@ -21,7 +21,7 @@ import { matchesGameFilters } from '@/lib/filters';
  * exactly like the real API. The internal `playerId` and `displayName` fields
  * are mock-only: `playerId` is used for search dedup and token derivation,
  * `displayName` lets the mock path evaluate guesses locally. The real API
- * never sends either — it only sends `token` and `nameLength`.
+ * sends only `token`, `nameLength`, and the Easy mode's first-letter clue.
  */
 
 /** Raw mock entry before derived fields (token, nameLength) are added. */
@@ -113,9 +113,23 @@ export function getMockFilterOptions(filters: GameFilterParams): FilterOptionsRe
 }
 
 /** Mock parity for backend Task 6: only return a game that satisfies its filters. */
-export function getMockRandomMatch(filters: GameFilterParams): MockMatchResponse | null {
+export function getMockRandomMatch(filters: GameFilterParams, difficulty: 'easy' | 'normal' = 'normal'): MockMatchResponse | null {
   const matches = matchingMockGames(filters);
-  return matches.length > 0 ? matches[Math.floor(Math.random() * matches.length)] : null;
+  const match = matches.length > 0 ? matches[Math.floor(Math.random() * matches.length)] : null;
+  if (!match) return null;
+  return {
+    ...match,
+    homeLineup: match.homeLineup.map((player) => ({
+      ...player,
+      hasFirstLetter: difficulty === 'easy' && player.hasFirstLetter,
+      ...(difficulty === 'easy' ? { firstLetter: player.firstLetter } : {}),
+    })),
+    awayLineup: match.awayLineup.map((player) => ({
+      ...player,
+      hasFirstLetter: difficulty === 'easy' && player.hasFirstLetter,
+      ...(difficulty === 'easy' ? { firstLetter: player.firstLetter } : {}),
+    })),
+  };
 }
 
 /** Mock parity for backend Task 7: search and display the resolved player name. */
@@ -156,12 +170,13 @@ function mockToken(gameId: number, playerId: number): string {
  * running against the mock dataset. In production these come from
  * GET /api/matches/* (v1.0.2) and are seeded from game_events.csv (v1.0.1).
  */
-function mockEvents(playerId: number): Pick<MockLineupPlayer, 'goals' | 'assists' | 'redCards' | 'isCaptain'> {
+function mockEvents(playerId: number): Pick<MockLineupPlayer, 'goals' | 'assists' | 'redCards' | 'isCaptain' | 'hasFirstLetter'> {
   return {
     goals: playerId % 4 === 0 ? 1 : 0,
     assists: playerId % 7 === 0 ? 1 : 0,
     redCards: playerId % 11 === 0 ? 1 : 0,
     isCaptain: playerId % 9 === 0,
+    hasFirstLetter: true,
   };
 }
 
@@ -171,6 +186,7 @@ function buildLineup(gameId: number, players: MockRawPlayer[]): MockLineupPlayer
     nameLength: normalize(p.displayName).length,
     wordBoundaries: getWordBoundaries(p.displayName),
     token: mockToken(gameId, p.playerId),
+    firstLetter: normalize(p.displayName).charAt(0).toUpperCase() || null,
     ...mockEvents(p.playerId),
   }));
 }

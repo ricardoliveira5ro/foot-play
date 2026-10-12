@@ -7,6 +7,7 @@ import { getCorrectLettersByLength } from '@/lib/wordle';
 import type { TeamColorEntry } from '@/lib/teamColors';
 import { getTextColor } from '@/lib/colorUtils';
 import { badgesForShirt, type ShirtBadge } from '@/lib/shirtBadges';
+import { DIFFICULTY_CONFIG, DEFAULT_DIFFICULTY, type Difficulty } from '@/lib/difficulty';
 
 const SHIRT_PATH =
   'M28 10 L32 13 L36 10 L56 14 L62 15 L62 20 L51 22 L51 58 L13 58 L13 22 L2 20 L2 15 L8 14 L28 10 Z';
@@ -28,6 +29,7 @@ interface ShirtProps {
    * the default white/ink styling.
    */
   colors?: TeamColorEntry;
+  difficulty?: Difficulty;
 }
 
 /**
@@ -48,6 +50,7 @@ function shirtAriaLabel(
   shirtNumber: number | null,
   badges: ShirtBadge[],
   name?: string,
+  firstLetter?: string | null,
 ): string {
   const number = shirtNumber ?? '?';
   const goalCount = badges.filter((badge) => badge === 'scorer').length;
@@ -58,6 +61,9 @@ function shirtAriaLabel(
     );
   }
   if (badges.includes('sent-off')) badgeLabels.push(BADGE_LABELS['sent-off']);
+  if (firstLetter && (state === 'default' || state === 'in-progress')) {
+    badgeLabels.push(`first letter ${firstLetter}`);
+  }
   const badgesSuffix = badgeLabels.length > 0 ? `, ${badgeLabels.join(', ')}` : '';
   switch (state) {
     case 'default':
@@ -77,17 +83,19 @@ function LetterSlots({
   nameLength,
   guessHistory,
   wordBoundaries = [],
+  firstLetter,
 }: {
   nameLength: number;
   guessHistory?: GuessResult[][];
   wordBoundaries?: number[];
+  firstLetter?: string | null;
 }) {
   const correctLetters = guessHistory
     ? getCorrectLettersByLength(guessHistory, nameLength)
     : [];
 
   // If no guess history, show placeholder dots
-  if (correctLetters.every(l => l === null)) {
+  if (correctLetters.every(l => l === null) && !firstLetter) {
     const slots: React.ReactNode[] = [];
     for (let i = 0; i < nameLength; i++) {
       if (wordBoundaries.includes(i)) {
@@ -107,7 +115,7 @@ function LetterSlots({
     if (wordBoundaries.includes(i)) {
       slots.push(<span key={`spacer-${i}`} className="text-ink/30" aria-hidden="true"> </span>);
     }
-    const letter = correctLetters[i];
+    const letter = (i === 0 ? firstLetter : null) ?? correctLetters[i];
     slots.push(
       letter ? (
         <span key={i} className="font-semibold text-correct">
@@ -187,12 +195,13 @@ function BadgeIcon({ badge }: { badge: ShirtBadge }) {
  * Four states: default → in-progress → correct → failed.
  * The whole unit is a button with an expanded (>=44px) hit area.
  */
-export default function Shirt({ shirt, index, onClick, guessHistory, colors }: ShirtProps) {
+export default function Shirt({ shirt, index, onClick, guessHistory, colors, difficulty = DEFAULT_DIFFICULTY }: ShirtProps) {
   const { token, nameLength, shirtNumber, coords, state } = shirt;
 
   // §3.1: no event data on this game means [] for every shirt. There is no
   // per-shirt availability signal and this must not invent one.
   const badges = badgesForShirt({ goals: shirt.goals, redCards: shirt.redCards });
+  const firstLetter = DIFFICULTY_CONFIG[difficulty].showFirstLetter ? shirt.firstLetter : null;
   const hasStateBadge = state === 'correct' || state === 'failed';
   const badgeRowWidth =
     badges.length * 16 +
@@ -267,7 +276,7 @@ export default function Shirt({ shirt, index, onClick, guessHistory, colors }: S
       <button
         type="button"
         onClick={onClick ? () => onClick(token) : undefined}
-        aria-label={shirtAriaLabel(state, shirtNumber, badges, shirt.name)}
+        aria-label={shirtAriaLabel(state, shirtNumber, badges, shirt.name, firstLetter)}
         className={`-m-2 block w-[calc(100%+1rem)] cursor-pointer rounded-md p-2 ${state === 'failed' ? 'opacity-60 saturate-[0.6]' : ''}`}
       >
         {/* Inner wrapper carries the entrance animation so positional and
@@ -327,7 +336,7 @@ export default function Shirt({ shirt, index, onClick, guessHistory, colors }: S
       <div className="pointer-events-none absolute left-1/2 top-full z-10 mt-1 w-max -translate-x-1/2">
         <div className="inline-block rounded-md bg-paper px-2 py-1 shadow-sm">
           {(state === 'default' || state === 'in-progress') && (
-            <LetterSlots nameLength={nameLength} guessHistory={guessHistory} wordBoundaries={shirt.wordBoundaries} />
+            <LetterSlots nameLength={nameLength} guessHistory={guessHistory} wordBoundaries={shirt.wordBoundaries} firstLetter={firstLetter} />
           )}
           {state === 'correct' && (
             <span className="block max-w-35 truncate text-[13px] font-semibold text-correct">

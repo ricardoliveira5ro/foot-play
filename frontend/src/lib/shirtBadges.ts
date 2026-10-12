@@ -32,3 +32,52 @@ export function badgesForShirt(input: { goals: number; redCards: number }): Shir
 
   return badges;
 }
+
+import { DIFFICULTY_CONFIG, type Difficulty } from './difficulty';
+
+export type ShirtClue = 'first-letter' | 'scorers' | 'captain' | 'shirt-number';
+
+/** The subset of an appearance row that can carry a clue. */
+export interface ClueShirt {
+  goals: number;
+  /** Accepted for structural symmetry with the appearance row. Never a clue:
+   *  the send-off icon is decoration in every mode (§5.1, O5). */
+  redCards: number;
+  isCaptain: boolean;
+  hasFirstLetter: boolean;
+}
+
+/** Fixed display order. The caller may sort, but the policy returns this. */
+const CLUE_ORDER: readonly ShirtClue[] = ['first-letter', 'scorers', 'captain', 'shirt-number'];
+
+/**
+ * The clues a shirt actually shows, in a given mode.
+ *
+ * The mode's flags say which clues are *permitted*; the shirt's data says
+ * which *exist*. Intersecting the two is what makes degradation automatic:
+ * a game with no event rows yields fewer clues instead of an error, and the
+ * 227 captain-less games (§5.5) yield no captain clue rather than a broken
+ * one.
+ *
+ * `shirt-number` is the odd one out: it is config-only, because this input
+ * deliberately carries no `shirtNumber`. In `hard` and `expert` it is still
+ * returned — those modes *hide* the number (§5.1), they do not remove it
+ * from the data, and v1.2.3 masks it at render time. So its presence here
+ * means "this shirt has a number to show or mask", never "show the number".
+ */
+export function availableClues(mode: Difficulty, shirt: ClueShirt): ShirtClue[] {
+  const config = DIFFICULTY_CONFIG[mode];
+  const present: Record<ShirtClue, boolean> = {
+    'first-letter': shirt.hasFirstLetter,
+    scorers: shirt.goals > 0,
+    captain: shirt.isCaptain === true,
+    'shirt-number': true,
+  };
+  const permitted: Record<ShirtClue, boolean> = {
+    'first-letter': config.showFirstLetter,
+    scorers: config.showScorersClue,
+    captain: config.showCaptainClue,
+    'shirt-number': config.showShirtNumber || !config.showShirtNumber,
+  };
+  return CLUE_ORDER.filter((clue) => permitted[clue] && present[clue]);
+}

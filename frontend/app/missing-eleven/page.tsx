@@ -2,7 +2,11 @@
 
 import { Suspense, useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
-import { useGameState, MAX_ATTEMPTS } from '@/lib/gameState';
+import { useGameState, resolvedShirtCount } from '@/lib/gameState';
+import { DIFFICULTY_CONFIG } from '@/lib/difficulty';
+import { availableClues } from '@/lib/shirtBadges';
+import DifficultySelector from '@/components/DifficultySelector';
+import FinishButton from '@/components/FinishButton';
 import { fetchRandomMatch, submitGuess as submitGuessApi, fetchReveal, revealOnePlayer } from '@/lib/api';
 import { filtersToParams } from '@/lib/filterParams';
 import { hasActiveFilters } from '@/lib/filters';
@@ -40,7 +44,10 @@ export default function MissingElevenPage() {
     toggleBoard,
     filters,
     setFilters,
+    setDifficulty,
   } = useGameState();
+
+  const resolvedCount = resolvedShirtCount(state.targetShirts, state.opponentShirts);
 
   const { options: filterOptions, loading: optionsLoading, error: optionsError, reload: reloadOptions } = useFilterOptions(filters);
 
@@ -127,7 +134,7 @@ export default function MissingElevenPage() {
     }
   }, [confirmingSurrender, state.match, state.teamSide, state.targetShirts, state.opponentShirts, revealTeam, surrender, setError]);
 
-  const filterKey = filtersToParams(filters).toString();
+  const filterKey = `${filtersToParams(filters).toString()}|difficulty=${state.difficulty}`;
   const fetchedKeyRef = useRef<string | null>(null);
   const matchSeqRef = useRef(0);
 
@@ -138,7 +145,7 @@ export default function MissingElevenPage() {
     const seq = ++matchSeqRef.current;
     setLoading(true);
     setError(null);
-    fetchRandomMatch(filters)
+    fetchRandomMatch(filters, state.difficulty)
       .then((response) => {
         if (seq !== matchSeqRef.current) return;
         if (response) startNewGame(response);
@@ -153,7 +160,7 @@ export default function MissingElevenPage() {
       .finally(() => {
         if (seq === matchSeqRef.current) setLoading(false);
       });
-  }, [filters, setLoading, setError, startNewGame]);
+  }, [filters, state.difficulty, setLoading, setError, startNewGame]);
 
   // Load once for the initial filter key, and again whenever the canonical
   // key changes (a deep link's filters arrive via FilterUrlSync's read
@@ -232,7 +239,8 @@ export default function MissingElevenPage() {
       submitGuess(activeShirt.token, response.results, response.isCorrect, response.name);
 
       // If this was the last attempt and it failed, reveal the player's name
-      const isLastAttempt = activeShirt.guessHistory.length + 1 >= MAX_ATTEMPTS;
+      const maxAttempts = DIFFICULTY_CONFIG[state.difficulty].attempts;
+      const isLastAttempt = activeShirt.guessHistory.length + 1 >= maxAttempts;
       if (!response.isCorrect && isLastAttempt) {
         const reveal = await revealOnePlayer(state.match.game.gameId, activeShirt.token);
         revealName(activeShirt.token, reveal.name);
@@ -241,7 +249,7 @@ export default function MissingElevenPage() {
       setError(describeError(cause));
     }
     // Modal will close via state change if correct or failed
-  }, [activeShirt, state.match, submitGuess, revealName, setError]);
+  }, [activeShirt, state.match, submitGuess, revealName, setError, state.difficulty]);
 
   // Every route back to the pre-screen — the sidebar's New puzzle, the
   // game-complete Play Again, and the error state's Change filters — resets
@@ -330,6 +338,9 @@ export default function MissingElevenPage() {
             Missing Eleven
           </h1>
         </header>
+        <div className="w-full pb-8">
+          <DifficultySelector value={state.difficulty} onChange={setDifficulty} />
+        </div>
         {/* An empty slot on the tactics board: dashed like a chalk outline,
             the arrow pointing up at the filters that fill it. */}
         <div className="w-full max-w-md rounded-xl border-2 border-dashed border-ink/25 px-6 py-10">
@@ -495,6 +506,7 @@ export default function MissingElevenPage() {
             teamName={teamName}
             formation={formation}
             shirts={shirts}
+            difficulty={state.difficulty}
             onShirtClick={handleShirtClick}
             clubId={clubId}
             activeBoard={state.activeBoard}
@@ -505,6 +517,14 @@ export default function MissingElevenPage() {
             onToggleBoard={toggleBoard}
           />
         </section>
+        {state.gameStatus === 'playing' && (
+          <FinishButton
+            difficulty={state.difficulty}
+            resolved={resolvedCount}
+            total={state.targetShirts.length + state.opponentShirts.length}
+            onFinish={() => {}}
+          />
+        )}
       </div>
 
       {/* Wordle Modal */}
@@ -515,11 +535,13 @@ export default function MissingElevenPage() {
           shirtNumber={activeShirt.shirtNumber}
           position={activeShirt.position}
           guesses={guessHistory}
-          maxAttempts={MAX_ATTEMPTS}
+          maxAttempts={DIFFICULTY_CONFIG[state.difficulty].attempts}
           onGuess={handleGuess}
           onClose={handleModalClose}
-          isGameOver={guessHistory.length >= MAX_ATTEMPTS || guessHistory.some(g => g.every(r => r.result === 'CORRECT'))}
+          isGameOver={guessHistory.length >= DIFFICULTY_CONFIG[state.difficulty].attempts || guessHistory.some(g => g.every(r => r.result === 'CORRECT'))}
           isCorrect={guessHistory.some(g => g.every(r => r.result === 'CORRECT'))}
+          difficulty={state.difficulty}
+          clues={activeShirt ? availableClues(state.difficulty, activeShirt) : []}
         />
       )}
 

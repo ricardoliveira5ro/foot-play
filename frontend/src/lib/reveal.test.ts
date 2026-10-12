@@ -14,6 +14,7 @@ function makeShirt(overrides: Partial<ShirtGameData> & { token: string }): Shirt
     assists: 0,
     redCards: 0,
     isCaptain: false,
+    hasFirstLetter: true,
     state: 'failed',
     attempts: 6,
     guessHistory: [],
