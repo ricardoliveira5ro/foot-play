@@ -4,12 +4,12 @@ import { useState } from 'react';
 import { DIFFICULTY_CONFIG, type Difficulty } from '../lib/difficulty';
 
 interface FinishButtonProps {
-  difficulty: Difficulty;
+  readonly difficulty: Difficulty;
   /** Shirts already `correct` or `failed`, across both boards. */
-  resolved: number;
+  readonly resolved: number;
   /** Shirts on the board. 22 for a full game, less for a partial lineup. */
-  total: number;
-  onFinish: () => void;
+  readonly total: number;
+  readonly onFinish: () => void;
 }
 
 /** A full game is 11 + 11. Anything less is a partial lineup, which cannot be finished. */
@@ -41,7 +41,8 @@ export default function FinishButton({ difficulty, resolved, total, onFinish }: 
 
   if (confirming) {
     return (
-      <div className="finish" role="group" aria-label="Confirm finish">
+      <fieldset className="finish min-w-0 border-0 p-0">
+        <legend className="sr-only">Confirm finish</legend>
         <p className="finish__confirm">
           Finish with {resolved} of {FULL_BOARD} resolved? This cannot be undone.
         </p>
@@ -51,7 +52,7 @@ export default function FinishButton({ difficulty, resolved, total, onFinish }: 
         <button type="button" className="finish__confirm-no" onClick={() => setConfirming(false)}>
           Keep playing
         </button>
-      </div>
+      </fieldset>
     );
   }
 

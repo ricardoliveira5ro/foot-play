@@ -3,8 +3,8 @@
 import { DIFFICULTIES, DIFFICULTY_CONFIG, type Difficulty } from '../lib/difficulty';
 
 interface DifficultySelectorProps {
-  value: Difficulty;
-  onChange: (mode: Difficulty) => void;
+  readonly value: Difficulty;
+  readonly onChange: (mode: Difficulty) => void;
 }
 
 /** One-line summary of what a mode changes. Kept beside the table on
