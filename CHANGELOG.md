@@ -8,6 +8,69 @@ from, and release notes are taken from the entry itself.
 
 ---
 
+## v1.2.2 — Easy and Normal modes
+
+_2026-10-12 · Spec: `docs/v1/v1.2/plan-v1.2.2-easy-normal-modes.md`_
+
+### Added
+
+- **Difficulty selection before a game starts.** Easy and Normal are selectable
+  before the board loads. Normal is the default; selecting a different mode
+  during an active game is not available. A reload starts in Normal again.
+- **A single difficulty configuration** (`frontend/src/lib/difficulty.ts`)
+  defines attempt budgets, clue visibility, shirt-number visibility, opponent
+  requirements, labels, and score multipliers for all four planned modes. This
+  release offers Easy and Normal only; Hard and Expert remain unselectable.
+- **Mode-specific attempt limits.** Easy and Normal both allow six guesses per
+  player. The reducer and page read the budget from the selected mode's config.
+- **Per-shirt clue policy** (`availableClues` in
+  `frontend/src/lib/shirtBadges.ts`). Easy and Normal can show scorer and captain
+  clues when the appearance data supports them; Easy also permits a first-letter
+  clue. Red-card badges remain decorative and do not become a guessing clue.
+- **Easy first letters on the board.** Unresolved shirts show the player's
+  uppercase first normalized letter in the first name slot; the remaining
+  slots continue to show the existing guess feedback. The letter is included
+  in the shirt's accessible label.
+- **A clue summary in the guess modal.** The modal lists the clues available
+  for the selected shirt, so data absence (such as no scorer or captain row)
+  is reflected per player.
+- **Mode-shaped random-match responses.** The frontend sends
+  `difficulty=easy|normal` to `/api/matches/random`, and the backend validates
+  the value. Easy lineup entries include `firstLetter` and set
+  `hasFirstLetter` according to the player's name. Normal entries set
+  `hasFirstLetter: false` and omit `firstLetter`; `/api/matches/:id` also uses
+  the Normal-shaped response by default. Mock match responses follow the same
+  behavior.
+- **A config-driven Finish confirmation.** The control is rendered only for a
+  mode whose `opponentRequired` setting is true. It renders nothing in Easy and
+  Normal, and requires confirmation before invoking its callback.
+
+### Fixed
+
+- **Easy and Normal no longer receive identical clue payloads.** The Easy-only
+  first-letter value is absent from a Normal random-match response, preventing
+  it from being exposed in the ordinary Normal request.
+- **Three Sonar findings.** The Finish confirmation uses a labeled `fieldset`
+  instead of a generic `role="group"`, and the `DifficultySelectorProps` and
+  `FinishButtonProps` fields are read-only.
+
+### Validation
+
+- Frontend `npm run test:coverage` — **30 files, 497 tests passed**; statements
+  98.91% (821/830), branches 97.77% (660/675), functions 98.29% (230/234), and
+  lines 99.42% (687/691).
+
+### Notes
+
+- The difficulty query parameter is client-controlled. A client can change it
+  to Easy and receive the Easy clue; enforcing a selected mode against a
+  modified request requires server-owned game/session state and is outside this
+  release.
+- No Prisma migration or database column is added. The Easy letter is derived
+  from the player name when building the match response.
+
+---
+
 ## v1.2.1 — Token-keyed reveal
 
 _2026-10-10 · Spec: `docs/v1/v1.2/plan-v1.2.1-token-reveal.md`_
