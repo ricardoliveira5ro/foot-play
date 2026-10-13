@@ -8,6 +8,23 @@ from, and release notes are taken from the entry itself.
 
 ---
 
+## v1.2.4 — Expert mode
+
+_2026-10-13 · Spec: `docs/v1/v1.2/plan-v1.2.4-expert-mode.md`_
+
+### Added
+
+- **Expert mode** is now selectable with three attempts, no clues, hidden
+  unresolved shirt numbers, and the opponent lineup required to finish.
+- **Explicit Finish for Expert.** The control stays locked until all 22 shirts
+  are resolved and asks for confirmation before completing the game. Easy,
+  Normal, and Hard now auto-complete once the target lineup is resolved.
+- **Surrender preserves the resolved result.** It ends the run without marking
+  untouched shirts failed, including an Expert run surrendered before the
+  opponent lineup is played.
+
+---
+
 ## v1.2.3 — Hard mode
 
 _2026-10-13 · Spec: `docs/v1/v1.2/plan-v1.2.3-hard-mode.md`_
