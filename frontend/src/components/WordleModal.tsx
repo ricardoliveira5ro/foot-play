@@ -205,6 +205,17 @@ export default function WordleModal({
   const keyStates = useMemo(() => getKeyStates(guesses), [guesses]);
   const displayShirtNumber = maskedShirtNumber(difficulty, shirtNumber, 'in-progress');
 
+  let shirtNumberLabel: string | number;
+  if (displayShirtNumber !== null) {
+    shirtNumberLabel = DIFFICULTY_CONFIG[difficulty].showShirtNumber
+      ? `#${displayShirtNumber}`
+      : displayShirtNumber;
+  } else if (shirtNumber !== null || shirtNumberHidden) {
+    shirtNumberLabel = '?';
+  } else {
+    shirtNumberLabel = 'Player';
+  }
+
   // Open as a modal dialog on mount (native focus trap + top layer).
   useEffect(() => {
     const dialog = dialogRef.current;
@@ -425,11 +436,7 @@ export default function WordleModal({
               className="font-sans font-semibold text-ink text-base"
               aria-label={shirtNumberHidden ? '? (number hidden)' : undefined}
             >
-              {displayShirtNumber !== null ? (
-                DIFFICULTY_CONFIG[difficulty].showShirtNumber ? `#${displayShirtNumber}` : displayShirtNumber
-              ) : shirtNumber !== null || shirtNumberHidden ? (
-                '?'
-              ) : 'Player'}
+              {shirtNumberLabel}
             </p>
             <p id="wordle-modal-desc" className="text-xs text-ink/55 mt-0.5">
               Guess the {getPositionLabel(position)}
