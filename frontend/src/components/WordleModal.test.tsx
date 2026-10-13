@@ -62,6 +62,12 @@ describe('WordleModal', () => {
       expect(screen.getByTestId('modal-shirt-number').textContent).toBe('?');
     });
 
+    it('masks a server-withheld number in the Hard modal', () => {
+      renderModal({ shirtNumber: null, shirtNumberHidden: true, difficulty: 'hard' });
+      expect(screen.getByTestId('modal-shirt-number').textContent).toBe('?');
+      expect(screen.getByTestId('modal-shirt-number')).toHaveAttribute('aria-label', '? (number hidden)');
+    });
+
     it('shows the header number in Normal', () => {
       renderModal({ shirtNumber: 9, difficulty: 'normal' });
       expect(screen.getByTestId('modal-shirt-number').textContent).toBe('#9');

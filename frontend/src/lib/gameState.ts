@@ -54,8 +54,8 @@ export type GameAction =
   | { type: 'TOGGLE_BOARD' }
   | { type: 'OPEN_SHIRT'; payload: string }
   | { type: 'CLOSE_SHIRT' }
-  | { type: 'SUBMIT_GUESS'; payload: { token: string; results: GuessResult[]; isCorrect: boolean; name?: string } }
-  | { type: 'REVEAL_NAME'; payload: { token: string; name: string } }
+  | { type: 'SUBMIT_GUESS'; payload: { token: string; results: GuessResult[]; isCorrect: boolean; name?: string; shirtNumber?: number | null } }
+  | { type: 'REVEAL_NAME'; payload: { token: string; name: string; shirtNumber?: number | null } }
   | { type: 'SURRENDER' }
   | { type: 'NEW_GAME' }
   | { type: 'SET_ERROR'; payload: string | null }
@@ -160,7 +160,7 @@ function nextShirtState(isCorrect: boolean, isLastAttempt: boolean): ShirtState 
 function handleSubmitGuess(state: GameState, action: Extract<GameAction, { type: 'SUBMIT_GUESS' }>): GameState {
   if (!state.match || state.gameStatus !== 'playing') return state;
 
-  const { token, results, isCorrect, name } = action.payload;
+  const { token, results, isCorrect, name, shirtNumber } = action.payload;
   const activeShirts = state.activeBoard === 'target' ? state.targetShirts : state.opponentShirts;
   const shirtIndex = activeShirts.findIndex(s => s.token === token);
   if (shirtIndex === -1) return state;
@@ -179,6 +179,7 @@ function handleSubmitGuess(state: GameState, action: Extract<GameAction, { type:
     guessHistory: [...shirt.guessHistory, results],
     correctLetters: collectCorrectLetters(results, shirt.correctLetters),
     ...(isCorrect ? { name } : {}),
+    ...(isCorrect && shirtNumber !== undefined ? { shirtNumber, shirtNumberHidden: false } : {}),
   });
 
   const updatedTarget = state.activeBoard === 'target' ? updatedActiveShirts : state.targetShirts;
@@ -226,7 +227,13 @@ function handleOpenShirt(state: GameState, action: Extract<GameAction, { type: '
 /** Full REVEAL_NAME handling — extracted so the reducer case stays thin. */
 function handleRevealName(state: GameState, action: Extract<GameAction, { type: 'REVEAL_NAME' }>): GameState {
   const reveal = (shirts: ShirtGameData[]) =>
-    shirts.map(s => (s.token === action.payload.token ? { ...s, name: action.payload.name } : s));
+    shirts.map(s => (s.token === action.payload.token ? {
+      ...s,
+      name: action.payload.name,
+      ...(action.payload.shirtNumber !== undefined
+        ? { shirtNumber: action.payload.shirtNumber, shirtNumberHidden: false }
+        : {}),
+    } : s));
   return {
     ...state,
     targetShirts: reveal(state.targetShirts),
@@ -356,8 +363,8 @@ interface UseGameStateReturn {
   toggleBoard: () => void;
   openShirt: (token: string) => void;
   closeShirt: () => void;
-  submitGuess: (token: string, results: GuessResult[], isCorrect: boolean, name?: string) => void;
-  revealName: (token: string, name: string) => void;
+  submitGuess: (token: string, results: GuessResult[], isCorrect: boolean, name?: string, shirtNumber?: number | null) => void;
+  revealName: (token: string, name: string, shirtNumber?: number | null) => void;
   surrender: () => void;
   newGame: () => void;
   setError: (error: string | null) => void;
@@ -391,12 +398,12 @@ export function useGameState(): UseGameStateReturn {
     dispatch({ type: 'CLOSE_SHIRT' });
   }, []);
 
-  const submitGuess = useCallback((token: string, results: GuessResult[], isCorrect: boolean, name?: string) => {
-    dispatch({ type: 'SUBMIT_GUESS', payload: { token, results, isCorrect, name } });
+  const submitGuess = useCallback((token: string, results: GuessResult[], isCorrect: boolean, name?: string, shirtNumber?: number | null) => {
+    dispatch({ type: 'SUBMIT_GUESS', payload: { token, results, isCorrect, name, shirtNumber } });
   }, []);
 
-  const revealName = useCallback((token: string, name: string) => {
-    dispatch({ type: 'REVEAL_NAME', payload: { token, name } });
+  const revealName = useCallback((token: string, name: string, shirtNumber?: number | null) => {
+    dispatch({ type: 'REVEAL_NAME', payload: { token, name, shirtNumber } });
   }, []);
 
   const surrender = useCallback(() => {

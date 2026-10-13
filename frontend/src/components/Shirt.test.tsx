@@ -59,6 +59,12 @@ describe('Shirt number masking', () => {
     expect(screen.getByRole('button').getAttribute('aria-label')).toContain('? (no number on record)');
   });
 
+  it('renders a mask when the server withholds the number from the lineup payload', () => {
+    renderShirt({ shirtNumber: null, shirtNumberHidden: true }, 'hard');
+    expect(screen.getByTestId('shirt-number').textContent).toBe('?');
+    expect(screen.getByRole('button').getAttribute('aria-label')).toContain('? (number hidden)');
+  });
+
   it('keeps clue icons and text out of Hard mode while preserving red-card decoration', () => {
     renderShirt({ redCards: 1 }, 'hard');
     const button = screen.getByRole('button');

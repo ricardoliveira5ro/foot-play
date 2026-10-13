@@ -198,7 +198,7 @@ function BadgeIcon({ badge }: { badge: ShirtBadge }) {
 export default function Shirt({ shirt, index, onClick, guessHistory, colors, difficulty = DEFAULT_DIFFICULTY }: ShirtProps) {
   const { token, nameLength, shirtNumber, coords, state } = shirt;
   const displayNumber = maskedShirtNumber(difficulty, shirtNumber, state);
-  const numberLabel = shirtNumberAriaLabel(difficulty, shirtNumber, state);
+  const numberLabel = shirtNumberAriaLabel(difficulty, shirtNumber, state, shirt.shirtNumberHidden);
 
   // §3.1: no event data on this game means [] for every shirt. There is no
   // per-shirt availability signal and this must not invent one.
@@ -309,7 +309,7 @@ export default function Shirt({ shirt, index, onClick, guessHistory, colors, dif
               {displayNumber}
             </span>
           )}
-          {shirtNumber !== null && displayNumber === null && (
+          {(shirt.shirtNumberHidden || (shirtNumber !== null && displayNumber === null)) && (
             <span
               data-testid="shirt-number"
               className={`absolute inset-0 flex items-center justify-center pt-[4%] font-display leading-none ${numberClass}`}

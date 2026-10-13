@@ -40,6 +40,7 @@ describe('shirtNumberAriaLabel', () => {
   it('distinguishes a hidden number from a missing number', () => {
     expect(shirtNumberAriaLabel('hard', 9, 'default')).toBe('? (number hidden)');
     expect(shirtNumberAriaLabel('hard', null, 'default')).toBe('? (no number on record)');
+    expect(shirtNumberAriaLabel('hard', null, 'default', true)).toBe('? (number hidden)');
   });
 
   it('uses the same masking labels in Expert', () => {

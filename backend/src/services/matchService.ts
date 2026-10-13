@@ -126,17 +126,18 @@ function buildLineup(gameId: number, appearances: GameWithRelations['appearances
       token: generatePlayerToken(gameId, a.playerId),
       nameLength: normalize(displayName).length,
       wordBoundaries: getWordBoundaries(displayName),
-      shirtNumber: a.number ?? null,
+      shirtNumber: difficulty === 'hard' ? null : a.number ?? null,
+      ...(difficulty === 'hard' ? { shirtNumberHidden: a.number !== null } : {}),
       position: fitted[i].position,
       coords: fitted[i].coords,
       // Event columns (v1.0.2). These default to 0 and stay 0 on a game that
       // was seeded before v1.0.1 — 0 is indistinguishable from "did not
       // score", which is why degradation is per game and carries no flag.
-      goals: a.goals,
+      goals: difficulty === 'hard' ? 0 : a.goals,
       assists: a.assists,
       redCards: a.redCards,
       // Prisma types isCaptain as Boolean?; the wire type is boolean.
-      isCaptain: a.isCaptain ?? false,
+      isCaptain: difficulty === 'hard' ? false : (a.isCaptain ?? false),
       // The Easy clue is only present in an Easy response. Keep both the
       // availability bit and its value out of Normal payloads.
       hasFirstLetter: difficulty === 'easy' && displayName.trim().length > 0,
@@ -147,7 +148,7 @@ function buildLineup(gameId: number, appearances: GameWithRelations['appearances
   });
 }
 
-export async function getPlayerNameForAppearance(gameId: number, token: string): Promise<string | null> {
+export async function getPlayerForAppearance(gameId: number, token: string): Promise<{ name: string; shirtNumber: number | null } | null> {
   const playerId = await resolvePlayerToken(gameId, token);
 
   if (!playerId) return null;
@@ -157,7 +158,16 @@ export async function getPlayerNameForAppearance(gameId: number, token: string):
     include: { player: true }
   })
 
-  return appearance?.player.displayName ?? appearance?.player.name ?? null;
+  if (!appearance) return null;
+  return {
+    name: appearance.player.displayName ?? appearance.player.name ?? '',
+    shirtNumber: appearance.number,
+  };
+}
+
+export async function getPlayerNameForAppearance(gameId: number, token: string): Promise<string | null> {
+  const player = await getPlayerForAppearance(gameId, token);
+  return player?.name ?? null;
 }
 
 export async function getRevealAppearances(gameId: number, clubId: number) {

@@ -277,6 +277,28 @@ describe('gameReducer', () => {
   });
 
   describe('SUBMIT_GUESS', () => {
+    it('restores a withheld number when a Hard shirt is guessed correctly', () => {
+      const match = makeMatch({
+        homeLineup: [{ ...player('home-1'), shirtNumber: null, shirtNumberHidden: true }],
+      });
+      let state = gameReducer(initialState, { type: 'SET_MATCH', payload: match });
+      state = gameReducer(state, { type: 'SET_DIFFICULTY', payload: 'hard' });
+      state = openShirt(state, 'home-1');
+      const next = gameReducer(state, {
+        type: 'SUBMIT_GUESS',
+        payload: {
+          token: 'home-1',
+          results: [{ letter: 'M', result: 'CORRECT' }],
+          isCorrect: true,
+          name: 'Messi',
+          shirtNumber: 10,
+        },
+      });
+
+      expect(next.targetShirts[0].shirtNumber).toBe(10);
+      expect(next.targetShirts[0].shirtNumberHidden).toBe(false);
+    });
+
     it('marks a correct guess as correct, stores the name, and closes the modal', () => {
       const state = openShirt(playingState(), 'home-1');
       const next = gameReducer(state, correctGuess('home-1', 'Messi'));
@@ -398,6 +420,19 @@ describe('gameReducer', () => {
       expect(next.targetShirts[0].name).toBe('Messi');
       expect(next.targetShirts[1].name).toBeUndefined();
       expect(next.opponentShirts[0].name).toBeUndefined();
+    });
+
+    it('restores a withheld number when a failed shirt is revealed', () => {
+      const match = makeMatch({
+        homeLineup: [{ ...player('home-1'), shirtNumber: null, shirtNumberHidden: true }],
+      });
+      const state = gameReducer(initialState, { type: 'SET_MATCH', payload: match });
+      const next = gameReducer(state, {
+        type: 'REVEAL_NAME',
+        payload: { token: 'home-1', name: 'Messi', shirtNumber: 10 },
+      });
+      expect(next.targetShirts[0].shirtNumber).toBe(10);
+      expect(next.targetShirts[0].shirtNumberHidden).toBe(false);
     });
   });
 

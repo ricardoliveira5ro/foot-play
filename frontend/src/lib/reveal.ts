@@ -5,6 +5,7 @@ import type { ShirtGameData } from './gameState';
 export interface RevealMatch {
   token: string;
   name: string;
+  shirtNumber: number | null;
 }
 
 /**
@@ -31,7 +32,7 @@ export function revealMatches(
   for (const shirt of shirts) {
     if (shirt.state === 'correct') continue;
     const player = players.find((p) => p.token === shirt.token);
-    if (player) matches.push({ token: shirt.token, name: player.name });
+    if (player) matches.push({ token: shirt.token, name: player.name, shirtNumber: player.shirtNumber });
   }
   return matches;
 }

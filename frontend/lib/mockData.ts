@@ -121,11 +121,13 @@ export function getMockRandomMatch(filters: GameFilterParams, difficulty: 'easy'
     ...match,
     homeLineup: match.homeLineup.map((player) => ({
       ...player,
+      ...(difficulty === 'hard' ? { shirtNumber: null, shirtNumberHidden: player.shirtNumber !== null } : {}),
       hasFirstLetter: difficulty === 'easy' && player.hasFirstLetter,
       ...(difficulty === 'easy' ? { firstLetter: player.firstLetter } : {}),
     })),
     awayLineup: match.awayLineup.map((player) => ({
       ...player,
+      ...(difficulty === 'hard' ? { shirtNumber: null, shirtNumberHidden: player.shirtNumber !== null } : {}),
       hasFirstLetter: difficulty === 'easy' && player.hasFirstLetter,
       ...(difficulty === 'easy' ? { firstLetter: player.firstLetter } : {}),
     })),

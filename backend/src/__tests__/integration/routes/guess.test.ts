@@ -13,6 +13,7 @@ describe('POST /api/guess', () => {
     expect(res.status).toBe(200);
     expect(res.body.isCorrect).toBe(true);
     expect(res.body.name).toBe('Messi');
+    expect(res.body.shirtNumber).toBe(10);
     expect(res.body.results.every((r: any) => r.result === 'CORRECT')).toBe(true);
   });
 
@@ -106,7 +107,7 @@ describe('POST /api/guess/reveal-one', () => {
       token: generatePlayerToken(1, 101),
     });
     expect(res.status).toBe(200);
-    expect(res.body).toEqual({ name: 'Messi' });
+    expect(res.body).toEqual({ name: 'Messi', shirtNumber: 10 });
   });
 
   it('falls back to the player name when displayName is null', async () => {
@@ -115,7 +116,7 @@ describe('POST /api/guess/reveal-one', () => {
       token: generatePlayerToken(2, 114),
     });
     expect(res.status).toBe(200);
-    expect(res.body).toEqual({ name: 'Test Player' });
+    expect(res.body).toEqual({ name: 'Test Player', shirtNumber: null });
   });
 
   it('returns 404 when the token resolves but the player has no appearance in the game', async () => {

@@ -21,9 +21,10 @@ export function shirtNumberAriaLabel(
   mode: Difficulty,
   shirtNumber: number | null,
   state: ShirtState,
+  shirtNumberHidden = false,
 ): string {
   const display = maskedShirtNumber(mode, shirtNumber, state);
   if (display !== null) return String(display);
-  if (shirtNumber === null) return '? (no number on record)';
-  return '? (number hidden)';
+  if (shirtNumberHidden || shirtNumber !== null) return '? (number hidden)';
+  return '? (no number on record)';
 }

@@ -153,7 +153,12 @@ export async function submitGuess(gameId: number, token: string, guess: string):
       }
       const results = evaluateGuess(guess, player.displayName);
       const isCorrect = results.every((r) => r.result === 'CORRECT');
-      return { results, isCorrect, name: isCorrect ? player.displayName : undefined };
+      return {
+        results,
+        isCorrect,
+        name: isCorrect ? player.displayName : undefined,
+        shirtNumber: isCorrect ? player.shirtNumber : undefined,
+      };
     }
     throw new Error(`Match ${gameId} not found in mock dataset`);
   }
@@ -206,7 +211,7 @@ export async function revealOnePlayer(gameId: number, token: string): Promise<Re
     const all = [...entry.homeLineup, ...entry.awayLineup];
     const player = all.find((p) => p.token === token);
     if (!player) throw new Error('Player not found');
-    return { name: player.displayName };
+    return { name: player.displayName, shirtNumber: player.shirtNumber };
   }
   const response = await fetch(`${API_BASE_URL}/api/guess/reveal-one`, {
     method: 'POST',

@@ -92,8 +92,8 @@ export default function MissingElevenPage() {
   });
 
   const revealTeam = useCallback((players: RevealPlayer[], shirts: ShirtGameData[]) => {
-    for (const { token, name } of revealMatches(players, shirts)) {
-      revealName(token, name);
+    for (const { token, name, shirtNumber } of revealMatches(players, shirts)) {
+      revealName(token, name, shirtNumber);
     }
   }, [revealName]);
 
@@ -236,14 +236,14 @@ export default function MissingElevenPage() {
 
     try {
       const response = await submitGuessApi(state.match.game.gameId, activeShirt.token, guess);
-      submitGuess(activeShirt.token, response.results, response.isCorrect, response.name);
+      submitGuess(activeShirt.token, response.results, response.isCorrect, response.name, response.shirtNumber);
 
       // If this was the last attempt and it failed, reveal the player's name
       const maxAttempts = DIFFICULTY_CONFIG[state.difficulty].attempts;
       const isLastAttempt = activeShirt.guessHistory.length + 1 >= maxAttempts;
       if (!response.isCorrect && isLastAttempt) {
         const reveal = await revealOnePlayer(state.match.game.gameId, activeShirt.token);
-        revealName(activeShirt.token, reveal.name);
+        revealName(activeShirt.token, reveal.name, reveal.shirtNumber);
       }
     } catch (cause: unknown) {
       setError(describeError(cause));
@@ -533,6 +533,7 @@ export default function MissingElevenPage() {
           nameLength={activeShirt.nameLength}
           wordBoundaries={activeShirt.wordBoundaries}
           shirtNumber={activeShirt.shirtNumber}
+          shirtNumberHidden={activeShirt.shirtNumberHidden}
           position={activeShirt.position}
           guesses={guessHistory}
           maxAttempts={DIFFICULTY_CONFIG[state.difficulty].attempts}

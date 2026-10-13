@@ -20,6 +20,8 @@ interface WordleModalProps {
   wordBoundaries?: number[];
   /** The player's shirt number */
   shirtNumber: number | null;
+  /** True when Hard mode withheld this number from the lineup response. */
+  shirtNumberHidden?: boolean;
   /** The player's position (e.g., 'ST', 'CB', 'GK') */
   position: string | null;
   /** Previous guesses with their results */
@@ -179,6 +181,7 @@ export default function WordleModal({
   nameLength,
   wordBoundaries = [],
   shirtNumber,
+  shirtNumberHidden = false,
   position,
   guesses,
   maxAttempts = 6,
@@ -418,12 +421,13 @@ export default function WordleModal({
           <div>
             <p
               id="wordle-modal-title"
-              data-testid={shirtNumber !== null ? 'modal-shirt-number' : undefined}
+              data-testid={shirtNumber !== null || shirtNumberHidden ? 'modal-shirt-number' : undefined}
               className="font-sans font-semibold text-ink text-base"
+              aria-label={shirtNumberHidden ? '? (number hidden)' : undefined}
             >
               {displayShirtNumber !== null ? (
                 DIFFICULTY_CONFIG[difficulty].showShirtNumber ? `#${displayShirtNumber}` : displayShirtNumber
-              ) : shirtNumber !== null ? (
+              ) : shirtNumber !== null || shirtNumberHidden ? (
                 '?'
               ) : 'Player'}
             </p>

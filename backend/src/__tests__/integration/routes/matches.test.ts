@@ -26,6 +26,10 @@ describe('GET /api/matches/random', () => {
     const res = await request(app).get('/api/matches/random?difficulty=hard');
     expect(res.status).toBe(200);
     for (const player of [...res.body.homeLineup, ...res.body.awayLineup]) {
+      expect(player.shirtNumber).toBeNull();
+      expect(typeof player.shirtNumberHidden).toBe('boolean');
+      expect(player.goals).toBe(0);
+      expect(player.isCaptain).toBe(false);
       expect(player.hasFirstLetter).toBe(false);
       expect(player).not.toHaveProperty('firstLetter');
     }
