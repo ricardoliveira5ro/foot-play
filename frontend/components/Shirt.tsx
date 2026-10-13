@@ -52,6 +52,7 @@ function shirtAriaLabel(
   badges: ShirtBadge[],
   name?: string,
   firstLetter?: string | null,
+  isCaptain = false,
 ): string {
   const goalCount = badges.filter((badge) => badge === 'scorer').length;
   const badgeLabels: string[] = [];
@@ -61,6 +62,7 @@ function shirtAriaLabel(
     );
   }
   if (badges.includes('sent-off')) badgeLabels.push(BADGE_LABELS['sent-off']);
+  if (isCaptain) badgeLabels.push('captain for this match');
   if (firstLetter && (state === 'default' || state === 'in-progress')) {
     badgeLabels.push(`first letter ${firstLetter}`);
   }
@@ -205,6 +207,7 @@ export default function Shirt({ shirt, index, onClick, guessHistory, colors, dif
   const badges = badgesForShirt({ goals: shirt.goals, redCards: shirt.redCards })
     .filter((badge) => badge !== 'scorer' || DIFFICULTY_CONFIG[difficulty].showScorersClue);
   const firstLetter = DIFFICULTY_CONFIG[difficulty].showFirstLetter ? shirt.firstLetter : null;
+  const hasCaptainBadge = DIFFICULTY_CONFIG[difficulty].showCaptainClue && shirt.isCaptain;
   const hasStateBadge = state === 'correct' || state === 'failed';
   const badgeRowWidth =
     badges.length * 16 +
@@ -279,7 +282,7 @@ export default function Shirt({ shirt, index, onClick, guessHistory, colors, dif
       <button
         type="button"
         onClick={onClick ? () => onClick(token) : undefined}
-        aria-label={shirtAriaLabel(state, numberLabel, badges, shirt.name, firstLetter)}
+        aria-label={shirtAriaLabel(state, numberLabel, badges, shirt.name, firstLetter, hasCaptainBadge)}
         className={`-m-2 block w-[calc(100%+1rem)] cursor-pointer rounded-md p-2 ${state === 'failed' ? 'opacity-60 saturate-[0.6]' : ''}`}
       >
         {/* Inner wrapper carries the entrance animation so positional and
@@ -319,6 +322,15 @@ export default function Shirt({ shirt, index, onClick, guessHistory, colors, dif
               }}
             >
               ?
+            </span>
+          )}
+          {hasCaptainBadge && (
+            <span
+              aria-hidden="true"
+              data-badge="captain"
+              className="absolute right-[6%] top-[36%] flex h-3.5 w-3.5 items-center justify-center rounded-full border border-ink/25 bg-[#E8A00C] font-mono text-[9px] font-bold leading-none text-ink shadow-sm"
+            >
+              C
             </span>
           )}
         </span>

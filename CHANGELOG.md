@@ -27,6 +27,12 @@ _2026-10-13 · Spec: `docs/v1/v1.2/plan-v1.2.3-hard-mode.md`_
   explains that Hard hides numbers, and regression coverage confirms Finish
   remains absent in every offered mode.
 
+### Fixed
+
+- **Captain clue visibility.** Easy and Normal now show a compact `C` badge
+  tucked beneath the shirt's right sleeve, with the captain clue included in
+  the shirt's accessible label. Modes that hide captain clues keep it hidden.
+
 ---
 
 ## v1.2.2 — Easy and Normal modes
