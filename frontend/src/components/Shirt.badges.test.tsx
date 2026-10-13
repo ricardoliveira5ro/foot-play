@@ -148,7 +148,7 @@ describe('Shirt badges', () => {
   it('keeps the existing null-shirt-number accessible name', () => {
     const { button } = renderShirt({ shirtNumber: null, goals: 1, redCards: 0 });
     expect(button.getAttribute('aria-label')).toBe(
-      'Shirt ?, tap to guess the player, scored in this match',
+      'Shirt ? (no number on record), tap to guess the player, scored in this match',
     );
   });
 });

@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState, useCallback, useMemo } from 'react';
 import type { GuessResult } from '@/lib/wordle';
 import { DEFAULT_DIFFICULTY, DIFFICULTY_CONFIG, type Difficulty } from '../lib/difficulty';
+import { maskedShirtNumber } from '../lib/shirtNumberMask';
 import type { ShirtClue } from '../lib/shirtBadges';
 
 const CLUE_LABELS: Record<ShirtClue, string> = {
@@ -199,6 +200,7 @@ export default function WordleModal({
 
   const canSubmit = inputValue.length === targetLength && !isGameOver;
   const keyStates = useMemo(() => getKeyStates(guesses), [guesses]);
+  const displayShirtNumber = maskedShirtNumber(difficulty, shirtNumber, 'in-progress');
 
   // Open as a modal dialog on mount (native focus trap + top layer).
   useEffect(() => {
@@ -414,8 +416,16 @@ export default function WordleModal({
         {/* Header */}
         <header className="flex items-center justify-between p-4 border-b border-ink/10">
           <div>
-            <p id="wordle-modal-title" className="font-sans font-semibold text-ink text-base">
-              {shirtNumber !== null ? `#${shirtNumber}` : 'Player'}
+            <p
+              id="wordle-modal-title"
+              data-testid={shirtNumber !== null ? 'modal-shirt-number' : undefined}
+              className="font-sans font-semibold text-ink text-base"
+            >
+              {displayShirtNumber !== null ? (
+                DIFFICULTY_CONFIG[difficulty].showShirtNumber ? `#${displayShirtNumber}` : displayShirtNumber
+              ) : shirtNumber !== null ? (
+                '?'
+              ) : 'Player'}
             </p>
             <p id="wordle-modal-desc" className="text-xs text-ink/55 mt-0.5">
               Guess the {getPositionLabel(position)}

@@ -8,6 +8,24 @@ from, and release notes are taken from the entry itself.
 
 ---
 
+## v1.2.3 — Hard mode
+
+_2026-10-13 · Spec: `docs/v1/v1.2/plan-v1.2.3-hard-mode.md`_
+
+### Added
+
+- **Hard mode** joins Easy and Normal in the selector. It keeps six attempts,
+  removes first-letter and scorer clues, and masks unresolved shirt numbers as
+  `?`. Numbers reappear after a shirt is solved or failed; missing numbers stay
+  absent. Shirt number data remains unchanged.
+- **Accessible number labels** distinguish a masked number from one missing
+  from the lineup data.
+- **Config-driven number descriptions and Finish availability.** The selector
+  explains that Hard hides numbers, and regression coverage confirms Finish
+  remains absent in every offered mode.
+
+---
+
 ## v1.2.2 — Easy and Normal modes
 
 _2026-10-12 · Spec: `docs/v1/v1.2/plan-v1.2.2-easy-normal-modes.md`_

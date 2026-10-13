@@ -16,6 +16,7 @@ import MOCK_MATCHES, {
 import { evaluateGuess } from '@/lib/wordle';
 import { EMPTY_FILTERS } from '@/types';
 import { filtersToParams } from '@/lib/filterParams';
+import type { Difficulty } from '@/lib/difficulty';
 
 /**
  * API client for the FootPlay backend.
@@ -90,13 +91,16 @@ function isFilterOptionsResponse(value: unknown): value is FilterOptionsResponse
 }
 
 /** GET /api/matches/random — a random match with both full lineups. */
-export async function fetchRandomMatch(filters: GameFilterParams = EMPTY_FILTERS, difficulty: 'easy' | 'normal' = 'normal'): Promise<GameResponse | null> {
+export async function fetchRandomMatch(filters: GameFilterParams = EMPTY_FILTERS, difficulty: Difficulty = 'normal'): Promise<GameResponse | null> {
+  // The API only shapes the payload around first-letter visibility. Hard and
+  // Normal both omit that clue, so request the Normal-shaped payload for Hard.
+  const responseMode = difficulty === 'easy' ? 'easy' : 'normal';
   if (USE_MOCK) {
     await delay(MOCK_DELAY_MS);
-    return getMockRandomMatch(filters, difficulty);
+    return getMockRandomMatch(filters, responseMode);
   }
   const params = new URLSearchParams(filtersToParams(filters));
-  params.set('difficulty', difficulty);
+  params.set('difficulty', responseMode);
   return requestRandomMatch(`/api/matches/random?${params.toString()}`);
 }
 
