@@ -22,6 +22,19 @@ describe('GET /api/matches/random', () => {
     expect(empty.status).toBe(404);
   });
 
+  it('accepts Hard and omits the Easy-only first-letter clue', async () => {
+    const res = await request(app).get('/api/matches/random?difficulty=hard');
+    expect(res.status).toBe(200);
+    for (const player of [...res.body.homeLineup, ...res.body.awayLineup]) {
+      expect(player.shirtNumber).toBeNull();
+      expect(typeof player.shirtNumberHidden).toBe('boolean');
+      expect(player.goals).toBe(0);
+      expect(player.isCaptain).toBe(false);
+      expect(player.hasFirstLetter).toBe(false);
+      expect(player).not.toHaveProperty('firstLetter');
+    }
+  });
+
   it('returns 404 when no matches exist', async () => {
     await prisma.appearance.deleteMany();
     await prisma.game.deleteMany();

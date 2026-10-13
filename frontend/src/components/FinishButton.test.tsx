@@ -58,4 +58,20 @@ describe('FinishButton', () => {
       );
     }
   });
+
+  it('renders nothing in Hard too, proving the third non-Expert mode reads the flag', () => {
+    const { container } = render(
+      <FinishButton difficulty="hard" resolved={22} total={22} onFinish={() => {}} />,
+    );
+    expect(container.innerHTML).toBe('');
+    expect(screen.queryByRole('button')).toBeNull();
+  });
+
+  it('still renders the confirmation step for the required mode', () => {
+    const onFinish = vi.fn();
+    render(<FinishButton difficulty="expert" resolved={22} total={22} onFinish={onFinish} />);
+    fireEvent.click(screen.getByRole('button', { name: /^finish/i }));
+    expect(onFinish).not.toHaveBeenCalled();
+    expect(screen.getByText(/cannot be undone/i)).toBeTruthy();
+  });
 });

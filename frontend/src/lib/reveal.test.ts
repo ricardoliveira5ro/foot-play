@@ -31,7 +31,7 @@ describe('revealMatches', () => {
   it('matches a revealed player to the shirt carrying the same token', () => {
     const shirts = [makeShirt({ token: 't-6', shirtNumber: 6 })];
     const result = revealMatches([makeReveal({ token: 't-6', name: 'Target Six' })], shirts);
-    expect(result).toEqual([{ token: 't-6', name: 'Target Six' }]);
+    expect(result).toEqual([{ token: 't-6', name: 'Target Six', shirtNumber: 10 }]);
   });
 
   it('assigns distinct names to two shirts that both have a null number (R1(a))', () => {
@@ -51,8 +51,8 @@ describe('revealMatches', () => {
       shirts,
     );
     expect(result).toEqual([
-      { token: 't-a', name: 'First Player' },
-      { token: 't-b', name: 'Second Player' },
+      { token: 't-a', name: 'First Player', shirtNumber: null },
+      { token: 't-b', name: 'Second Player', shirtNumber: null },
     ]);
   });
 
@@ -69,8 +69,8 @@ describe('revealMatches', () => {
       shirts,
     );
     expect(result).toEqual([
-      { token: 't-x', name: 'Numbersman' },
-      { token: 't-y', name: 'Trickster' },
+      { token: 't-x', name: 'Numbersman', shirtNumber: 6 },
+      { token: 't-y', name: 'Trickster', shirtNumber: 6 },
     ]);
   });
 
@@ -97,7 +97,7 @@ describe('revealMatches', () => {
       ],
       shirts,
     );
-    expect(result).toEqual([{ token: 't-2', name: 'New Name' }]);
+    expect(result).toEqual([{ token: 't-2', name: 'New Name', shirtNumber: 10 }]);
   });
 
   it('ignores a revealed player with no shirt on this board', () => {
@@ -109,7 +109,7 @@ describe('revealMatches', () => {
   it('leaves an already-named failed shirt matchable and unchanged in value', () => {
     const shirts = [makeShirt({ token: 't-1', state: 'failed', name: 'Stale' })];
     const result = revealMatches([makeReveal({ token: 't-1', name: 'Fresh' })], shirts);
-    expect(result).toEqual([{ token: 't-1', name: 'Fresh' }]);
+    expect(result).toEqual([{ token: 't-1', name: 'Fresh', shirtNumber: 10 }]);
     expect(shirts[0].name).toBe('Stale'); // pure: no mutation
   });
 

@@ -29,6 +29,8 @@ export interface LineupPlayer {
   /** Normalized indices where a word separator (space/hyphen/apostrophe) occurs. */
   wordBoundaries: number[];
   shirtNumber: number | null;
+  /** True when Hard mode withheld a real number from the lineup response. */
+  shirtNumberHidden?: boolean;
   /** Position code, e.g. 'GK' | 'CB' | 'LB' | 'CM' | 'ST'. */
   position: string | null;
   coords: PositionCoords;
@@ -149,6 +151,8 @@ export interface GuessResponse {
   isCorrect: boolean;
   /** Only present when isCorrect is true. */
   name?: string;
+  /** Only returned after a correct guess. */
+  shirtNumber?: number | null;
 }
 
 /** One entry of POST /api/guess/reveal. */
@@ -172,4 +176,5 @@ export interface RevealResponse {
 /** POST /api/guess/reveal-one response — a single player's name. */
 export interface RevealOneResponse {
   name: string;
+  shirtNumber: number | null;
 }

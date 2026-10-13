@@ -8,6 +8,33 @@ from, and release notes are taken from the entry itself.
 
 ---
 
+## v1.2.3 — Hard mode
+
+_2026-10-13 · Spec: `docs/v1/v1.2/plan-v1.2.3-hard-mode.md`_
+
+### Added
+
+- **Hard mode** joins Easy and Normal in the selector. It keeps six attempts,
+  removes first-letter and scorer clues, and masks unresolved shirt numbers as
+  `?`. The Hard lineup response redacts actual numbers, scorer totals and
+  captain status. Numbers reappear after a shirt is solved or failed; missing
+  numbers stay absent.
+- **Accessible number labels** distinguish a masked number from one missing
+  from the lineup data.
+- **Hard-mode match requests** retain `difficulty=hard`; the backend accepts
+  Hard and omits first-letter data from its response.
+- **Config-driven number descriptions and Finish availability.** The selector
+  explains that Hard hides numbers, and regression coverage confirms Finish
+  remains absent in every offered mode.
+
+### Fixed
+
+- **Captain clue visibility.** Easy and Normal now show a compact `C` badge
+  tucked beneath the shirt's right sleeve, with the captain clue included in
+  the shirt's accessible label. Modes that hide captain clues keep it hidden.
+
+---
+
 ## v1.2.2 — Easy and Normal modes
 
 _2026-10-12 · Spec: `docs/v1/v1.2/plan-v1.2.2-easy-normal-modes.md`_

@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { asyncHandler } from '../middleware/asyncHandler';
 import { validateEnumStringField, validateNonEmptyStringField, validateNumberField } from '../middleware/validate';
-import { getMatchById, getPlayerNameForAppearance, getRevealAppearances } from '../services/matchService';
+import { getMatchById, getPlayerForAppearance, getRevealAppearances } from '../services/matchService';
 import { evaluateGuessWithResult } from '../services/wordle';
 
 const router = Router();
@@ -22,20 +22,20 @@ router.post('/', asyncHandler(async (req, res) => {
     return res.status(400).json(guess);
   }
 
-  const playerName = await getPlayerNameForAppearance(gameId, token)
+  const player = await getPlayerForAppearance(gameId, token)
 
-  if (!playerName) {
+  if (!player) {
     return res.status(404).json({ error: `Player not found`, code: 'NOT_FOUND' })
   }
 
-  const result = evaluateGuessWithResult(guess, playerName);
+  const result = evaluateGuessWithResult(guess, player.name);
   const response = {
     results: result.results,
     isCorrect: result.isCorrect
   }
   
   if (result.isCorrect) {
-    res.json({ ...response, name: playerName });
+    res.json({ ...response, name: player.name, shirtNumber: player.shirtNumber });
   } else {
     res.json(response);
   }
@@ -76,13 +76,11 @@ router.post('/reveal-one', asyncHandler(async (req, res) => {
     return res.status(400).json(token);
   }
 
-  const name = await getPlayerNameForAppearance(gameId, token);
-
-  if (!name) {
+  const player = await getPlayerForAppearance(gameId, token);
+  if (!player) {
     return res.status(404).json({ error: 'Player not found', code: 'NOT_FOUND' });
   }
-
-  res.json({ name });
+  res.json(player);
 }));
 
 export default router;

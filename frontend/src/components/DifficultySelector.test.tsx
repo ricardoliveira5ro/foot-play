@@ -36,4 +36,10 @@ describe('DifficultySelector', () => {
     expect(screen.getByText(/first letter/i)).toBeTruthy();
     expect(screen.getAllByText(/6 attempts/i).length).toBeGreaterThan(0);
   });
+
+  it('tells the player that Hard hides the number', () => {
+    render(<DifficultySelector value="normal" onChange={() => {}} />);
+    expect(screen.getByText(/number hidden/i)).toBeTruthy();
+    expect(screen.getAllByText(/number shown/i)).toHaveLength(2);
+  });
 });

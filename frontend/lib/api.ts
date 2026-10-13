@@ -16,6 +16,7 @@ import MOCK_MATCHES, {
 import { evaluateGuess } from '@/lib/wordle';
 import { EMPTY_FILTERS } from '@/types';
 import { filtersToParams } from '@/lib/filterParams';
+import type { Difficulty } from '@/lib/difficulty';
 
 /**
  * API client for the FootPlay backend.
@@ -90,13 +91,16 @@ function isFilterOptionsResponse(value: unknown): value is FilterOptionsResponse
 }
 
 /** GET /api/matches/random — a random match with both full lineups. */
-export async function fetchRandomMatch(filters: GameFilterParams = EMPTY_FILTERS, difficulty: 'easy' | 'normal' = 'normal'): Promise<GameResponse | null> {
+export async function fetchRandomMatch(filters: GameFilterParams = EMPTY_FILTERS, difficulty: Difficulty = 'normal'): Promise<GameResponse | null> {
+  // Expert is not selectable yet; until its API rules ship, request the
+  // Normal-shaped payload if a caller supplies it directly.
+  const responseMode = difficulty === 'expert' ? 'normal' : difficulty;
   if (USE_MOCK) {
     await delay(MOCK_DELAY_MS);
-    return getMockRandomMatch(filters, difficulty);
+    return getMockRandomMatch(filters, responseMode);
   }
   const params = new URLSearchParams(filtersToParams(filters));
-  params.set('difficulty', difficulty);
+  params.set('difficulty', responseMode);
   return requestRandomMatch(`/api/matches/random?${params.toString()}`);
 }
 
@@ -149,7 +153,12 @@ export async function submitGuess(gameId: number, token: string, guess: string):
       }
       const results = evaluateGuess(guess, player.displayName);
       const isCorrect = results.every((r) => r.result === 'CORRECT');
-      return { results, isCorrect, name: isCorrect ? player.displayName : undefined };
+      return {
+        results,
+        isCorrect,
+        name: isCorrect ? player.displayName : undefined,
+        shirtNumber: isCorrect ? player.shirtNumber : undefined,
+      };
     }
     throw new Error(`Match ${gameId} not found in mock dataset`);
   }
@@ -202,7 +211,7 @@ export async function revealOnePlayer(gameId: number, token: string): Promise<Re
     const all = [...entry.homeLineup, ...entry.awayLineup];
     const player = all.find((p) => p.token === token);
     if (!player) throw new Error('Player not found');
-    return { name: player.displayName };
+    return { name: player.displayName, shirtNumber: player.shirtNumber };
   }
   const response = await fetch(`${API_BASE_URL}/api/guess/reveal-one`, {
     method: 'POST',

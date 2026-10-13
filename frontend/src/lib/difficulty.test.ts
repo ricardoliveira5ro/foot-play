@@ -47,10 +47,11 @@ describe('DIFFICULTY_CONFIG', () => {
 
 describe('DIFFICULTIES', () => {
   it('offers only the modes that have shipped, in ascending order', () => {
-    // v1.2.2 ships Easy and Normal. v1.2.3 appends 'hard', v1.2.4 appends
-    // 'expert'. The offer list is deliberately not the same thing as the
-    // config keys.
-    expect(DIFFICULTIES).toEqual(['easy', 'normal']);
+    expect(DIFFICULTIES).toEqual(['easy', 'normal', 'hard']);
+  });
+
+  it('still withholds Expert until v1.2.4', () => {
+    expect(DIFFICULTIES).not.toContain('expert');
   });
 
   it('offers a subset of the config, in config order', () => {

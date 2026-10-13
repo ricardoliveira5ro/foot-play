@@ -8,6 +8,7 @@ import type { TeamColorEntry } from '@/lib/teamColors';
 import { getTextColor } from '@/lib/colorUtils';
 import { badgesForShirt, type ShirtBadge } from '@/lib/shirtBadges';
 import { DIFFICULTY_CONFIG, DEFAULT_DIFFICULTY, type Difficulty } from '@/lib/difficulty';
+import { maskedShirtNumber, shirtNumberAriaLabel } from '@/lib/shirtNumberMask';
 
 const SHIRT_PATH =
   'M28 10 L32 13 L36 10 L56 14 L62 15 L62 20 L51 22 L51 58 L13 58 L13 22 L2 20 L2 15 L8 14 L28 10 Z';
@@ -47,12 +48,12 @@ const BADGE_LABELS: Record<ShirtBadge, string> = {
 /** State-aware accessible name for the shirt button. */
 function shirtAriaLabel(
   state: ShirtState,
-  shirtNumber: number | null,
+  number: string,
   badges: ShirtBadge[],
   name?: string,
   firstLetter?: string | null,
+  isCaptain = false,
 ): string {
-  const number = shirtNumber ?? '?';
   const goalCount = badges.filter((badge) => badge === 'scorer').length;
   const badgeLabels: string[] = [];
   if (goalCount > 0) {
@@ -61,6 +62,7 @@ function shirtAriaLabel(
     );
   }
   if (badges.includes('sent-off')) badgeLabels.push(BADGE_LABELS['sent-off']);
+  if (isCaptain) badgeLabels.push('captain for this match');
   if (firstLetter && (state === 'default' || state === 'in-progress')) {
     badgeLabels.push(`first letter ${firstLetter}`);
   }
@@ -197,11 +199,15 @@ function BadgeIcon({ badge }: { badge: ShirtBadge }) {
  */
 export default function Shirt({ shirt, index, onClick, guessHistory, colors, difficulty = DEFAULT_DIFFICULTY }: ShirtProps) {
   const { token, nameLength, shirtNumber, coords, state } = shirt;
+  const displayNumber = maskedShirtNumber(difficulty, shirtNumber, state);
+  const numberLabel = shirtNumberAriaLabel(difficulty, shirtNumber, state, shirt.shirtNumberHidden);
 
   // §3.1: no event data on this game means [] for every shirt. There is no
   // per-shirt availability signal and this must not invent one.
-  const badges = badgesForShirt({ goals: shirt.goals, redCards: shirt.redCards });
+  const badges = badgesForShirt({ goals: shirt.goals, redCards: shirt.redCards })
+    .filter((badge) => badge !== 'scorer' || DIFFICULTY_CONFIG[difficulty].showScorersClue);
   const firstLetter = DIFFICULTY_CONFIG[difficulty].showFirstLetter ? shirt.firstLetter : null;
+  const hasCaptainBadge = DIFFICULTY_CONFIG[difficulty].showCaptainClue && shirt.isCaptain;
   const hasStateBadge = state === 'correct' || state === 'failed';
   const badgeRowWidth =
     badges.length * 16 +
@@ -276,7 +282,7 @@ export default function Shirt({ shirt, index, onClick, guessHistory, colors, dif
       <button
         type="button"
         onClick={onClick ? () => onClick(token) : undefined}
-        aria-label={shirtAriaLabel(state, shirtNumber, badges, shirt.name, firstLetter)}
+        aria-label={shirtAriaLabel(state, numberLabel, badges, shirt.name, firstLetter, hasCaptainBadge)}
         className={`-m-2 block w-[calc(100%+1rem)] cursor-pointer rounded-md p-2 ${state === 'failed' ? 'opacity-60 saturate-[0.6]' : ''}`}
       >
         {/* Inner wrapper carries the entrance animation so positional and
@@ -294,15 +300,37 @@ export default function Shirt({ shirt, index, onClick, guessHistory, colors, dif
               </g>
             )}
           </svg>
-          {shirtNumber !== null && (
+          {displayNumber !== null && (
             <span
+              data-testid="shirt-number"
               className={`absolute inset-0 flex items-center justify-center pt-[4%] font-display leading-none ${numberClass}`}
               style={{
                 fontSize: '38cqw',
                 ...(colors?.numberOutline ? { WebkitTextStroke: '1px #000' } : {}),
               }}
             >
-              {shirtNumber}
+              {displayNumber}
+            </span>
+          )}
+          {(shirt.shirtNumberHidden || (shirtNumber !== null && displayNumber === null)) && (
+            <span
+              data-testid="shirt-number"
+              className={`absolute inset-0 flex items-center justify-center pt-[4%] font-display leading-none ${numberClass}`}
+              style={{
+                fontSize: '38cqw',
+                ...(colors?.numberOutline ? { WebkitTextStroke: '1px #000' } : {}),
+              }}
+            >
+              ?
+            </span>
+          )}
+          {hasCaptainBadge && (
+            <span
+              aria-hidden="true"
+              data-badge="captain"
+              className="absolute right-[6%] top-[36%] flex h-3.5 w-3.5 items-center justify-center rounded-full border border-ink/25 bg-[#E8A00C] font-mono text-[9px] font-bold leading-none text-ink shadow-sm"
+            >
+              C
             </span>
           )}
         </span>

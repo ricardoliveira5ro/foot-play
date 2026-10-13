@@ -32,8 +32,8 @@ function makeShirt(overrides: Partial<ShirtData> = {}): ShirtData {
   };
 }
 
-function renderShirt(overrides: Partial<ShirtData> = {}) {
-  const { container } = render(<Shirt shirt={makeShirt(overrides)} index={0} />);
+function renderShirt(overrides: Partial<ShirtData> = {}, difficulty?: 'easy' | 'normal' | 'hard' | 'expert') {
+  const { container } = render(<Shirt shirt={makeShirt(overrides)} index={0} difficulty={difficulty} />);
   const button = container.querySelector('button');
   if (!button) throw new Error('Shirt did not render a button');
   return { container, button };
@@ -57,6 +57,20 @@ describe('Shirt badges', () => {
     const { container, button } = renderShirt({ goals: 0, redCards: 0 });
     expect(container.querySelectorAll('[data-badge]')).toHaveLength(0);
     expect(button.getAttribute('aria-label')).toBe('Shirt 10, tap to guess the player');
+  });
+
+  it('places a captain marker beneath the right arm in modes that show the clue', () => {
+    const { container, button } = renderShirt({ isCaptain: true }, 'normal');
+    const badge = container.querySelector('[data-badge="captain"]');
+    expect(badge).not.toBeNull();
+    expect(badge).toHaveClass('right-[6%]', 'top-[36%]', 'bg-[#E8A00C]');
+    expect(button.getAttribute('aria-label')).toContain('captain for this match');
+  });
+
+  it('does not show the captain marker in Hard', () => {
+    const { container, button } = renderShirt({ isCaptain: true }, 'hard');
+    expect(container.querySelector('[data-badge="captain"]')).toBeNull();
+    expect(button.getAttribute('aria-label')).not.toContain('captain');
   });
 
   it('renders one scorer badge per goal and names the total', () => {
@@ -148,7 +162,7 @@ describe('Shirt badges', () => {
   it('keeps the existing null-shirt-number accessible name', () => {
     const { button } = renderShirt({ shirtNumber: null, goals: 1, redCards: 0 });
     expect(button.getAttribute('aria-label')).toBe(
-      'Shirt ?, tap to guess the player, scored in this match',
+      'Shirt ? (no number on record), tap to guess the player, scored in this match',
     );
   });
 });

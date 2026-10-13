@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState, useCallback, useMemo } from 'react';
 import type { GuessResult } from '@/lib/wordle';
 import { DEFAULT_DIFFICULTY, DIFFICULTY_CONFIG, type Difficulty } from '../lib/difficulty';
+import { maskedShirtNumber } from '../lib/shirtNumberMask';
 import type { ShirtClue } from '../lib/shirtBadges';
 
 const CLUE_LABELS: Record<ShirtClue, string> = {
@@ -19,6 +20,8 @@ interface WordleModalProps {
   wordBoundaries?: number[];
   /** The player's shirt number */
   shirtNumber: number | null;
+  /** True when Hard mode withheld this number from the lineup response. */
+  shirtNumberHidden?: boolean;
   /** The player's position (e.g., 'ST', 'CB', 'GK') */
   position: string | null;
   /** Previous guesses with their results */
@@ -178,6 +181,7 @@ export default function WordleModal({
   nameLength,
   wordBoundaries = [],
   shirtNumber,
+  shirtNumberHidden = false,
   position,
   guesses,
   maxAttempts = 6,
@@ -199,6 +203,18 @@ export default function WordleModal({
 
   const canSubmit = inputValue.length === targetLength && !isGameOver;
   const keyStates = useMemo(() => getKeyStates(guesses), [guesses]);
+  const displayShirtNumber = maskedShirtNumber(difficulty, shirtNumber, 'in-progress');
+
+  let shirtNumberLabel: string | number;
+  if (displayShirtNumber !== null) {
+    shirtNumberLabel = DIFFICULTY_CONFIG[difficulty].showShirtNumber
+      ? `#${displayShirtNumber}`
+      : displayShirtNumber;
+  } else if (shirtNumber !== null || shirtNumberHidden) {
+    shirtNumberLabel = '?';
+  } else {
+    shirtNumberLabel = 'Player';
+  }
 
   // Open as a modal dialog on mount (native focus trap + top layer).
   useEffect(() => {
@@ -414,8 +430,13 @@ export default function WordleModal({
         {/* Header */}
         <header className="flex items-center justify-between p-4 border-b border-ink/10">
           <div>
-            <p id="wordle-modal-title" className="font-sans font-semibold text-ink text-base">
-              {shirtNumber !== null ? `#${shirtNumber}` : 'Player'}
+            <p
+              id="wordle-modal-title"
+              data-testid={shirtNumber !== null || shirtNumberHidden ? 'modal-shirt-number' : undefined}
+              className="font-sans font-semibold text-ink text-base"
+              aria-label={shirtNumberHidden ? '? (number hidden)' : undefined}
+            >
+              {shirtNumberLabel}
             </p>
             <p id="wordle-modal-desc" className="text-xs text-ink/55 mt-0.5">
               Guess the {getPositionLabel(position)}
