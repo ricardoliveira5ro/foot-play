@@ -20,6 +20,8 @@ _2026-10-13 · Spec: `docs/v1/v1.2/plan-v1.2.3-hard-mode.md`_
   absent. Shirt number data remains unchanged.
 - **Accessible number labels** distinguish a masked number from one missing
   from the lineup data.
+- **Hard-mode match requests** retain `difficulty=hard`; the backend accepts
+  Hard and omits the Easy-only first-letter clue from its response.
 - **Config-driven number descriptions and Finish availability.** The selector
   explains that Hard hides numbers, and regression coverage confirms Finish
   remains absent in every offered mode.

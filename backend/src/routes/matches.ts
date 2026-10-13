@@ -54,10 +54,10 @@ function parseGameFilterParams(query: Record<string, unknown>): GameFilterParams
   };
 }
 
-function parseDifficulty(value: unknown): 'easy' | 'normal' | { error: string; code: 'INVALID_PARAMETER' } {
+function parseDifficulty(value: unknown): 'easy' | 'normal' | 'hard' | { error: string; code: 'INVALID_PARAMETER' } {
   if (value === undefined) return 'normal';
-  if (value === 'easy' || value === 'normal') return value;
-  return { error: "Query parameter 'difficulty' must be one of: easy, normal", code: 'INVALID_PARAMETER' };
+  if (value === 'easy' || value === 'normal' || value === 'hard') return value;
+  return { error: "Query parameter 'difficulty' must be one of: easy, normal, hard", code: 'INVALID_PARAMETER' };
 }
 
 function queryString(value: unknown): string | null {

@@ -84,7 +84,7 @@ export async function getMatchById(id: number) {
   return game as GameWithRelations | null;
 }
 
-export function buildMatchResponse(game: GameWithRelations, difficulty: 'easy' | 'normal' = 'normal') {
+export function buildMatchResponse(game: GameWithRelations, difficulty: 'easy' | 'normal' | 'hard' = 'normal') {
   return {
     game: {
       gameId: game.gameId,
@@ -103,7 +103,7 @@ export function buildMatchResponse(game: GameWithRelations, difficulty: 'easy' |
   };
 }
 
-function buildLineup(gameId: number, appearances: GameWithRelations['appearances'], clubId: number, formation: string | null, difficulty: 'easy' | 'normal') {
+function buildLineup(gameId: number, appearances: GameWithRelations['appearances'], clubId: number, formation: string | null, difficulty: 'easy' | 'normal' | 'hard') {
   const side = appearances
     .filter((a) => a.clubId === clubId)
     .sort((a, b) => {

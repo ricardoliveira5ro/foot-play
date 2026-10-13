@@ -113,7 +113,7 @@ export function getMockFilterOptions(filters: GameFilterParams): FilterOptionsRe
 }
 
 /** Mock parity for backend Task 6: only return a game that satisfies its filters. */
-export function getMockRandomMatch(filters: GameFilterParams, difficulty: 'easy' | 'normal' = 'normal'): MockMatchResponse | null {
+export function getMockRandomMatch(filters: GameFilterParams, difficulty: 'easy' | 'normal' | 'hard' = 'normal'): MockMatchResponse | null {
   const matches = matchingMockGames(filters);
   const match = matches.length > 0 ? matches[Math.floor(Math.random() * matches.length)] : null;
   if (!match) return null;
