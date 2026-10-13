@@ -38,6 +38,7 @@ export default function MissingElevenPage() {
     submitGuess,
     revealName,
     surrender,
+    finishGame,
     newGame,
     setError,
     setLoading,
@@ -178,7 +179,7 @@ export default function MissingElevenPage() {
 
   // Fetch revealed names when the game completes (both teams in parallel)
   useEffect(() => {
-    if (state.gameStatus === 'complete' && state.match) {
+    if ((state.gameStatus === 'complete' || state.gameStatus === 'surrendered') && state.match) {
       const pickedSide = state.teamSide;
       const oppositeSide = pickedSide === 'home' ? 'away' : 'home';
       
@@ -284,7 +285,7 @@ export default function MissingElevenPage() {
   }, [router, pathname, setFilters]);
 
   // Derive game complete state from gameStatus
-  const isGameComplete = state.gameStatus === 'complete';
+  const isGameComplete = state.gameStatus === 'complete' || state.gameStatus === 'surrendered';
 
   // The empty state is keyed on a *successful* options response whose `total`
   // is zero for an active filter set — never on a failed match request. The
@@ -439,7 +440,7 @@ export default function MissingElevenPage() {
 
   // Live score — recomputed after each guess from the current state
   const scoreBreakdown =
-    (state.gameStatus === 'playing' || state.gameStatus === 'complete') && state.match
+    (state.gameStatus === 'playing' || isGameComplete) && state.match
       ? computeTotalScore(state.targetShirts, state.opponentShirts, targetTeamName, opponentTeamName)
       : null;
   const liveScore = scoreBreakdown?.grandTotal ?? 0;
@@ -522,7 +523,7 @@ export default function MissingElevenPage() {
             difficulty={state.difficulty}
             resolved={resolvedCount}
             total={state.targetShirts.length + state.opponentShirts.length}
-            onFinish={() => {}}
+          onFinish={finishGame}
           />
         )}
       </div>

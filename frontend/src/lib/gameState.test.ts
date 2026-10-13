@@ -7,9 +7,10 @@ import { EMPTY_FILTERS } from '../../types';
 
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { gameReducer, initialState, MAX_ATTEMPTS, resolvedShirtCount } from './gameState';
-import type { GameState, GameAction } from './gameState';
+import type { GameState, GameAction, ShirtGameData } from './gameState';
 import { DEFAULT_DIFFICULTY, DIFFICULTY_CONFIG } from './difficulty';
-import type { GameResponse, LineupPlayer, GuessResult } from '@/types';
+import type { Difficulty } from './difficulty';
+import type { GameResponse, LineupPlayer, GuessResult, ShirtState } from '@/types';
 
 // --- Fixtures ---
 
@@ -386,7 +387,7 @@ describe('gameReducer', () => {
       expect(next).toBe(state);
     });
 
-    it('stays playing when only one board is fully resolved', () => {
+    it('auto-completes when the target board is resolved in Normal', () => {
       let state = playingState();
       // Resolve both home shirts (target board) — away board still unresolved.
       state = gameReducer(state, { type: 'OPEN_SHIRT', payload: 'home-1' });
@@ -395,21 +396,106 @@ describe('gameReducer', () => {
       state = gameReducer(state, correctGuess('home-2'));
       expect(state.targetShirts.every(s => s.state === 'correct')).toBe(true);
       expect(state.opponentShirts.some(s => s.state !== 'correct' && s.state !== 'failed')).toBe(true);
-      expect(state.gameStatus).toBe('playing');
+      expect(state.gameStatus).toBe('complete');
     });
 
-    it('completes only when all shirts on both boards are resolved', () => {
+    it('auto-completes when all target shirts are resolved in Normal', () => {
       let state = playingState();
       // Resolve the target board (home shirts).
       for (const token of ['home-1', 'home-2']) {
         state = gameReducer(state, { type: 'OPEN_SHIRT', payload: token });
         state = gameReducer(state, correctGuess(token));
       }
-      // Switch to the opponent board and resolve it too.
-      state = gameReducer(state, { type: 'TOGGLE_BOARD' });
-      state = gameReducer(state, { type: 'OPEN_SHIRT', payload: 'away-1' });
-      state = gameReducer(state, correctGuess('away-1'));
       expect(state.gameStatus).toBe('complete');
+    });
+  });
+
+  describe('FINISH_GAME and mode completion', () => {
+    const blank: ShirtGameData = {
+      ...player('fixture'), state: 'default', attempts: 0, guessHistory: [], correctLetters: [],
+    };
+    const board = (states: ShirtState[], prefix: string) => states.map((state, i) => ({
+      ...blank, token: `${prefix}-${i}`, state,
+    }));
+    const targetOnly = (difficulty: Difficulty): GameState => ({
+      ...initialState,
+      match: makeMatch(),
+      activeBoard: 'opponent',
+      targetShirts: board(Array.from({ length: 11 }, () => 'correct'), 'target'),
+      opponentShirts: board(Array.from({ length: 11 }, () => 'default'), 'opponent'),
+      gameStatus: 'playing',
+      difficulty,
+    });
+
+    it('refuses Finish in Expert while the opponent half is unresolved', () => {
+      const state = targetOnly('expert');
+      const next = gameReducer(state, { type: 'FINISH_GAME' });
+      expect(next.gameStatus).toBe('playing');
+      expect(next.targetShirts).toBe(state.targetShirts);
+      expect(next.opponentShirts).toBe(state.opponentShirts);
+    });
+
+    it('refuses Finish at 21 of 22', () => {
+      const state = {
+        ...initialState,
+        match: makeMatch(),
+        targetShirts: board(['default', ...Array.from({ length: 10 }, (): ShirtState => 'correct')], 'target'),
+        opponentShirts: board(Array.from({ length: 11 }, () => 'correct'), 'opponent'),
+        gameStatus: 'playing' as const,
+        difficulty: 'expert' as const,
+      };
+      expect(gameReducer(state, { type: 'FINISH_GAME' }).gameStatus).toBe('playing');
+    });
+
+    it('finishes a fully resolved Expert game without changing either board', () => {
+      const state = {
+        ...initialState,
+        targetShirts: board(Array.from({ length: 11 }, () => 'correct'), 'target'),
+        opponentShirts: board(Array.from({ length: 11 }, () => 'failed'), 'opponent'),
+        gameStatus: 'playing' as const,
+        difficulty: 'expert' as const,
+      };
+      const next = gameReducer(state, { type: 'FINISH_GAME' });
+      expect(next.gameStatus).toBe('complete');
+      expect(next.targetShirts).toBe(state.targetShirts);
+      expect(next.opponentShirts).toBe(state.opponentShirts);
+    });
+
+    it('auto-completes Easy, Normal, and Hard at 11 of 22', () => {
+      for (const difficulty of ['easy', 'normal', 'hard'] as const) {
+        const state = targetOnly(difficulty);
+        const next = gameReducer(state, {
+          type: 'SUBMIT_GUESS',
+          payload: { token: state.opponentShirts[0].token, results: [], isCorrect: false },
+        });
+        expect(next.gameStatus).toBe('complete');
+        expect(resolvedShirtCount(next.targetShirts, next.opponentShirts)).toBe(11);
+      }
+    });
+
+    it('does not auto-complete Expert at 22 until Finish is dispatched', () => {
+      const state = {
+        ...initialState,
+        match: makeMatch(),
+        targetShirts: board(['default', ...Array.from({ length: 10 }, (): ShirtState => 'correct')], 'target'),
+        opponentShirts: board(Array.from({ length: 11 }, () => 'correct'), 'opponent'),
+        gameStatus: 'playing' as const,
+        difficulty: 'expert' as const,
+      };
+      const next = gameReducer(state, {
+        type: 'SUBMIT_GUESS',
+        payload: { token: state.targetShirts[0].token, results: [], isCorrect: true, name: 'Player' },
+      });
+      expect(next.gameStatus).toBe('playing');
+      expect(resolvedShirtCount(next.targetShirts, next.opponentShirts)).toBe(22);
+    });
+
+    it('allows an Expert surrender with 11 resolved and leaves the opponent untouched', () => {
+      const state = targetOnly('expert');
+      const next = gameReducer(state, { type: 'SURRENDER' });
+      expect(next.gameStatus).toBe('surrendered');
+      expect(resolvedShirtCount(next.targetShirts, next.opponentShirts)).toBe(11);
+      expect(next.opponentShirts.every(s => s.state === 'default' && s.attempts === 0)).toBe(true);
     });
   });
 
@@ -437,21 +523,21 @@ describe('gameReducer', () => {
   });
 
   describe('SURRENDER', () => {
-    it('completes the game and marks non-correct shirts as failed', () => {
+    it('ends the game without changing unresolved shirts', () => {
       const state = playingState();
       const next = gameReducer(state, { type: 'SURRENDER' });
-      expect(next.gameStatus).toBe('complete');
-      expect(next.targetShirts.every(s => s.state === 'failed')).toBe(true);
-      expect(next.opponentShirts.every(s => s.state === 'failed')).toBe(true);
+      expect(next.gameStatus).toBe('surrendered');
+      expect(next.targetShirts).toBe(state.targetShirts);
+      expect(next.opponentShirts).toBe(state.opponentShirts);
     });
 
     it('keeps correct shirts correct when surrendering', () => {
       let state = openShirt(playingState(), 'home-1');
       state = gameReducer(state, correctGuess('home-1'));
       const next = gameReducer(state, { type: 'SURRENDER' });
-      expect(next.gameStatus).toBe('complete');
+      expect(next.gameStatus).toBe('surrendered');
       expect(next.targetShirts[0].state).toBe('correct');
-      expect(next.targetShirts[1].state).toBe('failed');
+      expect(next.targetShirts[1].state).toBe('default');
     });
 
     it('is a no-op when not playing', () => {

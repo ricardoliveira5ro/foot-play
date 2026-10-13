@@ -48,11 +48,10 @@ export const DIFFICULTY_CONFIG: Record<Difficulty, DifficultyConfig> = {
 };
 
 /**
- * Modes offered in the UI, in ascending order. Deliberately shorter than the
- * config: a mode is offered only once the patch that implements its rules
- * has shipped. v1.2.2 offers Easy and Normal; v1.2.3 appends Hard; v1.2.4
- * appends Expert.
+ * Modes offered in the UI, in ascending order. A mode is offered only once
+ * the patch implementing its rules has shipped: v1.2.2 offers Easy and
+ * Normal, v1.2.3 appends Hard, and v1.2.4 appends Expert.
  */
-export const DIFFICULTIES: readonly Difficulty[] = ['easy', 'normal', 'hard'];
+export const DIFFICULTIES: readonly Difficulty[] = ['easy', 'normal', 'hard', 'expert'];
 
 export const DEFAULT_DIFFICULTY: Difficulty = 'normal';

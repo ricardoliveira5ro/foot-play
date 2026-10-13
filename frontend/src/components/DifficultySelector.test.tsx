@@ -39,7 +39,14 @@ describe('DifficultySelector', () => {
 
   it('tells the player that Hard hides the number', () => {
     render(<DifficultySelector value="normal" onChange={() => {}} />);
-    expect(screen.getByText(/number hidden/i)).toBeTruthy();
+    expect(screen.getAllByText(/number hidden/i)).toHaveLength(2);
     expect(screen.getAllByText(/number shown/i)).toHaveLength(2);
+  });
+
+  it('states that Expert offers three attempts and requires the opponent', () => {
+    render(<DifficultySelector value="normal" onChange={() => {}} />);
+    expect(screen.getAllByText(/3 attempts/)).toHaveLength(1);
+    expect(screen.getAllByText(/opponent required/)).toHaveLength(1);
+    expect(screen.getAllByText(/opponent optional/)).toHaveLength(3);
   });
 });

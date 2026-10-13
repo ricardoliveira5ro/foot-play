@@ -17,7 +17,8 @@ function describeMode(mode: Difficulty): string {
     c.showCaptainClue && 'captain',
   ].filter(Boolean) as string[];
   const clueText = clues.length ? clues.join(' + ') : 'no clues';
-  return `${c.attempts} attempts · ${clueText} · ${c.showShirtNumber ? 'number shown' : 'number hidden'}`;
+  const opponentText = c.opponentRequired ? 'opponent required' : 'opponent optional';
+  return `${c.attempts} attempts · ${clueText} · ${c.showShirtNumber ? 'number shown' : 'number hidden'} · ${opponentText}`;
 }
 
 export default function DifficultySelector({ value, onChange }: DifficultySelectorProps) {

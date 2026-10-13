@@ -18,7 +18,7 @@ const MAX_ATTEMPTS = DIFFICULTY_CONFIG[DEFAULT_DIFFICULTY].attempts;
 
 // --- Types ---
 
-export type GameStatus = 'idle' | 'loading' | 'playing' | 'complete';
+export type GameStatus = 'idle' | 'loading' | 'playing' | 'complete' | 'surrendered';
 
 export interface ShirtGameData extends ShirtData {
   /** Number of guess attempts made for this shirt */
@@ -57,6 +57,7 @@ export type GameAction =
   | { type: 'SUBMIT_GUESS'; payload: { token: string; results: GuessResult[]; isCorrect: boolean; name?: string; shirtNumber?: number | null } }
   | { type: 'REVEAL_NAME'; payload: { token: string; name: string; shirtNumber?: number | null } }
   | { type: 'SURRENDER' }
+  | { type: 'FINISH_GAME' }
   | { type: 'NEW_GAME' }
   | { type: 'SET_ERROR'; payload: string | null }
   | { type: 'SET_LOADING'; payload: boolean }
@@ -126,9 +127,12 @@ function updateShirtState(
   });
 }
 
-function checkGameComplete(target: ShirtGameData[], opponent: ShirtGameData[]): boolean {
+export function checkGameComplete(target: ShirtGameData[], opponent: ShirtGameData[], difficulty: Difficulty): boolean {
   const all = [...target, ...opponent];
-  return all.length > 0 && all.every(s => s.state === 'correct' || s.state === 'failed');
+  if (all.length === 0) return false;
+  const settled = (s: ShirtGameData) => s.state === 'correct' || s.state === 'failed';
+  if (!target.every(settled)) return false;
+  return !DIFFICULTY_CONFIG[difficulty].opponentRequired || opponent.every(settled);
 }
 
 /** Lineup swap for a chosen side: target = chosen side, opponent = the other. */
@@ -185,8 +189,10 @@ function handleSubmitGuess(state: GameState, action: Extract<GameAction, { type:
   const updatedTarget = state.activeBoard === 'target' ? updatedActiveShirts : state.targetShirts;
   const updatedOpponent = state.activeBoard === 'opponent' ? updatedActiveShirts : state.opponentShirts;
 
-  // Only end the game when ALL shirts on both boards are resolved.
-  const isComplete = checkGameComplete(updatedTarget, updatedOpponent);
+  // Modes that require the opponent finish only through the explicit Finish action.
+  const isComplete =
+    !DIFFICULTY_CONFIG[state.difficulty].opponentRequired &&
+    checkGameComplete(updatedTarget, updatedOpponent, state.difficulty);
 
   return {
     ...state,
@@ -244,16 +250,13 @@ function handleRevealName(state: GameState, action: Extract<GameAction, { type: 
 /** Full SURRENDER handling — extracted so the reducer case stays thin. */
 function handleSurrender(state: GameState): GameState {
   if (state.gameStatus !== 'playing') return state;
+  return { ...state, gameStatus: 'surrendered' };
+}
 
-  const markFailed = (shirts: ShirtGameData[]) =>
-    shirts.map(s => (s.state === 'correct' ? s : { ...s, state: 'failed' as ShirtState }));
-
-  return {
-    ...state,
-    gameStatus: 'complete',
-    targetShirts: markFailed(state.targetShirts),
-    opponentShirts: markFailed(state.opponentShirts),
-  };
+function handleFinishGame(state: GameState): GameState {
+  if (state.gameStatus !== 'playing') return state;
+  if (!checkGameComplete(state.targetShirts, state.opponentShirts, state.difficulty)) return state;
+  return { ...state, gameStatus: 'complete' };
 }
 
 /** Full SET_ERROR handling — extracted so the reducer case stays thin. */
@@ -336,6 +339,10 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
       return handleSurrender(state);
     }
 
+    case 'FINISH_GAME': {
+      return handleFinishGame(state);
+    }
+
     case 'NEW_GAME': {
       return initialState;
     }
@@ -366,6 +373,7 @@ interface UseGameStateReturn {
   submitGuess: (token: string, results: GuessResult[], isCorrect: boolean, name?: string, shirtNumber?: number | null) => void;
   revealName: (token: string, name: string, shirtNumber?: number | null) => void;
   surrender: () => void;
+  finishGame: () => void;
   newGame: () => void;
   setError: (error: string | null) => void;
   setLoading: (loading: boolean) => void;
@@ -410,6 +418,8 @@ export function useGameState(): UseGameStateReturn {
     dispatch({ type: 'SURRENDER' });
   }, []);
 
+  const finishGame = useCallback(() => dispatch({ type: 'FINISH_GAME' }), []);
+
   const newGame = useCallback(() => {
     dispatch({ type: 'NEW_GAME' });
   }, []);
@@ -439,6 +449,7 @@ export function useGameState(): UseGameStateReturn {
     submitGuess,
     revealName,
     surrender,
+    finishGame,
     newGame,
     setError,
     setLoading,

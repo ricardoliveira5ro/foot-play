@@ -46,12 +46,8 @@ describe('DIFFICULTY_CONFIG', () => {
 });
 
 describe('DIFFICULTIES', () => {
-  it('offers only the modes that have shipped, in ascending order', () => {
-    expect(DIFFICULTIES).toEqual(['easy', 'normal', 'hard']);
-  });
-
-  it('still withholds Expert until v1.2.4', () => {
-    expect(DIFFICULTIES).not.toContain('expert');
+  it('offers every mode that has shipped, in ascending order', () => {
+    expect(DIFFICULTIES).toEqual(['easy', 'normal', 'hard', 'expert']);
   });
 
   it('offers a subset of the config, in config order', () => {

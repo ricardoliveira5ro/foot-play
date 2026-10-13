@@ -196,7 +196,7 @@ describe('useGameState', () => {
   });
 
   describe('surrender', () => {
-    it('completes the game and marks unresolved shirts as failed', () => {
+    it('ends the game without resolving untouched shirts', () => {
       const { result } = renderHook(() => useGameState());
       act(() => {
         result.current.startNewGame(makeMatch());
@@ -204,10 +204,17 @@ describe('useGameState', () => {
       act(() => {
         result.current.surrender();
       });
-      expect(result.current.state.gameStatus).toBe('complete');
-      expect(result.current.state.targetShirts.every(s => s.state === 'failed')).toBe(true);
-      expect(result.current.state.opponentShirts.every(s => s.state === 'failed')).toBe(true);
+      expect(result.current.state.gameStatus).toBe('surrendered');
+      expect(result.current.state.targetShirts.every(s => s.state === 'default')).toBe(true);
+      expect(result.current.state.opponentShirts.every(s => s.state === 'default')).toBe(true);
     });
+  });
+
+  it('exposes finishGame and leaves an unfinished game unchanged', () => {
+    const { result } = renderHook(() => useGameState());
+    expect(typeof result.current.finishGame).toBe('function');
+    act(() => result.current.finishGame());
+    expect(result.current.state.gameStatus).toBe(initialState.gameStatus);
   });
 
   describe('newGame', () => {

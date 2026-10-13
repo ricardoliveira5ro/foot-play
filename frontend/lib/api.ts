@@ -92,15 +92,12 @@ function isFilterOptionsResponse(value: unknown): value is FilterOptionsResponse
 
 /** GET /api/matches/random — a random match with both full lineups. */
 export async function fetchRandomMatch(filters: GameFilterParams = EMPTY_FILTERS, difficulty: Difficulty = 'normal'): Promise<GameResponse | null> {
-  // Expert is not selectable yet; until its API rules ship, request the
-  // Normal-shaped payload if a caller supplies it directly.
-  const responseMode = difficulty === 'expert' ? 'normal' : difficulty;
   if (USE_MOCK) {
     await delay(MOCK_DELAY_MS);
-    return getMockRandomMatch(filters, responseMode);
+    return getMockRandomMatch(filters, difficulty);
   }
   const params = new URLSearchParams(filtersToParams(filters));
-  params.set('difficulty', responseMode);
+  params.set('difficulty', difficulty);
   return requestRandomMatch(`/api/matches/random?${params.toString()}`);
 }
 
