@@ -84,7 +84,7 @@ export async function getMatchById(id: number) {
   return game as GameWithRelations | null;
 }
 
-export function buildMatchResponse(game: GameWithRelations, difficulty: 'easy' | 'normal' | 'hard' = 'normal') {
+export function buildMatchResponse(game: GameWithRelations, difficulty: 'easy' | 'normal' | 'hard' | 'expert' = 'normal') {
   return {
     game: {
       gameId: game.gameId,
@@ -103,7 +103,7 @@ export function buildMatchResponse(game: GameWithRelations, difficulty: 'easy' |
   };
 }
 
-function buildLineup(gameId: number, appearances: GameWithRelations['appearances'], clubId: number, formation: string | null, difficulty: 'easy' | 'normal' | 'hard') {
+function buildLineup(gameId: number, appearances: GameWithRelations['appearances'], clubId: number, formation: string | null, difficulty: 'easy' | 'normal' | 'hard' | 'expert') {
   const side = appearances
     .filter((a) => a.clubId === clubId)
     .sort((a, b) => {
@@ -126,18 +126,18 @@ function buildLineup(gameId: number, appearances: GameWithRelations['appearances
       token: generatePlayerToken(gameId, a.playerId),
       nameLength: normalize(displayName).length,
       wordBoundaries: getWordBoundaries(displayName),
-      shirtNumber: difficulty === 'hard' ? null : a.number ?? null,
-      ...(difficulty === 'hard' ? { shirtNumberHidden: a.number !== null } : {}),
+      shirtNumber: difficulty === 'hard' || difficulty === 'expert' ? null : a.number ?? null,
+      ...(difficulty === 'hard' || difficulty === 'expert' ? { shirtNumberHidden: a.number !== null } : {}),
       position: fitted[i].position,
       coords: fitted[i].coords,
       // Event columns (v1.0.2). These default to 0 and stay 0 on a game that
       // was seeded before v1.0.1 — 0 is indistinguishable from "did not
       // score", which is why degradation is per game and carries no flag.
-      goals: difficulty === 'hard' ? 0 : a.goals,
+      goals: difficulty === 'hard' || difficulty === 'expert' ? 0 : a.goals,
       assists: a.assists,
       redCards: a.redCards,
       // Prisma types isCaptain as Boolean?; the wire type is boolean.
-      isCaptain: difficulty === 'hard' ? false : (a.isCaptain ?? false),
+      isCaptain: difficulty === 'hard' || difficulty === 'expert' ? false : (a.isCaptain ?? false),
       // The Easy clue is only present in an Easy response. Keep both the
       // availability bit and its value out of Normal payloads.
       hasFirstLetter: difficulty === 'easy' && displayName.trim().length > 0,

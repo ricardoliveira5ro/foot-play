@@ -113,7 +113,7 @@ export function getMockFilterOptions(filters: GameFilterParams): FilterOptionsRe
 }
 
 /** Mock parity for backend Task 6: only return a game that satisfies its filters. */
-export function getMockRandomMatch(filters: GameFilterParams, difficulty: 'easy' | 'normal' | 'hard' = 'normal'): MockMatchResponse | null {
+export function getMockRandomMatch(filters: GameFilterParams, difficulty: 'easy' | 'normal' | 'hard' | 'expert' = 'normal'): MockMatchResponse | null {
   const matches = matchingMockGames(filters);
   const match = matches.length > 0 ? matches[Math.floor(Math.random() * matches.length)] : null;
   if (!match) return null;
@@ -121,13 +121,15 @@ export function getMockRandomMatch(filters: GameFilterParams, difficulty: 'easy'
     ...match,
     homeLineup: match.homeLineup.map((player) => ({
       ...player,
-      ...(difficulty === 'hard' ? { shirtNumber: null, shirtNumberHidden: player.shirtNumber !== null } : {}),
+      ...(difficulty === 'hard' || difficulty === 'expert' ? { shirtNumber: null, shirtNumberHidden: player.shirtNumber !== null } : {}),
+      ...((difficulty === 'hard' || difficulty === 'expert') ? { isCaptain: false, goals: 0 } : {}),
       hasFirstLetter: difficulty === 'easy' && player.hasFirstLetter,
       ...(difficulty === 'easy' ? { firstLetter: player.firstLetter } : {}),
     })),
     awayLineup: match.awayLineup.map((player) => ({
       ...player,
-      ...(difficulty === 'hard' ? { shirtNumber: null, shirtNumberHidden: player.shirtNumber !== null } : {}),
+      ...(difficulty === 'hard' || difficulty === 'expert' ? { shirtNumber: null, shirtNumberHidden: player.shirtNumber !== null } : {}),
+      ...((difficulty === 'hard' || difficulty === 'expert') ? { isCaptain: false, goals: 0 } : {}),
       hasFirstLetter: difficulty === 'easy' && player.hasFirstLetter,
       ...(difficulty === 'easy' ? { firstLetter: player.firstLetter } : {}),
     })),
