@@ -67,6 +67,23 @@ describe('FinishButton', () => {
     expect(screen.queryByRole('button')).toBeNull();
   });
 
+  it('renders nothing when Normal is fully resolved', () => {
+    const { container } = render(
+      <FinishButton difficulty="normal" resolved={22} total={22} onFinish={() => {}} />,
+    );
+    expect(container.innerHTML).toBe('');
+    expect(screen.queryByRole('button')).toBeNull();
+  });
+
+  it('renders nothing when Easy and Hard are fully resolved', () => {
+    for (const difficulty of ['easy', 'hard'] as const) {
+      const { container } = render(
+        <FinishButton difficulty={difficulty} resolved={22} total={22} onFinish={() => {}} />,
+      );
+      expect(container.innerHTML).toBe('');
+    }
+  });
+
   it('still renders the confirmation step for the required mode', () => {
     const onFinish = vi.fn();
     render(<FinishButton difficulty="expert" resolved={22} total={22} onFinish={onFinish} />);
