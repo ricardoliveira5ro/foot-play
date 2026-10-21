@@ -438,10 +438,18 @@ export default function MissingElevenPage() {
   const targetSolved = state.targetShirts.filter(s => s.state === 'correct').length;
   const opponentSolved = state.opponentShirts.filter(s => s.state === 'correct').length;
 
-  // Live score — recomputed after each guess from the current state
+  // Live score — recomputed after each guess from the current state.
+  // The mode multiplier is applied here too, so the live counter and the
+  // final dialog agree instead of the score jumping at the end of the game.
   const scoreBreakdown =
     (state.gameStatus === 'playing' || isGameComplete) && state.match
-      ? computeTotalScore(state.targetShirts, state.opponentShirts, targetTeamName, opponentTeamName)
+      ? computeTotalScore(
+          state.targetShirts,
+          state.opponentShirts,
+          targetTeamName,
+          opponentTeamName,
+          DIFFICULTY_CONFIG[state.difficulty].multiplier,
+        )
       : null;
   const liveScore = scoreBreakdown?.grandTotal ?? 0;
 
@@ -556,6 +564,7 @@ export default function MissingElevenPage() {
           targetTeamName={targetTeamName}
           opponentTeamName={opponentTeamName}
           onPlayAgain={handleNewPuzzle}
+          difficulty={state.difficulty}
         />
       )}
     </>,

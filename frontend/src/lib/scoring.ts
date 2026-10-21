@@ -116,3 +116,12 @@ export function computeTotalScore(
     perPlayer,
   };
 }
+
+/**
+ * Render a scoring multiplier for display: 2 -> "2", 0.5 -> "0.5".
+ * Shared by the grand-total badge and the per-line badge so the two never
+ * format the same number differently.
+ */
+export function formatMultiplier(multiplier: number): string {
+  return String(Number(multiplier.toFixed(2)));
+}

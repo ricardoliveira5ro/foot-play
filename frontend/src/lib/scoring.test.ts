@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { scorePlayer, computeTotalScore } from './scoring';
+import { scorePlayer, computeTotalScore, formatMultiplier } from './scoring';
 import type { ShirtGameData } from './gameState';
 
 /** Minimal valid `ShirtGameData` with sensible defaults, overridable per case. */
@@ -311,5 +311,17 @@ describe('multiplier scaling', () => {
         computeTotalScore(target, [], 'Home', 'Away', 1).grandTotal,
       );
     });
+  });
+});
+
+describe('formatMultiplier', () => {
+  it('renders a whole multiplier without a decimal point', () => {
+    expect(formatMultiplier(1)).toBe('1');
+    expect(formatMultiplier(2)).toBe('2');
+    expect(formatMultiplier(3)).toBe('3');
+  });
+
+  it('renders a fractional multiplier with its decimal part', () => {
+    expect(formatMultiplier(0.5)).toBe('0.5');
   });
 });
