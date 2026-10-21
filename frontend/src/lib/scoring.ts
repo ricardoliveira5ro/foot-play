@@ -11,6 +11,8 @@ export interface PerPlayerScore {
   letterPoints: number;
   /** Total points for this shirt. */
   totalPoints: number;
+  /** Mode multiplier applied to this line. 1 when no mode is in play. */
+  multiplier: number;
 }
 
 /** Full score breakdown for a game. */
@@ -34,41 +36,59 @@ const LETTER_SCORE_MAX = 150;
  * letters in the name, multiplied by 150 and rounded to the nearest whole
  * number. Zero letters found earns 0; all letters found earns 150. Guards
  * against division by zero when the name has no letters (returns 0).
+ *
+ * The `multiplier` scales BOTH branches — a correct guess and a failed one
+ * are worth the same factor more or less. It defaults to 1, so callers that
+ * do not care about difficulty modes keep the unmultiplied scores.
  */
 export function scorePlayer(
   attempts: number,
   correct: boolean,
   uniqueCorrectLetters: number,
   totalLetters: number,
+  multiplier: number = 1,
 ): number {
   if (correct) {
-    return Math.max(BASE_CORRECT_SCORE - (Math.max(attempts, 1) - 1) * ATTEMPT_PENALTY, MIN_CORRECT_SCORE);
+    // The floor is part of the BASE, not of the result: a shirt that has
+    // bottomed out at 100 is worth 50 in Easy and 300 in Expert. Applying
+    // the floor after scaling would flatten the bottom of the range and
+    // make the multiplier invisible exactly where it matters.
+    const base = Math.max(
+      BASE_CORRECT_SCORE - (Math.max(attempts, 1) - 1) * ATTEMPT_PENALTY,
+      MIN_CORRECT_SCORE,
+    );
+    return Math.round(base * multiplier);
   }
 
   if (totalLetters === 0) return 0;
-  return Math.round((uniqueCorrectLetters / totalLetters) * LETTER_SCORE_MAX);
+  // `uniqueCorrectLetters` is the count of DISTINCT correct letters, so a
+  // letter guessed correctly in three attempts is still worth one. The
+  // multiplier scales the credit; it does not change what counts.
+  return Math.round((uniqueCorrectLetters / totalLetters) * LETTER_SCORE_MAX * multiplier);
 }
 
 /**
  * Compute the full score breakdown for a game.
  *
  * Processes both shirt arrays into per-player scores and sums everything
- * into the grand total.
+ * into the grand total. The `multiplier` (the difficulty mode's scoring
+ * factor) is applied to every line and defaults to 1.
  */
 export function computeTotalScore(
   targetShirts: ShirtGameData[],
   opponentShirts: ShirtGameData[],
   targetTeamName: string,
   opponentTeamName: string,
+  multiplier: number = 1,
 ): ScoreBreakdown {
   const processTeam = (shirts: ShirtGameData[], team: string): PerPlayerScore[] =>
     shirts.map(shirt => {
       const correct = shirt.state === 'correct';
       const letterPoints = correct
         ? 0
-        : scorePlayer(shirt.attempts, false, shirt.correctLetters.length, shirt.nameLength);
+        : scorePlayer(shirt.attempts, false, shirt.correctLetters.length, shirt.nameLength, multiplier);
       const totalPoints = correct
-        ? scorePlayer(shirt.attempts, true, 0, 0)
+        ? scorePlayer(shirt.attempts, true, 0, 0, multiplier)
         : letterPoints;
 
       return {
@@ -79,6 +99,7 @@ export function computeTotalScore(
         correct,
         letterPoints,
         totalPoints,
+        multiplier,
       };
     });
 
@@ -86,6 +107,8 @@ export function computeTotalScore(
   const opponentScores = processTeam(opponentShirts, opponentTeamName);
   const perPlayer = [...targetScores, ...opponentScores];
 
+  // The lines are already scaled, so the total is a plain sum — scaling it
+  // again would apply the multiplier twice.
   const playerPoints = perPlayer.reduce((sum, p) => sum + p.totalPoints, 0);
 
   return {
