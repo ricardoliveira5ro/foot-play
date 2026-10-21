@@ -8,6 +8,18 @@ from, and release notes are taken from the entry itself.
 
 ---
 
+## v1.2.5 — Multiplier scoring
+
+_2026-10-21 · Spec: `docs/v1/v1.2/plan-v1.2.5-multiplier-scoring.md`_
+
+### Added
+
+- **The difficulty multiplier now applies.** Every shirt's score is scaled by the mode's multiplier — the correct guess and the failed one alike — so Easy is worth half, Normal the same, Hard double and Expert triple. The `100` floor belongs to the base score (a bottomed-out shirt is worth 50 in Easy, 300 in Expert).
+- **The score breakdown shows the multiplier.** The multiplier appears next to the grand total and next to each shirt's points, and the displayed total is the sum of those already-scaled line items. The live score counter and the final dialog use the same multiplier, so the score no longer jumps at the end of a game.
+- **The opponent lineup is labelled honestly.** It reads `optional bonus` in Easy, Normal and Hard and `required` in Expert — the same flag the completion gate reads — and says `not played this game` when the player never put an attempt into that half.
+
+---
+
 ## v1.2.4 — Expert mode
 
 _2026-10-13 · Spec: `docs/v1/v1.2/plan-v1.2.4-expert-mode.md`_
