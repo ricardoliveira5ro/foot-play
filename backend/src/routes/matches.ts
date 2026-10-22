@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { asyncHandler } from '../middleware/asyncHandler';
-import { getRandomMatch, buildMatchResponse, getMatchById } from '../services/matchService';
+import { getRandomMatch, buildMatchResponse, buildLineupForSide, getMatchById } from '../services/matchService';
 import { getFilterOptions } from '../services/filterService';
 import type { GameFilterParams } from '../lib/filterQuery';
 import { validateNonNegativeIntParam } from '../middleware/validate';
@@ -17,13 +17,26 @@ router.get('/random', asyncHandler(async (req, res) => {
     return res.status(404).json({ error: 'No matches available', code: 'NOT_FOUND' });
   }
 
-  const response = buildMatchResponse(game, difficulty);
+  const response = buildMatchResponse(game, difficulty, true);
   res.json(response);
 }));
 
 // MUST stay above '/:id' — Express would otherwise match 'filter-options' as a game id.
 router.get('/filter-options', asyncHandler(async (req, res) => {
   res.json(await getFilterOptions(parseGameFilterParams(req.query)));
+}));
+
+router.get('/:id/lineup', asyncHandler(async (req, res) => {
+  const validation = validateNonNegativeIntParam('id', req.params.id);
+  if (typeof validation === 'object' && validation !== null && 'error' in validation) return res.status(400).json(validation);
+  const side = req.query.teamSide;
+  const difficulty = req.query.difficulty;
+  if ((side !== 'home' && side !== 'away') || (difficulty !== 'easy' && difficulty !== 'normal' && difficulty !== 'hard' && difficulty !== 'expert')) {
+    return res.status(400).json({ error: 'Invalid teamSide or difficulty', code: 'INVALID_PARAMETER' });
+  }
+  const game = await getMatchById(validation);
+  if (!game) return res.status(404).json({ error: 'Match not found', code: 'NOT_FOUND' });
+  res.json({ lineup: buildLineupForSide(game, side === 'home' ? game.homeClubId : game.awayClubId, difficulty) });
 }));
 
 router.get('/:id', asyncHandler(async (req, res) => {
@@ -39,7 +52,7 @@ router.get('/:id', asyncHandler(async (req, res) => {
     return res.status(404).json({ error: 'Match not found', code: 'NOT_FOUND' });
   }
 
-  const response = buildMatchResponse(game);
+  const response = buildMatchResponse(game, 'normal', true);
   res.json(response);
 }));
 

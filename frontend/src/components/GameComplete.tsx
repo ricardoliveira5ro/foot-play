@@ -23,6 +23,10 @@ interface GameCompleteProps {
   onPlayAgain: () => void;
   /** Mode in force. Drives the multiplier display and the opponent label. */
   difficulty?: Difficulty;
+  /** Optional bonus round, available only when an opponent XI is complete. */
+  canContinueOpponent?: boolean;
+  onContinueOpponent?: () => void;
+  isContinuingOpponent?: boolean;
 }
 
 function formatMatchDate(date: string | null): string | null {
@@ -117,6 +121,9 @@ export default function GameComplete({
   opponentTeamName,
   onPlayAgain,
   difficulty = DEFAULT_DIFFICULTY,
+  canContinueOpponent = false,
+  onContinueOpponent,
+  isContinuingOpponent = false,
 }: Readonly<GameCompleteProps>) {
   const home = match.homeClub?.name ?? 'Home';
   const away = match.awayClub?.name ?? 'Away';
@@ -137,7 +144,7 @@ export default function GameComplete({
   const allShirts = [...targetShirts, ...opponentShirts];
   const totalShirts = allShirts.length;
   const correctCount = allShirts.filter(s => s.state === 'correct').length;
-  const allCorrect = correctCount === totalShirts;
+  const allCorrect = correctCount === totalShirts && !canContinueOpponent;
   const targetSolved = targetShirts.filter(s => s.state === 'correct').length;
   const opponentSolved = opponentShirts.filter(s => s.state === 'correct').length;
 
@@ -332,7 +339,9 @@ export default function GameComplete({
                     {opponentLabel(opponentAttempted, difficulty)}
                   </span>
                 </h2>
-                {renderTeamSection(opponentShirts, scoreMap)}
+                {opponentShirts.length > 0
+                  ? renderTeamSection(opponentShirts, scoreMap)
+                  : <p className="rounded-lg border border-dashed border-ink/20 px-4 py-8 text-center text-sm text-ink/55">This lineup stays hidden until you choose the bonus round.</p>}
               </>
             )}
           </div>
@@ -361,6 +370,20 @@ export default function GameComplete({
 
         {/* Play Again button */}
         <div className="border-t border-ink/10 px-6 py-3">
+          {canContinueOpponent && onContinueOpponent && (
+            <button
+              type="button"
+              onClick={onContinueOpponent}
+              disabled={isContinuingOpponent}
+              className="mb-2 flex w-full items-center justify-between rounded-lg border border-correct/40 bg-correct/10 px-4 py-3 text-left text-ink transition-colors hover:bg-correct/15 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-flare disabled:cursor-wait disabled:opacity-60"
+            >
+              <span>
+                <span className="block text-sm font-semibold">{isContinuingOpponent ? 'Opening lineup…' : 'Guess the opponent'}</span>
+                <span className="mt-0.5 block text-xs text-ink/60">Unlock 11 more shirts and add bonus points</span>
+              </span>
+              <span aria-hidden="true" className="font-mono text-lg text-correct">↗</span>
+            </button>
+          )}
           <button
             type="button"
             onClick={onPlayAgain}
