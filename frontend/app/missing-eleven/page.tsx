@@ -555,7 +555,7 @@ export default function MissingElevenPage() {
 
         {/* Tactic board */}
         <section className="min-w-0" aria-label="Tactic board">
-          {state.activeBoard === 'opponent' && !state.opponentPhase && !isGameComplete && (
+          {state.activeBoard === 'opponent' && !state.opponentPhase && state.difficulty !== 'expert' && !isGameComplete && (
             <p className="mb-3 rounded-md border border-ink/10 bg-paper px-3 py-2 text-center text-xs text-ink/65">
               Opponent lineup locked · finish {targetTeamName} to unlock the bonus round.
             </p>
@@ -565,7 +565,7 @@ export default function MissingElevenPage() {
             formation={formation}
             shirts={shirts}
             difficulty={state.difficulty}
-            onShirtClick={state.activeBoard === 'opponent' && !state.opponentPhase ? undefined : handleShirtClick}
+            onShirtClick={state.activeBoard === 'opponent' && !state.opponentPhase && state.difficulty !== 'expert' ? undefined : handleShirtClick}
             clubId={clubId}
             activeBoard={state.activeBoard}
             targetTeamName={targetTeamName}
