@@ -10,13 +10,17 @@ from, and release notes are taken from the entry itself.
 
 ## v1.2.5 — Multiplier scoring
 
-_2026-10-21 · Spec: `docs/v1/v1.2/plan-v1.2.5-multiplier-scoring.md`_
+_2026-10-22 · Spec: `docs/v1/v1.2/plan-v1.2.5-multiplier-scoring.md`_
 
 ### Added
 
 - **The difficulty multiplier now applies.** Every shirt's score is scaled by the mode's multiplier — the correct guess and the failed one alike — so Easy is worth half, Normal the same, Hard double and Expert triple. The `100` floor belongs to the base score (a bottomed-out shirt is worth 50 in Easy, 300 in Expert).
 - **The score breakdown shows the multiplier.** The multiplier appears next to the grand total and next to each shirt's points, and the displayed total is the sum of those already-scaled line items. The live score counter and the final dialog use the same multiplier, so the score no longer jumps at the end of a game.
 - **The opponent lineup is labelled honestly.** It reads `optional bonus` in Easy, Normal and Hard and `required` in Expert — the same flag the completion gate reads — and says `not played this game` when the player never put an attempt into that half.
+- **Optional opponent bonus round.** In Easy, Normal and Hard, the target lineup ends the main round. A **Guess the opponent** action appears when the opponent has a full starting XI; choosing it loads the opponent lineup and resumes play for additional points.
+- **Opponent lineup details are deferred.** The initial match response includes only a position preview for optional opponents. Player data is fetched when the player starts that side, and completion reveals only the side that was played.
+- **Expert allows either-side play at any time.** Both lineups remain required, while the player can switch tabs and guess any unresolved shirt on either team. Finish stays locked until all 22 shirts are resolved.
+- **Surrender reveals the surrendered lineup.** Names are shown for guessed and unguessed players while correct and failed results remain intact.
 
 ---
 
