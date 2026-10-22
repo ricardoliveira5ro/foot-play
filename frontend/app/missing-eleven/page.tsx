@@ -109,14 +109,18 @@ export default function MissingElevenPage() {
       if (!state.match) return;
 
       try {
-        const pickedSide = state.teamSide;
-        const oppositeSide = pickedSide === 'home' ? 'away' : 'home';
+        const targetSide = state.teamSide;
+        const opponentSide = targetSide === 'home' ? 'away' : 'home';
+        const activeSide = state.opponentPhase ? opponentSide : targetSide;
+        const activeShirts = state.opponentPhase ? state.opponentShirts : state.targetShirts;
 
-        const picked = await fetchReveal(state.match.game.gameId, pickedSide);
-        revealTeam(picked.players, state.targetShirts);
+        const activeReveal = await fetchReveal(state.match.game.gameId, activeSide);
+        revealTeam(activeReveal.players, activeShirts);
         if (state.difficulty === 'expert') {
-          const opposite = await fetchReveal(state.match.game.gameId, oppositeSide);
-          revealTeam(opposite.players, state.opponentShirts);
+          const otherSide = state.opponentPhase ? targetSide : opponentSide;
+          const otherShirts = state.opponentPhase ? state.targetShirts : state.opponentShirts;
+          const otherReveal = await fetchReveal(state.match.game.gameId, otherSide);
+          revealTeam(otherReveal.players, otherShirts);
         }
 
         // Mark game as complete
@@ -610,9 +614,11 @@ export default function MissingElevenPage() {
           opponentTeamName={opponentTeamName}
           onPlayAgain={handleNewPuzzle}
           difficulty={state.difficulty}
-          canContinueOpponent={state.gameStatus === 'complete' && !state.opponentPhase && state.opponentShirts.length === 0 && state.difficulty !== 'expert' && state.targetShirts.length === 11 && (state.teamSide === 'home' ? state.match.awayPreview?.length : state.match.homePreview?.length) === 11}
+          canContinueOpponent={(state.gameStatus === 'complete' || state.gameStatus === 'surrendered') && !state.opponentPhase && state.opponentShirts.length === 0 && state.difficulty !== 'expert' && state.targetShirts.length === 11 && (state.teamSide === 'home' ? state.match.awayPreview?.length : state.match.homePreview?.length) === 11}
           onContinueOpponent={handleContinueOpponent}
           isContinuingOpponent={isContinuingOpponent}
+          surrendered={state.gameStatus === 'surrendered'}
+          targetRoundSurrendered={state.targetRoundSurrendered}
         />
       )}
     </>,

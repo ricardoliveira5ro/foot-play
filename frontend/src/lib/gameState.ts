@@ -40,6 +40,8 @@ export interface GameState {
   activeBoard: 'target' | 'opponent';
   /** Optional modes can resume once for an opponent bonus round. */
   opponentPhase: boolean;
+  /** A surrendered target round still counts as finished if the bonus round resumes. */
+  targetRoundSurrendered: boolean;
   activeShirtIndex: number | null;
   gameStatus: GameStatus;
   error: string | null;
@@ -75,6 +77,7 @@ export const initialState: GameState = {
   opponentShirts: [],
   activeBoard: 'target',
   opponentPhase: false,
+  targetRoundSurrendered: false,
   activeShirtIndex: null,
   gameStatus: 'idle',
   error: null,
@@ -198,9 +201,13 @@ function handleSubmitGuess(state: GameState, action: Extract<GameAction, { type:
   const updatedTarget = state.activeBoard === 'target' ? updatedActiveShirts : state.targetShirts;
   const updatedOpponent = state.activeBoard === 'opponent' ? updatedActiveShirts : state.opponentShirts;
 
-  // Modes that require the opponent finish only through the explicit Finish action.
+  // Optional modes finish immediately after the target XI. Once the player
+  // opts into the opponent bonus round, require the full opponent XI too.
+  const settled = (shirt: ShirtGameData) => shirt.state === 'correct' || shirt.state === 'failed';
+  const targetComplete = state.targetRoundSurrendered || (updatedTarget.length > 0 && updatedTarget.every(settled));
+  const opponentComplete = updatedOpponent.length > 0 && updatedOpponent.every(settled);
   const isComplete = !DIFFICULTY_CONFIG[state.difficulty].opponentRequired &&
-    checkGameComplete(updatedTarget, state.opponentPhase ? updatedOpponent : [], state.difficulty);
+    targetComplete && (!state.opponentPhase || opponentComplete);
 
   return {
     ...state,
@@ -222,6 +229,7 @@ function handleSelectTeam(state: GameState, action: Extract<GameAction, { type: 
     opponentShirts: createShirts(opponentLineup),
     activeBoard: 'target',
     opponentPhase: false,
+    targetRoundSurrendered: false,
     activeShirtIndex: null,
   };
 }
@@ -259,7 +267,11 @@ function handleRevealName(state: GameState, action: Extract<GameAction, { type: 
 /** Full SURRENDER handling — extracted so the reducer case stays thin. */
 function handleSurrender(state: GameState): GameState {
   if (state.gameStatus !== 'playing') return state;
-  return { ...state, gameStatus: 'surrendered' };
+  return {
+    ...state,
+    gameStatus: 'surrendered',
+    targetRoundSurrendered: state.targetRoundSurrendered || !state.opponentPhase,
+  };
 }
 
 function handleFinishGame(state: GameState): GameState {
@@ -306,6 +318,7 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
         activeBoard: 'target',
         gameStatus: 'playing',
         opponentPhase: false,
+        targetRoundSurrendered: false,
         error: null,
         activeShirtIndex: null,
       };
@@ -354,7 +367,7 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
     }
 
     case 'CONTINUE_OPPONENT': {
-      if (state.gameStatus !== 'complete' || DIFFICULTY_CONFIG[state.difficulty].opponentRequired || action.payload.length !== 11) return state;
+      if ((state.gameStatus !== 'complete' && state.gameStatus !== 'surrendered') || DIFFICULTY_CONFIG[state.difficulty].opponentRequired || action.payload.length !== 11) return state;
       return {
         ...state,
         opponentShirts: createShirts(action.payload),

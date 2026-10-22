@@ -27,6 +27,10 @@ interface GameCompleteProps {
   canContinueOpponent?: boolean;
   onContinueOpponent?: () => void;
   isContinuingOpponent?: boolean;
+  /** Surrender reveals the names of shirts that were never attempted too. */
+  surrendered?: boolean;
+  /** Keep surrendered target names visible after entering the opponent bonus round. */
+  targetRoundSurrendered?: boolean;
 }
 
 function formatMatchDate(date: string | null): string | null {
@@ -124,6 +128,8 @@ export default function GameComplete({
   canContinueOpponent = false,
   onContinueOpponent,
   isContinuingOpponent = false,
+  surrendered = false,
+  targetRoundSurrendered = false,
 }: Readonly<GameCompleteProps>) {
   const home = match.homeClub?.name ?? 'Home';
   const away = match.awayClub?.name ?? 'Away';
@@ -162,7 +168,11 @@ export default function GameComplete({
   const scoreBreakdown = computeTotalScore(targetShirts, opponentShirts, targetTeamName, opponentTeamName, multiplier);
   const scoreMap = new Map(scoreBreakdown.perPlayer.map(p => [p.token, p]));
 
-  function renderTeamSection(shirts: ShirtGameData[], scores: Map<string, PerPlayerScore>) {
+  function renderTeamSection(
+    shirts: ShirtGameData[],
+    scores: Map<string, PerPlayerScore>,
+    revealUnattempted = surrendered,
+  ) {
     return (
       <div>
         <div className="space-y-2">
@@ -172,15 +182,18 @@ export default function GameComplete({
             .map((shirt) => {
               const isCorrect = shirt.state === 'correct';
               const isFailed = shirt.state === 'failed';
-              const showName = isCorrect || isFailed;
+              const hasResult = isCorrect || isFailed;
+              const showName = hasResult || (revealUnattempted && Boolean(shirt.name));
+              const showAsFailed = isFailed || (revealUnattempted && !isCorrect && Boolean(shirt.name));
+              const showFailedRow = isFailed && !revealUnattempted;
 
               return (
                 <div
                   key={shirt.token}
                   className="flex items-center gap-2 p-2 rounded-lg transition-colors"
                   style={{
-                    backgroundColor: getRowBackground(isCorrect, isFailed),
-                    border: `1px solid ${getRowBorder(isCorrect, isFailed)}`,
+                    backgroundColor: getRowBackground(isCorrect, showFailedRow),
+                    border: `1px solid ${getRowBorder(isCorrect, showFailedRow)}`,
                   }}
                 >
                   <span className="shrink-0 w-8 text-center font-display text-base text-ink/60" aria-label={`Shirt ${shirt.shirtNumber ?? '?'}`}>
@@ -192,12 +205,12 @@ export default function GameComplete({
                   <span
                     className="flex-1 truncate font-semibold text-sm"
                     style={{
-                      color: getNameColor(isCorrect, isFailed),
+                      color: getNameColor(isCorrect, showAsFailed),
                     }}
                   >
                     {showName && shirt.name ? shirt.name : '—'}
                   </span>
-                  {showName && (() => {
+                  {hasResult && (() => {
                     const score = scores.get(shirt.token);
                     if (!score) return null;
                     return (
@@ -220,7 +233,7 @@ export default function GameComplete({
                       </>
                     );
                   })()}
-                  {showName && (
+                  {hasResult && (
                     <span
                       className="flex-shrink-0 flex h-5 w-5 items-center justify-center rounded-full"
                       style={{ backgroundColor: isCorrect ? 'var(--color-correct)' : 'var(--color-failed)' }}
@@ -326,7 +339,7 @@ export default function GameComplete({
                 >
                   {targetTeamName}
                 </h2>
-                {renderTeamSection(targetShirts, scoreMap)}
+                {renderTeamSection(targetShirts, scoreMap, surrendered || targetRoundSurrendered)}
               </>
             ) : (
               <>
