@@ -52,7 +52,7 @@ router.get('/:id', asyncHandler(async (req, res) => {
     return res.status(404).json({ error: 'Match not found', code: 'NOT_FOUND' });
   }
 
-  const response = buildMatchResponse(game, 'normal', true);
+  const response = buildMatchResponse(game);
   res.json(response);
 }));
 
