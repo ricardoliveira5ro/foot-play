@@ -155,7 +155,6 @@ jobs:
         uses: SonarSource/sonarqube-scan-action@v8
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
-          SONAR_HOST_URL: https://sonarcloud.io
           DATABASE_URL: "postgresql://dummy:dummy@localhost:5432/dummy"
           SHADOW_DATABASE_URL: "postgresql://dummy:dummy@localhost:5432/dummy_shadow"
 
@@ -164,7 +163,6 @@ jobs:
         timeout-minutes: 5
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
-          SONAR_HOST_URL: https://sonarcloud.io
           DATABASE_URL: "postgresql://dummy:dummy@localhost:5432/dummy"
           SHADOW_DATABASE_URL: "postgresql://dummy:dummy@localhost:5432/dummy_shadow"
 
