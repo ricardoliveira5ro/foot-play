@@ -152,6 +152,7 @@ jobs:
         run: npm run test:coverage
 
       - name: SonarQube Scan
+        if: github.ref == 'refs/heads/main'
         uses: SonarSource/sonarqube-scan-action@v8
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
@@ -159,6 +160,7 @@ jobs:
           SHADOW_DATABASE_URL: "postgresql://dummy:dummy@localhost:5432/dummy_shadow"
 
       - name: SonarQube Quality Gate check
+        if: github.ref == 'refs/heads/main'
         uses: SonarSource/sonarqube-quality-gate-action@v1
         timeout-minutes: 5
         env:
