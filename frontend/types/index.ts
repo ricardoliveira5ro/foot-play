@@ -69,6 +69,11 @@ export interface GameResponse {
   game: Game;
   homeLineup: LineupPlayer[];
   awayLineup: LineupPlayer[];
+  /** Client-selected side carried into the reducer after its lineup is loaded. */
+  targetSide?: TeamSide;
+  /** Position-only opponent previews in modes where the opponent is optional. */
+  homePreview?: Array<Pick<LineupPlayer, 'position' | 'coords' | 'shirtNumber'>>;
+  awayPreview?: Array<Pick<LineupPlayer, 'position' | 'coords' | 'shirtNumber'>>;
 }
 
 /** One entry of GET /api/players?name=<query>. */

@@ -6,6 +6,7 @@ import userEvent from '@testing-library/user-event';
 import GameComplete from './GameComplete';
 import type { Game } from '@/types';
 import type { ShirtGameData } from '@/lib/gameState';
+import type { Difficulty } from '@/lib/difficulty';
 
 // --- Fixtures ---
 
@@ -53,6 +54,18 @@ interface RenderOptions {
   targetTeamName?: string;
   opponentTeamName?: string;
   onPlayAgain?: () => void;
+  difficulty?: Difficulty;
+}
+
+/**
+ * A full solved lineup. `attempts: 1` matters: the opponent section label
+ * reads whether the opponent half was actually attempted, so a "solved"
+ * shirt must carry a real attempt.
+ */
+function solvedShirts(prefix = 't'): ShirtGameData[] {
+  return Array.from({ length: 11 }, (_, i) =>
+    makeShirt({ token: `${prefix}${i}`, state: 'correct', attempts: 1, shirtNumber: i + 1 }),
+  );
 }
 
 function renderGameComplete(options: RenderOptions = {}) {
@@ -65,6 +78,7 @@ function renderGameComplete(options: RenderOptions = {}) {
       targetTeamName={options.targetTeamName ?? 'Target FC'}
       opponentTeamName={options.opponentTeamName ?? 'Opponent FC'}
       onPlayAgain={onPlayAgain}
+      difficulty={options.difficulty}
     />
   );
   return { ...result, onPlayAgain };
@@ -265,5 +279,67 @@ describe('GameComplete', () => {
     const cancelEvent = new Event('cancel', { cancelable: true });
     dialog.dispatchEvent(cancelEvent);
     expect(cancelEvent.defaultPrevented).toBe(true);
+  });
+});
+
+describe('mode multiplier', () => {
+  it('shows the multiplier next to the grand total', () => {
+    renderGameComplete({ difficulty: 'hard' });
+    expect(screen.getByTestId('grand-total-multiplier').textContent).toBe('×2');
+  });
+
+  it('shows the multiplier on each per-shirt line', () => {
+    renderGameComplete({ difficulty: 'expert', targetShirts: solvedShirts('t') });
+    const badges = screen.getAllByTestId('per-player-multiplier');
+    expect(badges.length).toBeGreaterThan(0);
+    for (const badge of badges) {
+      expect(badge.textContent).toBe('×3');
+    }
+  });
+
+  it('shows no multiplier badge in Normal', () => {
+    renderGameComplete({ difficulty: 'normal', targetShirts: solvedShirts('t') });
+    expect(screen.queryByTestId('grand-total-multiplier')).toBeNull();
+    expect(screen.queryAllByTestId('per-player-multiplier')).toHaveLength(0);
+  });
+
+  it('labels the opponent an optional bonus in Easy, Normal and Hard', async () => {
+    const user = userEvent.setup();
+    for (const difficulty of ['easy', 'normal', 'hard'] as const) {
+      const { unmount } = renderGameComplete({
+        difficulty,
+        opponentShirts: solvedShirts('opp'),
+      });
+
+      await user.click(screen.getByRole('tab', { name: /Switch to Opponent FC lineup/ }));
+
+      expect(screen.getByTestId('opponent-section-label').textContent ?? '').toMatch(
+        /optional bonus/i,
+      );
+      unmount();
+    }
+  });
+
+  it('labels the opponent required in Expert', async () => {
+    const user = userEvent.setup();
+    renderGameComplete({ difficulty: 'expert', opponentShirts: solvedShirts('opp') });
+
+    await user.click(screen.getByRole('tab', { name: /Switch to Opponent FC lineup/ }));
+
+    const label = screen.getByTestId('opponent-section-label').textContent ?? '';
+    expect(label).toMatch(/required/i);
+    expect(label).not.toMatch(/optional/i);
+  });
+
+  it('says the opponent was not played when the half was never touched', async () => {
+    const user = userEvent.setup();
+    const untouched = Array.from({ length: 11 }, (_, i) => makeShirt({ token: `o${i}` }));
+    renderGameComplete({ difficulty: 'normal', opponentShirts: untouched });
+
+    await user.click(screen.getByRole('tab', { name: /Switch to Opponent FC lineup/ }));
+
+    expect(screen.getByTestId('opponent-section-label').textContent ?? '').toMatch(
+      /not played this game/i,
+    );
   });
 });

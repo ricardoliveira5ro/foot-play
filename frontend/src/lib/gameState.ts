@@ -38,6 +38,10 @@ export interface GameState {
   opponentShirts: ShirtGameData[];
   /** Which board is displayed */
   activeBoard: 'target' | 'opponent';
+  /** Optional modes can resume once for an opponent bonus round. */
+  opponentPhase: boolean;
+  /** A surrendered target round still counts as finished if the bonus round resumes. */
+  targetRoundSurrendered: boolean;
   activeShirtIndex: number | null;
   gameStatus: GameStatus;
   error: string | null;
@@ -58,6 +62,7 @@ export type GameAction =
   | { type: 'REVEAL_NAME'; payload: { token: string; name: string; shirtNumber?: number | null } }
   | { type: 'SURRENDER' }
   | { type: 'FINISH_GAME' }
+  | { type: 'CONTINUE_OPPONENT'; payload: LineupPlayer[] }
   | { type: 'NEW_GAME' }
   | { type: 'SET_ERROR'; payload: string | null }
   | { type: 'SET_LOADING'; payload: boolean }
@@ -71,6 +76,8 @@ export const initialState: GameState = {
   targetShirts: [],
   opponentShirts: [],
   activeBoard: 'target',
+  opponentPhase: false,
+  targetRoundSurrendered: false,
   activeShirtIndex: null,
   gameStatus: 'idle',
   error: null,
@@ -81,7 +88,10 @@ export const initialState: GameState = {
 // --- Helpers ---
 
 function pickSide(response: GameResponse): TeamSide {
-  if (response.homeLineup.length === 0 && response.awayLineup.length === 0) {
+  if (response.targetSide) return response.targetSide;
+  const homeCount = response.homeLineup.length || response.homePreview?.length || 0;
+  const awayCount = response.awayLineup.length || response.awayPreview?.length || 0;
+  if (homeCount === 0 && awayCount === 0) {
     throw new Error('This match has no lineup data.');
   }
 
@@ -99,10 +109,12 @@ function pickSide(response: GameResponse): TeamSide {
     preferred = crypto.getRandomValues(new Uint32Array(1))[0] % 2 === 0 ? 'home' : 'away';
   }
 
-  const preferredLineup = preferred === 'home' ? response.homeLineup : response.awayLineup;
-  if (preferredLineup.length > 0) return preferred;
+  const preferredCount = preferred === 'home' ? homeCount : awayCount;
+  if (preferredCount > 0) return preferred;
   return preferred === 'home' ? 'away' : 'home';
 }
+
+export const targetSideForMatch = pickSide;
 
 function createShirts(lineup: LineupPlayer[]): ShirtGameData[] {
   return lineup.map(entry => ({
@@ -189,10 +201,13 @@ function handleSubmitGuess(state: GameState, action: Extract<GameAction, { type:
   const updatedTarget = state.activeBoard === 'target' ? updatedActiveShirts : state.targetShirts;
   const updatedOpponent = state.activeBoard === 'opponent' ? updatedActiveShirts : state.opponentShirts;
 
-  // Modes that require the opponent finish only through the explicit Finish action.
-  const isComplete =
-    !DIFFICULTY_CONFIG[state.difficulty].opponentRequired &&
-    checkGameComplete(updatedTarget, updatedOpponent, state.difficulty);
+  // Optional modes finish immediately after the target XI. Once the player
+  // opts into the opponent bonus round, require the full opponent XI too.
+  const settled = (shirt: ShirtGameData) => shirt.state === 'correct' || shirt.state === 'failed';
+  const targetComplete = state.targetRoundSurrendered || (updatedTarget.length > 0 && updatedTarget.every(settled));
+  const opponentComplete = updatedOpponent.length > 0 && updatedOpponent.every(settled);
+  const isComplete = !DIFFICULTY_CONFIG[state.difficulty].opponentRequired &&
+    targetComplete && (!state.opponentPhase || opponentComplete);
 
   return {
     ...state,
@@ -213,6 +228,8 @@ function handleSelectTeam(state: GameState, action: Extract<GameAction, { type: 
     targetShirts: createShirts(targetLineup),
     opponentShirts: createShirts(opponentLineup),
     activeBoard: 'target',
+    opponentPhase: false,
+    targetRoundSurrendered: false,
     activeShirtIndex: null,
   };
 }
@@ -250,7 +267,11 @@ function handleRevealName(state: GameState, action: Extract<GameAction, { type: 
 /** Full SURRENDER handling — extracted so the reducer case stays thin. */
 function handleSurrender(state: GameState): GameState {
   if (state.gameStatus !== 'playing') return state;
-  return { ...state, gameStatus: 'surrendered' };
+  return {
+    ...state,
+    gameStatus: 'surrendered',
+    targetRoundSurrendered: state.targetRoundSurrendered || !state.opponentPhase,
+  };
 }
 
 function handleFinishGame(state: GameState): GameState {
@@ -296,6 +317,8 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
         opponentShirts: createShirts(opponentLineup),
         activeBoard: 'target',
         gameStatus: 'playing',
+        opponentPhase: false,
+        targetRoundSurrendered: false,
         error: null,
         activeShirtIndex: null,
       };
@@ -343,6 +366,18 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
       return handleFinishGame(state);
     }
 
+    case 'CONTINUE_OPPONENT': {
+      if ((state.gameStatus !== 'complete' && state.gameStatus !== 'surrendered') || DIFFICULTY_CONFIG[state.difficulty].opponentRequired || action.payload.length !== 11) return state;
+      return {
+        ...state,
+        opponentShirts: createShirts(action.payload),
+        activeBoard: 'opponent',
+        activeShirtIndex: null,
+        opponentPhase: true,
+        gameStatus: 'playing',
+      };
+    }
+
     case 'NEW_GAME': {
       return initialState;
     }
@@ -374,6 +409,7 @@ interface UseGameStateReturn {
   revealName: (token: string, name: string, shirtNumber?: number | null) => void;
   surrender: () => void;
   finishGame: () => void;
+  continueOpponent: (lineup: LineupPlayer[]) => void;
   newGame: () => void;
   setError: (error: string | null) => void;
   setLoading: (loading: boolean) => void;
@@ -420,6 +456,8 @@ export function useGameState(): UseGameStateReturn {
 
   const finishGame = useCallback(() => dispatch({ type: 'FINISH_GAME' }), []);
 
+  const continueOpponent = useCallback((lineup: LineupPlayer[]) => dispatch({ type: 'CONTINUE_OPPONENT', payload: lineup }), []);
+
   const newGame = useCallback(() => {
     dispatch({ type: 'NEW_GAME' });
   }, []);
@@ -450,6 +488,7 @@ export function useGameState(): UseGameStateReturn {
     revealName,
     surrender,
     finishGame,
+    continueOpponent,
     newGame,
     setError,
     setLoading,

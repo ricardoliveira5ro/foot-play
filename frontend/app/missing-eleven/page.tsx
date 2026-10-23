@@ -7,7 +7,7 @@ import { DIFFICULTY_CONFIG } from '@/lib/difficulty';
 import { availableClues } from '@/lib/shirtBadges';
 import DifficultySelector from '@/components/DifficultySelector';
 import FinishButton from '@/components/FinishButton';
-import { fetchRandomMatch, submitGuess as submitGuessApi, fetchReveal, revealOnePlayer } from '@/lib/api';
+import { fetchRandomMatch, fetchLineup, submitGuess as submitGuessApi, fetchReveal, revealOnePlayer } from '@/lib/api';
 import { filtersToParams } from '@/lib/filterParams';
 import { hasActiveFilters } from '@/lib/filters';
 import { useFilterOptions } from '@/lib/useFilterOptions';
@@ -21,9 +21,9 @@ import FilterPanel from '@/components/FilterPanel';
 import FilterEmptyState from '@/components/FilterEmptyState';
 import { computeTotalScore } from '@/lib/scoring';
 import FilterUrlSync from './FilterUrlSync';
-import type { ShirtData, RevealPlayer, GameFilterParams } from '@/types';
+import type { ShirtData, RevealPlayer, GameFilterParams, TeamSide } from '@/types';
 import { EMPTY_FILTERS } from '@/types';
-import type { ShirtGameData } from '@/lib/gameState';
+import { targetSideForMatch, type ShirtGameData } from '@/lib/gameState';
 
 function describeError(cause: unknown): string {
   return cause instanceof Error ? cause.message : 'Something went wrong.';
@@ -39,6 +39,7 @@ export default function MissingElevenPage() {
     revealName,
     surrender,
     finishGame,
+    continueOpponent,
     newGame,
     setError,
     setLoading,
@@ -84,6 +85,7 @@ export default function MissingElevenPage() {
   }, [router, pathname, setFilters]);
 
   const [confirmingSurrender, setConfirmingSurrender] = useState(false);
+  const [isContinuingOpponent, setIsContinuingOpponent] = useState(false);
   const confirmTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const shirtsRef = useRef({ target: state.targetShirts, opponent: state.opponentShirts });
 
@@ -107,19 +109,19 @@ export default function MissingElevenPage() {
       if (!state.match) return;
 
       try {
-        const pickedSide = state.teamSide;
-        const oppositeSide = pickedSide === 'home' ? 'away' : 'home';
+        const targetSide = state.teamSide;
+        const opponentSide = targetSide === 'home' ? 'away' : 'home';
+        const activeSide = state.opponentPhase ? opponentSide : targetSide;
+        const activeShirts = state.opponentPhase ? state.opponentShirts : state.targetShirts;
 
-        // Reveal both teams
-        const [picked, opposite] = await Promise.all([
-          fetchReveal(state.match.game.gameId, pickedSide),
-          fetchReveal(state.match.game.gameId, oppositeSide),
-        ]);
-
-        // Reveal names on unresolved shirts, matched per team to avoid
-        // shirt-number collisions between the two lineups.
-        revealTeam(picked.players, state.targetShirts);
-        revealTeam(opposite.players, state.opponentShirts);
+        const activeReveal = await fetchReveal(state.match.game.gameId, activeSide);
+        revealTeam(activeReveal.players, activeShirts);
+        if (state.difficulty === 'expert') {
+          const otherSide = state.opponentPhase ? targetSide : opponentSide;
+          const otherShirts = state.opponentPhase ? state.targetShirts : state.opponentShirts;
+          const otherReveal = await fetchReveal(state.match.game.gameId, otherSide);
+          revealTeam(otherReveal.players, otherShirts);
+        }
 
         // Mark game as complete
         surrender();
@@ -133,7 +135,7 @@ export default function MissingElevenPage() {
         setConfirmingSurrender(false);
       }, 4000);
     }
-  }, [confirmingSurrender, state.match, state.teamSide, state.targetShirts, state.opponentShirts, revealTeam, surrender, setError]);
+  }, [confirmingSurrender, state.match, state.teamSide, state.targetShirts, state.opponentShirts, state.difficulty, revealTeam, surrender, setError]);
 
   const filterKey = `${filtersToParams(filters).toString()}|difficulty=${state.difficulty}`;
   const fetchedKeyRef = useRef<string | null>(null);
@@ -147,9 +149,24 @@ export default function MissingElevenPage() {
     setLoading(true);
     setError(null);
     fetchRandomMatch(filters, state.difficulty)
-      .then((response) => {
+      .then(async (response) => {
         if (seq !== matchSeqRef.current) return;
-        if (response) startNewGame(response);
+        if (response) {
+          const side = targetSideForMatch(response);
+          if (state.difficulty !== 'expert') {
+            const targetKey = side === 'home' ? 'homeLineup' : 'awayLineup';
+            if (response[targetKey].length === 0) {
+              const targetLineup = await fetchLineup(response.game.gameId, side, state.difficulty);
+              if (seq !== matchSeqRef.current) return;
+              response = { ...response, targetSide: side, [targetKey]: targetLineup };
+            } else {
+              response = { ...response, targetSide: side };
+            }
+          } else {
+            response = { ...response, targetSide: side };
+          }
+          startNewGame(response);
+        }
         // null: no match under these filters. That is not an error — the
         // options' `total === 0` drives the explained empty state instead
         // (v1.1.4). A thrown failure still lands in the catch below.
@@ -177,28 +194,22 @@ export default function MissingElevenPage() {
     loadMatch();
   }, [started, filterKey, loadMatch]);
 
-  // Fetch revealed names when the game completes (both teams in parallel)
+  // Reveal only the side the player has actually finished. The opponent is
+  // fetched only after Continue, and Expert retains its two-sided flow.
   useEffect(() => {
-    if ((state.gameStatus === 'complete' || state.gameStatus === 'surrendered') && state.match) {
-      const pickedSide = state.teamSide;
-      const oppositeSide = pickedSide === 'home' ? 'away' : 'home';
-      
-      Promise.all([
-        fetchReveal(state.match.game.gameId, pickedSide),
-        fetchReveal(state.match.game.gameId, oppositeSide),
-      ])
-        .then(([picked, opposite]) => {
-          // Populate names on unresolved shirts so the board and GameComplete
-          // read shirt.name directly. Read from shirtsRef to avoid re-running
-          // this effect when revealName updates the shirts.
-          revealTeam(picked.players, shirtsRef.current.target);
-          revealTeam(opposite.players, shirtsRef.current.opponent);
+    if (state.gameStatus === 'complete' && state.match) {
+      const sideToReveal: TeamSide = state.opponentPhase
+        ? (state.teamSide === 'home' ? 'away' : 'home')
+        : state.teamSide;
+      fetchReveal(state.match.game.gameId, sideToReveal)
+        .then((result) => {
+          revealTeam(result.players, state.opponentPhase ? shirtsRef.current.opponent : shirtsRef.current.target);
         })
         .catch((cause: unknown) => {
           setError(describeError(cause));
         });
     }
-  }, [state.gameStatus, state.match, state.teamSide, setError, revealTeam]);
+  }, [state.gameStatus, state.match, state.teamSide, state.opponentPhase, setError, revealTeam]);
 
   // Cleanup confirm timer on unmount
   useEffect(() => {
@@ -273,6 +284,20 @@ export default function MissingElevenPage() {
     reloadOptions();
     loadMatch();
   }, [reloadOptions, loadMatch]);
+
+  const handleContinueOpponent = useCallback(async () => {
+    if (!state.match || state.opponentShirts.length > 0 || isContinuingOpponent) return;
+    const side = state.teamSide === 'home' ? 'away' : 'home';
+    setIsContinuingOpponent(true);
+    try {
+      const lineup = await fetchLineup(state.match.game.gameId, side, state.difficulty);
+      continueOpponent(lineup);
+    } catch (cause: unknown) {
+      setError(describeError(cause));
+    } finally {
+      setIsContinuingOpponent(false);
+    }
+  }, [state.match, state.teamSide, state.difficulty, state.opponentShirts.length, isContinuingOpponent, continueOpponent, setError]);
 
   // Clear all from the empty state. The URL is the source of truth, so it must
   // be cleared here too: the empty state does not render FilterUrlSync, and
@@ -416,14 +441,33 @@ export default function MissingElevenPage() {
 
   // Determine which side is active based on the board
   const activeTeamSide = state.activeBoard === 'target' ? state.teamSide : (state.teamSide === 'home' ? 'away' : 'home');
-  const lineup = activeTeamSide === 'home' ? state.match.homeLineup : state.match.awayLineup;
+  const lineup = state.activeBoard === 'opponent' && state.opponentPhase
+    ? state.opponentShirts
+    : (activeTeamSide === 'home' ? state.match.homeLineup : state.match.awayLineup);
+  const preview = activeTeamSide === 'home' ? state.match.homePreview : state.match.awayPreview;
   const formation = activeTeamSide === 'home' ? state.match.game.homeFormation : state.match.game.awayFormation;
   const teamName = (activeTeamSide === 'home' ? state.match.game.homeClub?.name : state.match.game.awayClub?.name) ?? 'Unknown team';
   const clubId = activeTeamSide === 'home' ? state.match.game.homeClub?.clubId : state.match.game.awayClub?.clubId;
 
   // Build shirts for the active board by merging lineup with game state
   const activeShirtsForBoard = state.activeBoard === 'target' ? state.targetShirts : state.opponentShirts;
-  const shirts: ShirtData[] = lineup.map((entry) => {
+  const visibleLineup: ShirtData[] = lineup.length > 0
+    ? lineup
+    : (state.activeBoard === 'opponent' ? (preview ?? []).map((entry, index) => ({
+        token: `locked-preview-${index}`,
+        nameLength: 0,
+        wordBoundaries: [],
+        shirtNumber: entry.shirtNumber,
+        position: entry.position,
+        coords: entry.coords,
+        goals: 0,
+        assists: 0,
+        redCards: 0,
+        isCaptain: false,
+        hasFirstLetter: false,
+        state: 'default' as const,
+      })) : []);
+  const shirts: ShirtData[] = visibleLineup.map((entry) => {
     const existing = activeShirtsForBoard.find(s => s.token === entry.token);
     return existing
       ? { ...entry, state: existing.state, guessHistory: existing.guessHistory, name: existing.name }
@@ -438,10 +482,18 @@ export default function MissingElevenPage() {
   const targetSolved = state.targetShirts.filter(s => s.state === 'correct').length;
   const opponentSolved = state.opponentShirts.filter(s => s.state === 'correct').length;
 
-  // Live score — recomputed after each guess from the current state
+  // Live score — recomputed after each guess from the current state.
+  // The mode multiplier is applied here too, so the live counter and the
+  // final dialog agree instead of the score jumping at the end of the game.
   const scoreBreakdown =
     (state.gameStatus === 'playing' || isGameComplete) && state.match
-      ? computeTotalScore(state.targetShirts, state.opponentShirts, targetTeamName, opponentTeamName)
+      ? computeTotalScore(
+          state.targetShirts,
+          state.opponentShirts,
+          targetTeamName,
+          opponentTeamName,
+          DIFFICULTY_CONFIG[state.difficulty].multiplier,
+        )
       : null;
   const liveScore = scoreBreakdown?.grandTotal ?? 0;
 
@@ -503,12 +555,17 @@ export default function MissingElevenPage() {
 
         {/* Tactic board */}
         <section className="min-w-0" aria-label="Tactic board">
+          {state.activeBoard === 'opponent' && !state.opponentPhase && state.difficulty !== 'expert' && !isGameComplete && (
+            <p className="mb-3 rounded-md border border-ink/10 bg-paper px-3 py-2 text-center text-xs text-ink/65">
+              Opponent lineup locked · finish {targetTeamName} to unlock the bonus round.
+            </p>
+          )}
           <TacticBoard
             teamName={teamName}
             formation={formation}
             shirts={shirts}
             difficulty={state.difficulty}
-            onShirtClick={handleShirtClick}
+            onShirtClick={state.activeBoard === 'opponent' && !state.opponentPhase && state.difficulty !== 'expert' ? undefined : handleShirtClick}
             clubId={clubId}
             activeBoard={state.activeBoard}
             targetTeamName={targetTeamName}
@@ -556,6 +613,12 @@ export default function MissingElevenPage() {
           targetTeamName={targetTeamName}
           opponentTeamName={opponentTeamName}
           onPlayAgain={handleNewPuzzle}
+          difficulty={state.difficulty}
+          canContinueOpponent={(state.gameStatus === 'complete' || state.gameStatus === 'surrendered') && !state.opponentPhase && state.opponentShirts.length === 0 && state.difficulty !== 'expert' && state.targetShirts.length === 11 && (state.teamSide === 'home' ? state.match.awayPreview?.length : state.match.homePreview?.length) === 11}
+          onContinueOpponent={handleContinueOpponent}
+          isContinuingOpponent={isContinuingOpponent}
+          surrendered={state.gameStatus === 'surrendered'}
+          targetRoundSurrendered={state.targetRoundSurrendered}
         />
       )}
     </>,

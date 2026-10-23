@@ -3,7 +3,7 @@ import { fitStartingXI, type LineupPlayer } from './positionMapping';
 import { Prisma } from '../generated/prisma/client';
 import { normalize, getWordBoundaries } from './wordle';
 import { generatePlayerToken, resolvePlayerToken } from './tokenService';
-import { completeLineupsWhere } from '../lib/lineupCompleteness';
+import { completeLineupsWhere, STARTING_LINEUP } from '../lib/lineupCompleteness';
 import { allFiltersWhere, type GameFilterParams } from '../lib/filterQuery';
 
 export type GameWithRelations = Prisma.GameGetPayload<{
@@ -84,7 +84,9 @@ export async function getMatchById(id: number) {
   return game as GameWithRelations | null;
 }
 
-export function buildMatchResponse(game: GameWithRelations, difficulty: 'easy' | 'normal' | 'hard' | 'expert' = 'normal') {
+export function buildMatchResponse(game: GameWithRelations, difficulty: 'easy' | 'normal' | 'hard' | 'expert' = 'normal', hideOptionalLineups = false) {
+  const homeLineup = buildLineup(game.gameId, game.appearances, game.homeClubId, game.homeClubFormation, difficulty);
+  const awayLineup = buildLineup(game.gameId, game.appearances, game.awayClubId, game.awayClubFormation, difficulty);
   return {
     game: {
       gameId: game.gameId,
@@ -98,14 +100,26 @@ export function buildMatchResponse(game: GameWithRelations, difficulty: 'easy' |
       homeFormation: game.homeClubFormation ?? null,
       awayFormation: game.awayClubFormation ?? null,
     },
-    homeLineup: buildLineup(game.gameId, game.appearances, game.homeClubId, game.homeClubFormation, difficulty),
-    awayLineup: buildLineup(game.gameId, game.appearances, game.awayClubId, game.awayClubFormation, difficulty),
+    // In optional-opponent modes the random-match response is visible before
+    // the player has chosen to continue. Keep only board geometry in it.
+    ...(difficulty === 'expert' || !hideOptionalLineups
+      ? { homeLineup, awayLineup }
+      : {
+          homeLineup: [],
+          awayLineup: [],
+          homePreview: homeLineup.map(({ position, coords, shirtNumber }) => ({ position, coords, shirtNumber })),
+          awayPreview: awayLineup.map(({ position, coords, shirtNumber }) => ({ position, coords, shirtNumber })),
+        }),
   };
+}
+
+export function buildLineupForSide(game: GameWithRelations, clubId: number, difficulty: 'easy' | 'normal' | 'hard' | 'expert') {
+  return buildLineup(game.gameId, game.appearances, clubId, clubId === game.homeClubId ? game.homeClubFormation : game.awayClubFormation, difficulty);
 }
 
 function buildLineup(gameId: number, appearances: GameWithRelations['appearances'], clubId: number, formation: string | null, difficulty: 'easy' | 'normal' | 'hard' | 'expert') {
   const side = appearances
-    .filter((a) => a.clubId === clubId)
+    .filter((a) => a.clubId === clubId && (a.type === undefined || a.type === STARTING_LINEUP))
     .sort((a, b) => {
       const na = a.number ?? Number.MAX_SAFE_INTEGER;
       const nb = b.number ?? Number.MAX_SAFE_INTEGER;

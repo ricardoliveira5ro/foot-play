@@ -4,7 +4,8 @@ import { useEffect, useRef, useState } from 'react';
 import TeamTabBar from '@/components/TeamTabBar';
 import type { Game } from '@/types';
 import type { ShirtGameData } from '@/lib/gameState';
-import { computeTotalScore } from '@/lib/scoring';
+import { DEFAULT_DIFFICULTY, DIFFICULTY_CONFIG, type Difficulty } from '@/lib/difficulty';
+import { computeTotalScore, formatMultiplier } from '@/lib/scoring';
 import type { PerPlayerScore } from '@/lib/scoring';
 
 interface GameCompleteProps {
@@ -20,6 +21,16 @@ interface GameCompleteProps {
   opponentTeamName: string;
   /** Callback to start a new game */
   onPlayAgain: () => void;
+  /** Mode in force. Drives the multiplier display and the opponent label. */
+  difficulty?: Difficulty;
+  /** Optional bonus round, available only when an opponent XI is complete. */
+  canContinueOpponent?: boolean;
+  onContinueOpponent?: () => void;
+  isContinuingOpponent?: boolean;
+  /** Surrender reveals the names of shirts that were never attempted too. */
+  surrendered?: boolean;
+  /** Keep surrendered target names visible after entering the opponent bonus round. */
+  targetRoundSurrendered?: boolean;
 }
 
 function formatMatchDate(date: string | null): string | null {
@@ -92,7 +103,34 @@ function getPositionLabel(position: string | null): string {
   return position ? labels[position] ?? position : '?';
 }
 
-export default function GameComplete({ match, targetShirts, opponentShirts, targetTeamName, opponentTeamName, onPlayAgain }: Readonly<GameCompleteProps>) {
+/**
+ * How the opponent section is labelled (§5.2, RD1).
+ *
+ * `opponentRequired` says the mode needs the opponent; `opponentAttempted`
+ * says whether the player actually put an attempt into it. Both matter,
+ * and they are different questions: under RD1 a `normal` game can end at
+ * 11/22 with the opponent untouched, so "optional bonus" on its own would
+ * point at points that are not on the line.
+ */
+function opponentLabel(opponentAttempted: boolean, difficulty: Difficulty): string {
+  if (DIFFICULTY_CONFIG[difficulty].opponentRequired) return 'required';
+  return opponentAttempted ? 'optional bonus' : 'optional bonus — not played this game';
+}
+
+export default function GameComplete({
+  match,
+  targetShirts,
+  opponentShirts,
+  targetTeamName,
+  opponentTeamName,
+  onPlayAgain,
+  difficulty = DEFAULT_DIFFICULTY,
+  canContinueOpponent = false,
+  onContinueOpponent,
+  isContinuingOpponent = false,
+  surrendered = false,
+  targetRoundSurrendered = false,
+}: Readonly<GameCompleteProps>) {
   const home = match.homeClub?.name ?? 'Home';
   const away = match.awayClub?.name ?? 'Away';
   const dateLabel = formatMatchDate(match.date) ?? match.season;
@@ -112,17 +150,29 @@ export default function GameComplete({ match, targetShirts, opponentShirts, targ
   const allShirts = [...targetShirts, ...opponentShirts];
   const totalShirts = allShirts.length;
   const correctCount = allShirts.filter(s => s.state === 'correct').length;
-  const allCorrect = correctCount === totalShirts;
+  const allCorrect = correctCount === totalShirts && !canContinueOpponent;
   const targetSolved = targetShirts.filter(s => s.state === 'correct').length;
   const opponentSolved = opponentShirts.filter(s => s.state === 'correct').length;
 
   const [activeTab, setActiveTab] = useState<'target' | 'opponent'>('target');
-  
+
+  // The mode's scoring factor. Applied to every line, so the grand total and
+  // the live counter agree.
+  const multiplier = DIFFICULTY_CONFIG[difficulty].multiplier;
+
+  // Did the player put an attempt into the opponent half? A normal game can
+  // end with the opponent untouched, and then its points are not on the line.
+  const opponentAttempted = opponentShirts.some((shirt) => shirt.attempts > 0);
+
   // Score breakdown — computed once from the final state
-  const scoreBreakdown = computeTotalScore(targetShirts, opponentShirts, targetTeamName, opponentTeamName);
+  const scoreBreakdown = computeTotalScore(targetShirts, opponentShirts, targetTeamName, opponentTeamName, multiplier);
   const scoreMap = new Map(scoreBreakdown.perPlayer.map(p => [p.token, p]));
 
-  function renderTeamSection(shirts: ShirtGameData[], scores: Map<string, PerPlayerScore>) {
+  function renderTeamSection(
+    shirts: ShirtGameData[],
+    scores: Map<string, PerPlayerScore>,
+    revealUnattempted = surrendered,
+  ) {
     return (
       <div>
         <div className="space-y-2">
@@ -132,15 +182,18 @@ export default function GameComplete({ match, targetShirts, opponentShirts, targ
             .map((shirt) => {
               const isCorrect = shirt.state === 'correct';
               const isFailed = shirt.state === 'failed';
-              const showName = isCorrect || isFailed;
+              const hasResult = isCorrect || isFailed;
+              const showName = hasResult || (revealUnattempted && Boolean(shirt.name));
+              const showAsFailed = isFailed || (revealUnattempted && !isCorrect && Boolean(shirt.name));
+              const showFailedRow = isFailed && !revealUnattempted;
 
               return (
                 <div
                   key={shirt.token}
                   className="flex items-center gap-2 p-2 rounded-lg transition-colors"
                   style={{
-                    backgroundColor: getRowBackground(isCorrect, isFailed),
-                    border: `1px solid ${getRowBorder(isCorrect, isFailed)}`,
+                    backgroundColor: getRowBackground(isCorrect, showFailedRow),
+                    border: `1px solid ${getRowBorder(isCorrect, showFailedRow)}`,
                   }}
                 >
                   <span className="shrink-0 w-8 text-center font-display text-base text-ink/60" aria-label={`Shirt ${shirt.shirtNumber ?? '?'}`}>
@@ -152,26 +205,35 @@ export default function GameComplete({ match, targetShirts, opponentShirts, targ
                   <span
                     className="flex-1 truncate font-semibold text-sm"
                     style={{
-                      color: getNameColor(isCorrect, isFailed),
+                      color: getNameColor(isCorrect, showAsFailed),
                     }}
                   >
                     {showName && shirt.name ? shirt.name : '—'}
                   </span>
-                  {showName && (() => {
+                  {hasResult && (() => {
                     const score = scores.get(shirt.token);
                     if (!score) return null;
                     return (
-                      <span
-                        className={`shrink-0 font-mono text-xs ${
-                          isCorrect ? 'text-correct' : 'text-failed'
-                        }`}
-                        aria-label={`${score.attempts} attempts, ${score.totalPoints} points`}
-                      >
-                        {score.attempts}T · {score.totalPoints}pt
-                      </span>
+                      <>
+                        <span
+                          className={`shrink-0 font-mono text-xs ${
+                            isCorrect ? 'text-correct' : 'text-failed'
+                          }`}
+                          aria-label={`${score.attempts} attempts, ${score.totalPoints} points`}
+                        >
+                          {score.attempts}T · {score.totalPoints}pt
+                        </span>
+                        {/* The multiplier is read off the line item, so the badge
+                            always describes the number printed beside it. */}
+                        {score.multiplier !== 1 && (
+                          <span data-testid="per-player-multiplier" className="text-ink/50">
+                            ×{formatMultiplier(score.multiplier)}
+                          </span>
+                        )}
+                      </>
                     );
                   })()}
-                  {showName && (
+                  {hasResult && (
                     <span
                       className="flex-shrink-0 flex h-5 w-5 items-center justify-center rounded-full"
                       style={{ backgroundColor: isCorrect ? 'var(--color-correct)' : 'var(--color-failed)' }}
@@ -245,9 +307,16 @@ export default function GameComplete({ match, targetShirts, opponentShirts, targ
             <div className="h-10 w-px bg-ink/10" aria-hidden="true" />
 
             {/* Score — the hero */}
-            <span className="font-display text-[clamp(36px,6vw,44px)] leading-none text-ink">
-              {scoreBreakdown.grandTotal.toLocaleString('en-US')}
-            </span>
+            <div className="flex items-baseline gap-2">
+              <span className="font-display text-[clamp(36px,6vw,44px)] leading-none text-ink">
+                {scoreBreakdown.grandTotal.toLocaleString('en-US')}
+              </span>
+              {multiplier !== 1 && (
+                <span data-testid="grand-total-multiplier" className="text-ink/60">
+                  ×{formatMultiplier(multiplier)}
+                </span>
+              )}
+            </div>
           </div>
         </header>
 
@@ -262,9 +331,32 @@ export default function GameComplete({ match, targetShirts, opponentShirts, targ
             onToggle={() => setActiveTab(prev => (prev === 'target' ? 'opponent' : 'target'))}
           />
           <div className="mt-4 max-h-[40vh] scrollbar-hide overflow-y-auto">
-            {activeTab === 'target'
-              ? renderTeamSection(targetShirts, scoreMap)
-              : renderTeamSection(opponentShirts, scoreMap)}
+            {activeTab === 'target' ? (
+              <>
+                <h2
+                  data-testid="target-section-label"
+                  className="mb-2 font-display uppercase tracking-[0.08em] text-ink"
+                >
+                  {targetTeamName}
+                </h2>
+                {renderTeamSection(targetShirts, scoreMap, surrendered || targetRoundSurrendered)}
+              </>
+            ) : (
+              <>
+                <h2
+                  data-testid="opponent-section-label"
+                  className="mb-2 font-display uppercase tracking-[0.08em] text-ink"
+                >
+                  {opponentTeamName}
+                  <span className="ml-2 text-ink/50">
+                    {opponentLabel(opponentAttempted, difficulty)}
+                  </span>
+                </h2>
+                {opponentShirts.length > 0
+                  ? renderTeamSection(opponentShirts, scoreMap)
+                  : <p className="rounded-lg border border-dashed border-ink/20 px-4 py-8 text-center text-sm text-ink/55">This lineup stays hidden until you choose the bonus round.</p>}
+              </>
+            )}
           </div>
         </div>
 
@@ -291,6 +383,20 @@ export default function GameComplete({ match, targetShirts, opponentShirts, targ
 
         {/* Play Again button */}
         <div className="border-t border-ink/10 px-6 py-3">
+          {canContinueOpponent && onContinueOpponent && (
+            <button
+              type="button"
+              onClick={onContinueOpponent}
+              disabled={isContinuingOpponent}
+              className="mb-2 flex w-full items-center justify-between rounded-lg border border-correct/40 bg-correct/10 px-4 py-3 text-left text-ink transition-colors hover:bg-correct/15 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-flare disabled:cursor-wait disabled:opacity-60"
+            >
+              <span>
+                <span className="block text-sm font-semibold">{isContinuingOpponent ? 'Opening lineup…' : 'Guess the opponent'}</span>
+                <span className="mt-0.5 block text-xs text-ink/60">Unlock 11 more shirts and add bonus points</span>
+              </span>
+              <span aria-hidden="true" className="font-mono text-lg text-correct">↗</span>
+            </button>
+          )}
           <button
             type="button"
             onClick={onPlayAgain}

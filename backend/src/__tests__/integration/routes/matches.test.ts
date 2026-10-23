@@ -35,6 +35,21 @@ describe('GET /api/matches/random', () => {
     }
   });
 
+  it('accepts Expert difficulty', async () => {
+    const res = await request(app).get('/api/matches/random?difficulty=expert');
+
+    expect(res.status).toBe(200);
+    expect(res.body.homeLineup.length).toBeGreaterThan(0);
+    expect(res.body.awayLineup.length).toBeGreaterThan(0);
+  });
+
+  it('rejects an unsupported difficulty', async () => {
+    const res = await request(app).get('/api/matches/random?difficulty=impossible');
+
+    expect(res.status).toBe(400);
+    expect(res.body.code).toBe('INVALID_PARAMETER');
+  });
+
   it('returns 404 when no matches exist', async () => {
     await prisma.appearance.deleteMany();
     await prisma.game.deleteMany();

@@ -1,6 +1,28 @@
 import { describe, it, expect } from 'vitest';
-import { scorePlayer, computeTotalScore } from './scoring';
+import { scorePlayer, computeTotalScore, formatMultiplier } from './scoring';
 import type { ShirtGameData } from './gameState';
+
+/** Minimal valid `ShirtGameData` with sensible defaults, overridable per case. */
+function makeShirt(overrides: Partial<ShirtGameData>): ShirtGameData {
+  return {
+    token: 't1',
+    nameLength: 6,
+    wordBoundaries: [],
+    shirtNumber: 7,
+    position: 'CM',
+    coords: { x: 50, y: 50 },
+    goals: 0,
+    assists: 0,
+    redCards: 0,
+    isCaptain: false,
+    hasFirstLetter: true,
+    state: 'correct',
+    attempts: 1,
+    guessHistory: [],
+    correctLetters: [],
+    ...overrides,
+  };
+}
 
 describe('scorePlayer — correct guesses', () => {
   it('awards 1000 for a first-try correct guess', () => {
@@ -65,27 +87,6 @@ describe('scorePlayer — failed guesses (partial credit)', () => {
 });
 
 describe('computeTotalScore', () => {
-  function makeShirt(overrides: Partial<ShirtGameData>): ShirtGameData {
-    return {
-      token: 't1',
-      nameLength: 6,
-      wordBoundaries: [],
-      shirtNumber: 7,
-      position: 'CM',
-      coords: { x: 50, y: 50 },
-      goals: 0,
-      assists: 0,
-      redCards: 0,
-      isCaptain: false,
-      hasFirstLetter: true,
-      state: 'correct',
-      attempts: 1,
-      guessHistory: [],
-      correctLetters: [],
-      ...overrides,
-    };
-  }
-
   it('scores 22,000 for all 22 correct on the first try (22 × 1000)', () => {
     const target = Array.from({ length: 11 }, (_, i) =>
       makeShirt({ token: `t${i}`, state: 'correct', attempts: 1, correctLetters: [] })
@@ -168,5 +169,159 @@ describe('computeTotalScore', () => {
     const breakdown = computeTotalScore(target, opponent, 'Home', 'Away');
     expect(breakdown.grandTotal).toBe(0);
     expect(breakdown.perPlayer).toHaveLength(22);
+  });
+});
+
+describe('multiplier scaling', () => {
+  describe('scorePlayer', () => {
+    it('leaves every score unchanged at ×1', () => {
+      expect(scorePlayer(1, true, 0, 0)).toBe(1000);
+      expect(scorePlayer(3, true, 0, 0)).toBe(600);
+      expect(scorePlayer(6, true, 0, 0)).toBe(100);
+      expect(scorePlayer(3, false, 3, 6)).toBe(75);
+      expect(scorePlayer(6, false, 0, 5)).toBe(0);
+      expect(scorePlayer(3, false, 5, 0)).toBe(0);
+    });
+
+    it('scales a first-try correct guess by ×2 and ×3', () => {
+      expect(scorePlayer(1, true, 0, 0, 2)).toBe(2000);
+      expect(scorePlayer(1, true, 0, 0, 3)).toBe(3000);
+      expect(scorePlayer(1, true, 0, 0, 0.5)).toBe(500);
+    });
+
+    it('scales a decayed correct guess by the same factor', () => {
+      expect(scorePlayer(2, true, 0, 0, 2)).toBe(1600);
+      expect(scorePlayer(4, true, 0, 0, 2)).toBe(800);
+      expect(scorePlayer(3, true, 0, 0, 3)).toBe(1800);
+    });
+
+    it('applies the 100 floor before scaling, so ×0.5 of 100 is 50', () => {
+      expect(scorePlayer(6, true, 0, 0, 1)).toBe(100);
+      expect(scorePlayer(6, true, 0, 0, 0.5)).toBe(50);
+      expect(scorePlayer(6, true, 0, 0, 2)).toBe(200);
+      expect(scorePlayer(6, true, 0, 0, 3)).toBe(300);
+    });
+
+    it('scales failed partial credit by the same factor', () => {
+      expect(scorePlayer(6, false, 3, 6, 2)).toBe(150);
+      expect(scorePlayer(6, false, 3, 6, 3)).toBe(225);
+      expect(scorePlayer(6, false, 3, 6, 0.5)).toBe(38);
+    });
+
+    it('rounds once, on the scaled result', () => {
+      // 1/8 × 150 = 18.75. Rounding the base first would give 19, and 19 × 0.5
+      // = 9.5 -> 10. Rounding the scaled value gives 9.
+      expect(scorePlayer(6, false, 1, 8, 1)).toBe(19);
+      expect(scorePlayer(6, false, 1, 8, 2)).toBe(38);
+      expect(scorePlayer(6, false, 1, 8, 0.5)).toBe(9);
+      expect(scorePlayer(6, false, 1, 8, 0.5)).not.toBe(10);
+    });
+
+    it('does not double-count a repeated letter', () => {
+      // "Müller" has two l's. The numerator is the unique count, and the
+      // multiplier does not change that. These are two DISTINCT numbers:
+      // 1/6 × 150 × 2 = 50 and 2/6 × 150 × 2 = 100. Do NOT assert them equal
+      // to each other — that would assert the bug.
+      expect(scorePlayer(6, false, 1, 6, 2)).toBe(50);
+      expect(scorePlayer(6, false, 2, 6, 2)).toBe(100);
+    });
+
+    it('keeps a zero-length name at zero under every multiplier', () => {
+      for (const m of [1, 0.5, 2, 3]) {
+        expect(scorePlayer(3, false, 0, 0, m)).toBe(0);
+      }
+    });
+  });
+
+  describe('computeTotalScore', () => {
+    it('sums the scaled line items, so the breakdown adds up to the total', () => {
+      const target = [
+        makeShirt({ token: 'a', state: 'correct', attempts: 1 }),
+        makeShirt({
+          token: 'b',
+          state: 'failed',
+          attempts: 6,
+          correctLetters: ['A', 'B'],
+          nameLength: 6,
+        }),
+      ];
+      const opponent = [
+        makeShirt({
+          token: 'o1',
+          state: 'failed',
+          attempts: 6,
+          correctLetters: ['A'],
+          nameLength: 6,
+        }),
+      ];
+
+      for (const m of [1, 0.5, 2, 3]) {
+        const breakdown = computeTotalScore(target, opponent, 'Home', 'Away', m);
+        const summed = breakdown.perPlayer.reduce((sum, p) => sum + p.totalPoints, 0);
+        expect(breakdown.grandTotal).toBe(summed);
+        expect(breakdown.perPlayer).toHaveLength(3);
+        for (const p of breakdown.perPlayer) {
+          expect(p.multiplier).toBe(m);
+        }
+      }
+    });
+
+    it('scales the grand total as a whole', () => {
+      const target = Array.from({ length: 11 }, (_, i) =>
+        makeShirt({ token: `t${i}`, state: 'correct', attempts: 1 })
+      );
+      const opponent: ShirtGameData[] = [];
+
+      expect(computeTotalScore(target, opponent, 'Home', 'Away', 1).grandTotal).toBe(11000);
+      expect(computeTotalScore(target, opponent, 'Home', 'Away', 2).grandTotal).toBe(22000);
+      expect(computeTotalScore(target, opponent, 'Home', 'Away', 0.5).grandTotal).toBe(5500);
+      expect(computeTotalScore(target, opponent, 'Home', 'Away', 3).grandTotal).toBe(33000);
+    });
+
+    it('leaves letterPoints and totalPoints consistent for a failed shirt', () => {
+      const target = [
+        makeShirt({
+          token: 'a',
+          state: 'failed',
+          attempts: 6,
+          correctLetters: ['A', 'B'],
+          nameLength: 6,
+        }),
+      ];
+
+      const breakdown = computeTotalScore(target, [], 'Home', 'Away', 2);
+      const line = breakdown.perPlayer[0];
+      expect(line.letterPoints).toBe(100);
+      expect(line.totalPoints).toBe(line.letterPoints);
+    });
+
+    it('keeps a correct shirt at zero letter points', () => {
+      const target = [makeShirt({ token: 'a', state: 'correct', attempts: 2 })];
+
+      const breakdown = computeTotalScore(target, [], 'Home', 'Away', 3);
+      const line = breakdown.perPlayer[0];
+      expect(line.letterPoints).toBe(0);
+      expect(line.totalPoints).toBe(2400);
+    });
+
+    it('defaults to no scaling when the multiplier is omitted', () => {
+      const target = [makeShirt({ token: 'a', state: 'correct', attempts: 1 })];
+
+      expect(computeTotalScore(target, [], 'Home', 'Away').grandTotal).toBe(
+        computeTotalScore(target, [], 'Home', 'Away', 1).grandTotal,
+      );
+    });
+  });
+});
+
+describe('formatMultiplier', () => {
+  it('renders a whole multiplier without a decimal point', () => {
+    expect(formatMultiplier(1)).toBe('1');
+    expect(formatMultiplier(2)).toBe('2');
+    expect(formatMultiplier(3)).toBe('3');
+  });
+
+  it('renders a fractional multiplier with its decimal part', () => {
+    expect(formatMultiplier(0.5)).toBe('0.5');
   });
 });

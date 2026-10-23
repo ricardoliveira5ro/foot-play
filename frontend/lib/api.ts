@@ -7,6 +7,7 @@ import type {
   RevealResponse,
   RevealOneResponse,
   TeamSide,
+  LineupPlayer,
 } from '@/types';
 import MOCK_MATCHES, {
   getMockFilterOptions,
@@ -94,11 +95,32 @@ function isFilterOptionsResponse(value: unknown): value is FilterOptionsResponse
 export async function fetchRandomMatch(filters: GameFilterParams = EMPTY_FILTERS, difficulty: Difficulty = 'normal'): Promise<GameResponse | null> {
   if (USE_MOCK) {
     await delay(MOCK_DELAY_MS);
-    return getMockRandomMatch(filters, difficulty);
+    const match = getMockRandomMatch(filters, difficulty);
+    if (!match || difficulty === 'expert') return match;
+    return {
+      game: match.game,
+      homeLineup: [],
+      awayLineup: [],
+      homePreview: match.homeLineup.map(({ position, coords, shirtNumber }) => ({ position, coords, shirtNumber })),
+      awayPreview: match.awayLineup.map(({ position, coords, shirtNumber }) => ({ position, coords, shirtNumber })),
+    };
   }
   const params = new URLSearchParams(filtersToParams(filters));
   params.set('difficulty', difficulty);
   return requestRandomMatch(`/api/matches/random?${params.toString()}`);
+}
+
+/** Fetch one side only when it becomes playable. */
+export async function fetchLineup(gameId: number, teamSide: TeamSide, difficulty: Difficulty): Promise<LineupPlayer[]> {
+  if (USE_MOCK) {
+    await delay(MOCK_DELAY_MS);
+    const entry = MOCK_MATCHES.find((match) => match.game.gameId === gameId);
+    if (!entry) throw new Error(`Match ${gameId} not found in mock dataset`);
+    return teamSide === 'home' ? entry.homeLineup : entry.awayLineup;
+  }
+  const query = new URLSearchParams({ teamSide, difficulty });
+  const result = await requestJson<{ lineup: LineupPlayer[] }>(`/api/matches/${gameId}/lineup?${query}`);
+  return result.lineup;
 }
 
 /** GET /api/matches/filter-options — counts and selectable filter options. */
