@@ -20,6 +20,11 @@ on:
         required: false
         default: true
         type: boolean
+      run_frontend_build:
+        description: 'Frontend build (type check)'
+        required: false
+        default: true
+        type: boolean
       run_tests_sonar:
         description: 'Run tests with coverage and the Sonar scan'
         required: false
@@ -113,6 +118,28 @@ jobs:
         working-directory: backend
         run: npm run build
 
+  frontend-build:
+    name: Frontend Build (Type Check)
+    runs-on: ubuntu-latest
+    if: ${{ github.event_name == 'push' || inputs.run_frontend_build }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: package-lock.json
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Build frontend (type check)
+        working-directory: frontend
+        run: npm run build
+
   backend-test:
     name: Tests, Coverage & Sonar Scan
     runs-on: ubuntu-latest
@@ -181,7 +208,7 @@ jobs:
   deploy:
     name: Deploy to Oracle Cloud
     runs-on: ubuntu-latest
-    needs: [frontend-lint, backend-lint, backend-build, backend-test]
+    needs: [frontend-lint, backend-lint, backend-build, frontend-build, backend-test]
     if: >
       always() &&
       github.ref == 'refs/heads/main' &&
@@ -189,6 +216,7 @@ jobs:
       needs.frontend-lint.result != 'failure' &&
       needs.backend-lint.result != 'failure' &&
       needs.backend-build.result != 'failure' &&
+      needs.frontend-build.result != 'failure' &&
       needs.backend-test.result != 'failure'
     steps:
       - name: Checkout code

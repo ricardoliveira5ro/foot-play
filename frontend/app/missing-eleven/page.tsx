@@ -21,7 +21,7 @@ import FilterPanel from '@/components/FilterPanel';
 import FilterEmptyState from '@/components/FilterEmptyState';
 import { computeTotalScore } from '@/lib/scoring';
 import FilterUrlSync from './FilterUrlSync';
-import type { ShirtData, RevealPlayer, GameFilterParams, TeamSide } from '@/types';
+import type { ShirtData, LineupPlayer, RevealPlayer, GameFilterParams, TeamSide } from '@/types';
 import { EMPTY_FILTERS } from '@/types';
 import { targetSideForMatch, type ShirtGameData } from '@/lib/gameState';
 
@@ -451,7 +451,7 @@ export default function MissingElevenPage() {
 
   // Build shirts for the active board by merging lineup with game state
   const activeShirtsForBoard = state.activeBoard === 'target' ? state.targetShirts : state.opponentShirts;
-  const visibleLineup: ShirtData[] = lineup.length > 0
+  const visibleLineup: LineupPlayer[] = lineup.length > 0
     ? lineup
     : (state.activeBoard === 'opponent' ? (preview ?? []).map((entry, index) => ({
         token: `locked-preview-${index}`,
@@ -465,7 +465,6 @@ export default function MissingElevenPage() {
         redCards: 0,
         isCaptain: false,
         hasFirstLetter: false,
-        state: 'default' as const,
       })) : []);
   const shirts: ShirtData[] = visibleLineup.map((entry) => {
     const existing = activeShirtsForBoard.find(s => s.token === entry.token);
