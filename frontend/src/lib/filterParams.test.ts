@@ -133,3 +133,46 @@ describe('isValidGameFilters', () => {
     expect(isValidGameFilters([])).toBe(false);
   });
 });
+
+import { dailyToParams, paramsToDailyKey, DAILY_PARAM_KEY } from './filterParams';
+
+describe('dailyToParams', () => {
+  it('emits exactly one key', () => {
+    expect(dailyToParams('2026-01-01').toString()).toBe('daily=2026-01-01');
+  });
+  it('uses the frozen key name', () => {
+    expect(DAILY_PARAM_KEY).toBe('daily');
+    expect(dailyToParams('2026-01-01').has('daily')).toBe(true);
+  });
+  it('emits nothing else, so it cannot clobber a filter param', () => {
+    const params = dailyToParams('2026-01-01');
+    expect([...params.keys()]).toEqual(['daily']);
+  });
+});
+
+describe('paramsToDailyKey', () => {
+  it('reads a valid key', () => {
+    expect(paramsToDailyKey(new URLSearchParams('daily=2026-01-01'))).toBe('2026-01-01');
+  });
+  it('returns null when the param is absent', () => {
+    expect(paramsToDailyKey(new URLSearchParams(''))).toBeNull();
+    expect(paramsToDailyKey(new URLSearchParams('teamIds=7&seasonFrom=2020'))).toBeNull();
+  });
+  it('returns null for a malformed key rather than passing it through', () => {
+    for (const bad of ['daily=2026-02-30', 'daily=2026-1-1', 'daily=today', 'daily=', 'daily=2026-13-01', 'daily=26-01-01']) {
+      expect(paramsToDailyKey(new URLSearchParams(bad))).toBeNull();
+    }
+  });
+  it('coexists with every filter param without being affected by them', () => {
+    const params = new URLSearchParams('teamIds=7&competitionIds=Premier%20League&seasonFrom=2020&seasonTo=2022&daily=2026-03-01');
+    expect(paramsToDailyKey(params)).toBe('2026-03-01');
+    expect(params.get('teamIds')).toBe('7');
+  });
+  it('survives a merge round trip', () => {
+    const merged = new URLSearchParams('teamIds=7&daily=2026-03-01');
+    for (const [k, v] of dailyToParams('2026-03-01')) merged.set(k, v);
+    expect(paramsToDailyKey(merged)).toBe('2026-03-01');
+    expect(merged.toString()).toBe('teamIds=7&daily=2026-03-01');
+  });
+});
+
