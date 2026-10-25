@@ -9,6 +9,7 @@ export default defineConfig({
       '@/types': path.resolve(__dirname, 'types'),
       '@/lib/curatedTeams': path.resolve(__dirname, 'lib/curatedTeams'),
       '@/lib/api': path.resolve(__dirname, 'lib/api'),
+      '@/lib/mockData': path.resolve(__dirname, 'lib/mockData'),
       '@/components/TeamTabBar': path.resolve(__dirname, 'components/TeamTabBar'),
       '@/components/MatchInfo': path.resolve(__dirname, 'components/MatchInfo'),
       '@/components/TacticBoard': path.resolve(__dirname, 'components/TacticBoard'),

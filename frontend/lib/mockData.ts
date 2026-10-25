@@ -285,4 +285,18 @@ export const MOCK_FILTER_OPTIONS: FilterOptionsResponse = getMockFilterOptions({
   seasonTo: null,
 });
 
+/**
+ * Game ids the mock daily selector chooses from.
+ *
+ * Every MOCK_MATCHES entry is complete, so this is simply their id list —
+ * but it is named and exported separately so that when v1.1.1's mock grows
+ * an incomplete game, this list is the single place to correct, and the
+ * mock can never hand out a daily puzzle that cannot be finished. Same rule
+ * as the backend's completeLineupsWhere(): the mock must satisfy the same
+ * invariant, or mock mode teaches a UI that is wrong in production.
+ */
+export const MOCK_DAILY_CANDIDATES: readonly number[] = Object.freeze(
+  MOCK_MATCHES.map((entry) => entry.game.gameId),
+);
+
 export default MOCK_MATCHES;
