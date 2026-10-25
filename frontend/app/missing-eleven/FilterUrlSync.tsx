@@ -2,13 +2,19 @@
 
 import { useEffect, useRef } from 'react';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
-import { filtersToParams, paramsToFilters, FILTER_PARAM_KEYS, LEGACY_FILTER_KEYS } from '@/lib/filterParams';
+import { filtersToParams, paramsToFilters, FILTER_PARAM_KEYS, LEGACY_FILTER_KEYS, paramsToDailyKey, DAILY_PARAM_KEY } from '@/lib/filterParams';
 import { hasActiveFilters } from '@/lib/filters';
 import type { GameFilterParams } from '@/types';
+import type { DailyKey } from '@/lib/daily';
 
 interface Props {
   applied: GameFilterParams;
   onFilters: (filters: GameFilterParams) => void;
+  /** The day key currently requested via ?daily=, or null. */
+  daily: DailyKey | null;
+  onDaily: (key: DailyKey | null) => void;
+  /** Fired once the query string has been read, so the page may load. */
+  onReady: () => void;
 }
 
 /**
@@ -19,7 +25,7 @@ interface Props {
  * deopted into client-side rendering"), so the page must wrap this component
  * in a `<Suspense>` boundary. Do not remove either.
  */
-export default function FilterUrlSync({ applied, onFilters }: Props): null {
+export default function FilterUrlSync({ applied, onFilters, daily, onDaily, onReady }: Props): null {
   const searchParams = useSearchParams();
   const router = useRouter();
   const pathname = usePathname();
@@ -33,6 +39,8 @@ export default function FilterUrlSync({ applied, onFilters }: Props): null {
   // Tracks whether this mount has ever seen a non-empty `applied`. Used to tell
   // the two "empty applied, populated URL" situations apart — see the write.
   const observedAppliedRef = useRef(false);
+  // Guards onReady against React StrictMode's double effect invocation.
+  const notifiedReadyRef = useRef(false);
 
   // 1. read: report the URL's filters. Effects run child-first, so this
   // dispatch happens before the page's own effects in the same commit — but
@@ -40,7 +48,8 @@ export default function FilterUrlSync({ applied, onFilters }: Props): null {
   // write below stays locked until the read has completed a full commit.
   useEffect(() => {
     keyRef.current = key;
-    const parsed = paramsToFilters(new URLSearchParams(key));
+    const params = new URLSearchParams(key);
+    const parsed = paramsToFilters(params);
     // Stale-empty guard. Start writes the URL before it flips `started`, but
     // Next commits a client `router.replace` asynchronously: the board (and
     // this component) can mount while `useSearchParams` still reports the
@@ -56,10 +65,11 @@ export default function FilterUrlSync({ applied, onFilters }: Props): null {
     // invocation would slip past a one-shot flag and re-adopt the stale URL.
     if (!hasActiveFilters(parsed) && hasActiveFilters(applied)) return;
     onFilters(parsed);
+    onDaily(paramsToDailyKey(params));
     // `applied` is read only for the stale-URL guard; listing it would
     // re-dispatch on every applied change and fight the user's own edits.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [key, onFilters]);
+  }, [key, onFilters, onDaily]);
 
   // 2. write: reflect the applied filters, merging over the live query.
   //
@@ -100,18 +110,29 @@ export default function FilterUrlSync({ applied, onFilters }: Props): null {
     // stripped, not left behind as unknown params forever.
     for (const k of LEGACY_FILTER_KEYS) next.delete(k);
     for (const [k, v] of filtersToParams(applied)) next.set(k, v);
+    // `daily` is deleted and re-set here rather than being added to
+    // FILTER_PARAM_KEYS, which stays a list of FILTER keys only. Leaving daily
+    // means removing it from the URL, which is how the address bar self-heals
+    // after a stale ?daily= link is declined.
+    if (daily) next.set(DAILY_PARAM_KEY, daily);
+    else next.delete(DAILY_PARAM_KEY);
     const href = next.size ? `${pathname}?${next}` : pathname;
     if (href === (currentKey ? `${pathname}?${currentKey}` : pathname)) return; // already canonical
     router.replace(href, { scroll: false });
-  }, [applied, router, pathname]);
+  }, [applied, daily, router, pathname]);
 
-  // 3. unlock writes — declared last so it runs after both effects above in
-  // the first commit. Setting `readyRef` inside the read effect would let the
-  // write effect of that same commit strip the URL before the read dispatch
-  // has re-rendered the page; this ordering is what prevents that.
+  // 3. unlock writes and notify readiness — declared last so it runs after
+  // both effects above in the first commit. Setting `readyRef` inside the read
+  // effect would let the write effect of that same commit strip the URL before
+  // the read dispatch has re-rendered the page; this ordering is what prevents
+  // that. onReady runs after the read dispatches so the page sees them in the
+  // same batched render, and is guarded so it fires exactly once per mount.
   useEffect(() => {
     readyRef.current = true;
-  }, []);
+    if (notifiedReadyRef.current) return;
+    notifiedReadyRef.current = true;
+    onReady();
+  }, [onReady]);
 
   return null;
 }

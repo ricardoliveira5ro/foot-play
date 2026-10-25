@@ -2,9 +2,12 @@
 import { render, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { useSearchParams, useRouter, usePathname } from 'next/navigation';
+import { Suspense, type ReactElement } from 'react';
 import FilterUrlSync from './FilterUrlSync';
 import { EMPTY_FILTERS } from '@/types';
 import type { GameFilterParams } from '@/types';
+import { FILTER_PARAM_KEYS } from '@/lib/filterParams';
+import type { DailyKey } from '@/lib/daily';
 
 vi.mock('next/navigation', () => ({
   useSearchParams: vi.fn(),
@@ -24,13 +27,66 @@ function makeFilters(overrides: Partial<GameFilterParams> = {}): GameFilterParam
   return { ...EMPTY_FILTERS, ...overrides };
 }
 
-function renderSync(applied: GameFilterParams, onFilters = vi.fn()) {
-  const utils = render(<FilterUrlSync applied={applied} onFilters={onFilters} />);
+const onDaily = vi.fn();
+const onReady = vi.fn();
+
+/**
+ * The pre-existing cases use `daily=1` as an opaque "unrelated" param. Now that
+ * the component owns `daily`, the harness keeps the requested key active by
+ * default so those cases still exercise filter preservation rather than daily
+ * cleanup. Daily-specific cases pass `daily` explicitly.
+ */
+function currentUrlDaily(): DailyKey | null {
+  return mockUseSearchParams().get('daily');
+}
+
+interface HarnessProps {
+  applied: GameFilterParams;
+  onFilters: (filters: GameFilterParams) => void;
+  daily?: DailyKey | null;
+  onDaily?: (key: DailyKey | null) => void;
+  onReady?: () => void;
+}
+
+function Harness({
+  applied,
+  onFilters,
+  daily = currentUrlDaily(),
+  onDaily: handleDaily = onDaily,
+  onReady: handleReady = onReady,
+}: HarnessProps): ReactElement {
+  return (
+    <Suspense fallback={null}>
+      <FilterUrlSync
+        applied={applied}
+        onFilters={onFilters}
+        daily={daily}
+        onDaily={handleDaily}
+        onReady={handleReady}
+      />
+    </Suspense>
+  );
+}
+
+interface RenderOverrides {
+  daily?: DailyKey | null;
+  onDaily?: (key: DailyKey | null) => void;
+  onReady?: () => void;
+}
+
+function renderSync(
+  applied: GameFilterParams,
+  onFilters = vi.fn(),
+  overrides: RenderOverrides = {},
+) {
+  const utils = render(<Harness applied={applied} onFilters={onFilters} {...overrides} />);
   return { ...utils, onFilters };
 }
 
 beforeEach(() => {
   vi.clearAllMocks();
+  onDaily.mockClear();
+  onReady.mockClear();
   mockUseSearchParams.mockReturnValue(new URLSearchParams() as never);
   mockUsePathname.mockReturnValue('/missing-eleven');
   mockUseRouter.mockReturnValue({ replace: mockReplace, push: mockPush, prefetch: vi.fn() } as never);
@@ -67,7 +123,7 @@ describe('FilterUrlSync', () => {
     const { onFilters, rerender } = renderSync(makeFilters());
 
     setUrl('teamIds=9');
-    rerender(<FilterUrlSync applied={makeFilters()} onFilters={onFilters} />);
+    rerender(<Harness applied={makeFilters()} onFilters={onFilters} />);
 
     expect(onFilters).toHaveBeenCalledTimes(2);
     expect(onFilters).toHaveBeenLastCalledWith(makeFilters({ teamIds: [9] }));
@@ -88,7 +144,7 @@ describe('FilterUrlSync', () => {
     const { rerender } = renderSync(makeFilters(), onFilters);
 
     // Simulate the page dispatching and applying a filter set.
-    rerender(<FilterUrlSync applied={makeFilters({ teamIds: [7] })} onFilters={onFilters} />);
+    rerender(<Harness applied={makeFilters({ teamIds: [7] })} onFilters={onFilters} />);
 
     await waitFor(() =>
       expect(mockReplace).toHaveBeenCalledWith('/missing-eleven?teamIds=7', { scroll: false }),
@@ -99,7 +155,7 @@ describe('FilterUrlSync', () => {
     setUrl('daily=1');
     const { rerender } = renderSync(makeFilters());
 
-    rerender(<FilterUrlSync applied={makeFilters({ teamIds: [7] })} onFilters={vi.fn()} />);
+    rerender(<Harness applied={makeFilters({ teamIds: [7] })} onFilters={vi.fn()} />);
 
     await waitFor(() => expect(mockReplace).toHaveBeenCalledTimes(1));
     const href = mockReplace.mock.calls[0][0] as string;
@@ -113,7 +169,7 @@ describe('FilterUrlSync', () => {
 
     // Clearing: applied filters no longer include teamIds, so the key must be
     // dropped rather than left behind as ?teamIds=.
-    rerender(<FilterUrlSync applied={makeFilters()} onFilters={vi.fn()} />);
+    rerender(<Harness applied={makeFilters()} onFilters={vi.fn()} />);
 
     await waitFor(() => expect(mockReplace).toHaveBeenCalledTimes(1));
     const href = mockReplace.mock.calls[0][0] as string;
@@ -128,7 +184,7 @@ describe('FilterUrlSync', () => {
     setUrl('opponentIds=5&daily=1');
     const { rerender } = renderSync(makeFilters());
 
-    rerender(<FilterUrlSync applied={makeFilters({ teamIds: [7] })} onFilters={vi.fn()} />);
+    rerender(<Harness applied={makeFilters({ teamIds: [7] })} onFilters={vi.fn()} />);
 
     await waitFor(() => expect(mockReplace).toHaveBeenCalledTimes(1));
     const href = mockReplace.mock.calls[0][0] as string;
@@ -141,7 +197,7 @@ describe('FilterUrlSync', () => {
     setUrl('');
     const { rerender } = renderSync(makeFilters());
 
-    rerender(<FilterUrlSync applied={makeFilters({ teamIds: [7] })} onFilters={vi.fn()} />);
+    rerender(<Harness applied={makeFilters({ teamIds: [7] })} onFilters={vi.fn()} />);
 
     await waitFor(() => expect(mockReplace).toHaveBeenCalledTimes(1));
     expect(mockReplace).toHaveBeenCalledWith(expect.any(String), { scroll: false });
@@ -153,8 +209,116 @@ describe('FilterUrlSync', () => {
     const { rerender } = renderSync(makeFilters({ teamIds: [7] }));
 
     // Equal-but-new object: the write effect re-runs but must early-return.
-    rerender(<FilterUrlSync applied={makeFilters({ teamIds: [7] })} onFilters={vi.fn()} />);
+    rerender(<Harness applied={makeFilters({ teamIds: [7] })} onFilters={vi.fn()} />);
 
     expect(mockReplace).not.toHaveBeenCalled();
+  });
+
+  it('reports the daily key from the URL', async () => {
+    setUrl('daily=2026-01-01');
+    renderSync(EMPTY_FILTERS, vi.fn(), { daily: null });
+    await waitFor(() => expect(onDaily).toHaveBeenCalledWith('2026-01-01'));
+  });
+
+  it('reports a null daily key when the param is absent', async () => {
+    setUrl('');
+    renderSync(EMPTY_FILTERS, vi.fn(), { daily: null });
+    await waitFor(() => expect(onDaily).toHaveBeenCalledWith(null));
+  });
+
+  it('reports a null daily key for a malformed date', async () => {
+    setUrl('daily=2026-02-30');
+    renderSync(EMPTY_FILTERS, vi.fn(), { daily: null });
+    await waitFor(() => expect(onDaily).toHaveBeenCalledWith(null));
+  });
+
+  it('writes ?daily= into the URL when a daily is requested', async () => {
+    setUrl('');
+    const onFilters = vi.fn();
+    const { rerender } = renderSync(EMPTY_FILTERS, onFilters, { daily: null });
+    await waitFor(() => expect(onReady).toHaveBeenCalledTimes(1));
+
+    rerender(<Harness applied={EMPTY_FILTERS} onFilters={onFilters} daily="2026-01-01" />);
+
+    await waitFor(() =>
+      expect(mockReplace).toHaveBeenCalledWith('/missing-eleven?daily=2026-01-01', { scroll: false }),
+    );
+  });
+
+  it('removes ?daily= from the URL when the daily is left', async () => {
+    setUrl('daily=2026-01-01');
+    const onFilters = vi.fn();
+    const { rerender } = renderSync(EMPTY_FILTERS, onFilters, { daily: '2026-01-01' });
+    await waitFor(() => expect(onReady).toHaveBeenCalledTimes(1));
+
+    rerender(<Harness applied={EMPTY_FILTERS} onFilters={onFilters} daily={null} />);
+
+    await waitFor(() =>
+      expect(mockReplace).toHaveBeenCalledWith('/missing-eleven', { scroll: false }),
+    );
+  });
+
+  it('preserves ?daily= when filters are rewritten', async () => {
+    setUrl('daily=2026-01-01');
+    const onFilters = vi.fn();
+    const { rerender } = renderSync(EMPTY_FILTERS, onFilters, { daily: '2026-01-01' });
+
+    rerender(
+      <Harness
+        applied={{ ...EMPTY_FILTERS, seasonFrom: 2020 }}
+        onFilters={onFilters}
+        daily="2026-01-01"
+      />,
+    );
+
+    await waitFor(() => expect(mockReplace).toHaveBeenCalled());
+    const href = String(mockReplace.mock.calls.at(-1)![0]);
+    expect(href).toContain('daily=2026-01-01');
+    expect(href).toContain('seasonFrom=2020');
+  });
+
+  it('keeps ?daily= out of FILTER_PARAM_KEYS', () => {
+    expect(FILTER_PARAM_KEYS).not.toContain('daily');
+  });
+
+  it('does not write to the URL before the first read', () => {
+    // The readyRef gate must survive the daily addition.
+    setUrl('daily=2026-01-01&teamIds=7');
+    renderSync(EMPTY_FILTERS, vi.fn(), { daily: null });
+    expect(mockReplace).not.toHaveBeenCalled();
+  });
+
+  it('calls onReady exactly once per query string', async () => {
+    setUrl('daily=2026-01-01');
+    const onFilters = vi.fn();
+    const { rerender } = renderSync(EMPTY_FILTERS, onFilters, { daily: null });
+    await waitFor(() => expect(onReady).toHaveBeenCalledTimes(1));
+
+    rerender(
+      <Harness
+        applied={{ ...EMPTY_FILTERS, seasonFrom: 2020 }}
+        onFilters={onFilters}
+        daily={null}
+      />,
+    );
+
+    expect(onReady).toHaveBeenCalledTimes(1);
+  });
+
+  it('fires onReady after reporting filters and daily', async () => {
+    setUrl('daily=2026-01-01&teamIds=7');
+    const order: string[] = [];
+    const onFilters = vi.fn(() => order.push('filters'));
+    const handleDaily = vi.fn(() => order.push('daily'));
+    const handleReady = vi.fn(() => order.push('ready'));
+
+    renderSync(EMPTY_FILTERS, onFilters, {
+      daily: null,
+      onDaily: handleDaily,
+      onReady: handleReady,
+    });
+
+    await waitFor(() => expect(handleReady).toHaveBeenCalledTimes(1));
+    expect(order).toEqual(['filters', 'daily', 'ready']);
   });
 });
