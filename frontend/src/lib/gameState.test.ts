@@ -706,3 +706,49 @@ describe('gameReducer', () => {
     });
   });
 });
+
+describe('START_DAILY', () => {
+  it('sets isDaily and dailyKey', () => {
+    const next = gameReducer(initialState, { type: 'START_DAILY', payload: '2026-01-01' });
+    expect(next.isDaily).toBe(true);
+    expect(next.dailyKey).toBe('2026-01-01');
+  });
+  it('moves to loading, so the page shows the loading state and not a stale board', () => {
+    expect(gameReducer(initialState, { type: 'START_DAILY', payload: '2026-01-01' }).gameStatus).toBe('loading');
+  });
+  it('clears the current match so the load effect fires', () => {
+    const playing = gameReducer(initialState, { type: 'SET_MATCH', payload: makeMatch() });
+    expect(gameReducer(playing, { type: 'START_DAILY', payload: '2026-01-01' }).match).toBeNull();
+  });
+  it('is a reference no-op for the same key — no refetch loop', () => {
+    const first = gameReducer(initialState, { type: 'START_DAILY', payload: '2026-01-01' });
+    expect(gameReducer(first, { type: 'START_DAILY', payload: '2026-01-01' })).toBe(first);
+  });
+  it('applies a genuine change of day', () => {
+    const first = gameReducer(initialState, { type: 'START_DAILY', payload: '2026-01-01' });
+    expect(gameReducer(first, { type: 'START_DAILY', payload: '2026-01-02' }).dailyKey).toBe('2026-01-02');
+  });
+  it('clears any error', () => {
+    const errored = gameReducer(initialState, { type: 'SET_ERROR', payload: 'boom' });
+    expect(gameReducer(errored, { type: 'START_DAILY', payload: '2026-01-01' }).error).toBeNull();
+  });
+});
+
+it('initialises isDaily to false and dailyKey to null', () => {
+  expect(initialState.isDaily).toBe(false);
+  expect(initialState.dailyKey).toBeNull();
+});
+
+it('NEW_GAME leaves daily mode', () => {
+  const daily = gameReducer(initialState, { type: 'START_DAILY', payload: '2026-01-01' });
+  const after = gameReducer(daily, { type: 'NEW_GAME' });
+  expect(after.isDaily).toBe(false);
+  expect(after.dailyKey).toBeNull();
+});
+
+it('SET_MATCH preserves isDaily and dailyKey', () => {
+  const daily = gameReducer(initialState, { type: 'START_DAILY', payload: '2026-01-01' });
+  const loaded = gameReducer(daily, { type: 'SET_MATCH', payload: makeMatch() });
+  expect(loaded.isDaily).toBe(true);
+  expect(loaded.dailyKey).toBe('2026-01-01');
+});

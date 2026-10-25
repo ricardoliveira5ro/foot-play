@@ -6,6 +6,7 @@ import { CURATED_TEAM_IDS } from '@/lib/curatedTeams';
 import { EMPTY_FILTERS } from '@/types';
 import { filtersEqual } from './filtersEqual';
 import { DEFAULT_DIFFICULTY, DIFFICULTY_CONFIG, type Difficulty } from './difficulty';
+import type { DailyKey } from '@/lib/daily';
 
 /**
  * The Normal-mode attempt budget. Retained because it is the pre-v1.2
@@ -49,6 +50,10 @@ export interface GameState {
   filters: GameFilterParams;
   /** Mode chosen for this session. Drives attempts and the clue set (§5.1). */
   difficulty: Difficulty;
+  /** True when the board is showing the deterministic daily puzzle (§6.2). */
+  isDaily: boolean;
+  /** The day key the daily puzzle belongs to; null in ordinary play. */
+  dailyKey: DailyKey | null;
 }
 
 export type GameAction =
@@ -66,7 +71,8 @@ export type GameAction =
   | { type: 'NEW_GAME' }
   | { type: 'SET_ERROR'; payload: string | null }
   | { type: 'SET_LOADING'; payload: boolean }
-  | { type: 'SET_FILTERS'; payload: GameFilterParams };
+  | { type: 'SET_FILTERS'; payload: GameFilterParams }
+  | { type: 'START_DAILY'; payload: DailyKey };
 
 // --- Initial State ---
 
@@ -83,6 +89,8 @@ export const initialState: GameState = {
   error: null,
   filters: EMPTY_FILTERS,
   difficulty: DEFAULT_DIFFICULTY,
+  isDaily: false,
+  dailyKey: null,
 };
 
 // --- Helpers ---
@@ -306,6 +314,19 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
       return { ...state, filters: action.payload };
     }
 
+    case 'START_DAILY': {
+      if (state.isDaily && state.dailyKey === action.payload) return state;
+      return {
+        ...state,
+        isDaily: true,
+        dailyKey: action.payload,
+        match: null,
+        gameStatus: 'loading',
+        error: null,
+        activeShirtIndex: null,
+      };
+    }
+
     case 'SET_MATCH': {
       const side = pickSide(action.payload);
       const { targetLineup, opponentLineup } = lineupsForSide(action.payload, side);
@@ -416,6 +437,7 @@ interface UseGameStateReturn {
   filters: GameFilterParams;
   setFilters: (filters: GameFilterParams) => void;
   setDifficulty: (mode: Difficulty) => void;
+  startDaily: (key: DailyKey) => void;
 }
 
 export function useGameState(): UseGameStateReturn {
@@ -476,6 +498,10 @@ export function useGameState(): UseGameStateReturn {
 
   const setDifficulty = useCallback((mode: Difficulty) => dispatch({ type: 'SET_DIFFICULTY', payload: mode }), []);
 
+  const startDaily = useCallback((key: DailyKey) => {
+    dispatch({ type: 'START_DAILY', payload: key });
+  }, []);
+
   return {
     state,
     dispatch,
@@ -495,6 +521,7 @@ export function useGameState(): UseGameStateReturn {
     filters: state.filters,
     setFilters,
     setDifficulty,
+    startDaily,
   };
 }
 
