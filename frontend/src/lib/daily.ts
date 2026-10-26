@@ -85,3 +85,32 @@ export function selectDailyGameId(candidates: number[], key: DailyKey): number {
 export function isPlayableDaily(requested: DailyKey | null, today: DailyKey): boolean {
   return requested !== null && requested === today;
 }
+
+/**
+ * Milliseconds from `now` until the next UTC midnight — the real scarcity
+ * behind the daily card's countdown. Date.UTC normalises the day overflow
+ * (month end, leap day, year end), so no calendar arithmetic is duplicated
+ * here.
+ */
+export function msUntilNextUtcMidnight(now: Date): number {
+  const nextMidnight = Date.UTC(
+    now.getUTCFullYear(),
+    now.getUTCMonth(),
+    now.getUTCDate() + 1,
+  );
+  return Math.max(0, nextMidnight - now.getTime());
+}
+
+/**
+ * 'HH:MM:SS' for a countdown. Rounds up so the display reaches 00:00:00 at
+ * the rollover rather than one second early. Never negative.
+ */
+export function formatUtcCountdown(ms: number): string {
+  const totalSeconds = Math.max(0, Math.ceil(ms / 1000));
+  const hours = Math.floor(totalSeconds / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  const seconds = totalSeconds % 60;
+  return [hours, minutes, seconds]
+    .map((part) => String(part).padStart(2, '0'))
+    .join(':');
+}

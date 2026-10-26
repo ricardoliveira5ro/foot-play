@@ -1,5 +1,13 @@
 import { describe, it, expect } from 'vitest';
-import { toDailyKey, isDailyKey, selectDailyGameId, dailyHash32, isPlayableDaily } from './daily';
+import {
+  toDailyKey,
+  isDailyKey,
+  selectDailyGameId,
+  dailyHash32,
+  isPlayableDaily,
+  msUntilNextUtcMidnight,
+  formatUtcCountdown,
+} from './daily';
 
 describe('toDailyKey', () => {
   it('keys on the UTC calendar date, not the local one', () => {
@@ -114,5 +122,46 @@ describe('isPlayableDaily', () => {
     expect(isPlayableDaily('2025-12-31', '2026-01-01')).toBe(false);
     expect(isPlayableDaily('2026-01-02', '2026-01-01')).toBe(false);
     expect(isPlayableDaily(null, '2026-01-01')).toBe(false);
+  });
+});
+
+describe('msUntilNextUtcMidnight', () => {
+  it('is a full day at exactly 00:00:00 UTC', () => {
+    expect(msUntilNextUtcMidnight(new Date('2026-01-01T00:00:00.000Z'))).toBe(86_400_000);
+  });
+
+  it('is one second at 23:59:59 UTC', () => {
+    expect(msUntilNextUtcMidnight(new Date('2026-01-01T23:59:59.000Z'))).toBe(1_000);
+  });
+
+  it('counts down through an ordinary day', () => {
+    expect(msUntilNextUtcMidnight(new Date('2026-03-01T12:34:56.000Z'))).toBe(41_104_000);
+  });
+
+  it('handles month, leap-day and year end through Date.UTC', () => {
+    expect(msUntilNextUtcMidnight(new Date('2026-02-28T23:00:00.000Z'))).toBe(3_600_000);
+    expect(msUntilNextUtcMidnight(new Date('2024-02-29T23:00:00.000Z'))).toBe(3_600_000);
+    expect(msUntilNextUtcMidnight(new Date('2026-12-31T23:00:00.000Z'))).toBe(3_600_000);
+  });
+
+  it('never returns a negative remainder', () => {
+    expect(msUntilNextUtcMidnight(new Date('2026-01-01T00:00:00.500Z'))).toBeGreaterThan(0);
+  });
+});
+
+describe('formatUtcCountdown', () => {
+  it.each([
+    [86_400_000, '24:00:00'],
+    [41_104_000, '11:25:04'],
+    [1_000, '00:00:01'],
+    [500, '00:00:01'],
+    [0, '00:00:00'],
+    [-5_000, '00:00:00'],
+  ])('formats %i ms as %s', (ms, expected) => {
+    expect(formatUtcCountdown(ms)).toBe(expected);
+  });
+
+  it('always renders two digits per field', () => {
+    expect(formatUtcCountdown(3_661_000)).toBe('01:01:01');
   });
 });

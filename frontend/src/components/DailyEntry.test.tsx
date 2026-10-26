@@ -37,12 +37,32 @@ describe('DailyEntry', () => {
   it('shows an in-progress notice instead of a button while playing today', () => {
     render(<DailyEntry {...base} dailyKey="2026-01-01" />);
     expect(screen.queryByRole('button', { name: /daily puzzle/i })).not.toBeInTheDocument();
-    expect(screen.getByText(/today's puzzle/i)).toBeInTheDocument();
+    expect(screen.getByText(/today[’']s puzzle/i)).toBeInTheDocument();
   });
 
   it('never renders a filter control — daily is a mode, not a filter variant (§6.2)', () => {
     render(<DailyEntry {...base} />);
     expect(screen.queryByRole('combobox')).not.toBeInTheDocument();
     expect(screen.queryByRole('checkbox')).not.toBeInTheDocument();
+  });
+
+  it('shows the real UTC reset countdown in the hero', () => {
+    render(<DailyEntry {...base} />);
+    expect(screen.getByText('Next eleven in')).toBeInTheDocument();
+    expect(screen.getByText('Resets at 00:00 UTC daily.')).toBeInTheDocument();
+    expect(screen.getByText(/^\d{2}:\d{2}:\d{2}$/)).toBeInTheDocument();
+  });
+
+  it('offers the daily in the compact in-game variant', async () => {
+    const onStartDaily = vi.fn();
+    render(<DailyEntry {...base} variant="compact" onStartDaily={onStartDaily} />);
+    await userEvent.click(screen.getByRole('button', { name: /daily puzzle/i }));
+    expect(onStartDaily).toHaveBeenCalledTimes(1);
+  });
+
+  it('shows a compact in-progress status with no start button while playing today', () => {
+    render(<DailyEntry {...base} dailyKey="2026-01-01" variant="compact" />);
+    expect(screen.queryByRole('button', { name: /daily puzzle/i })).not.toBeInTheDocument();
+    expect(screen.getByText(/today[’']s puzzle/i)).toBeInTheDocument();
   });
 });

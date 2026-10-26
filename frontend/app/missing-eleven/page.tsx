@@ -435,24 +435,11 @@ export default function MissingElevenPage() {
   // perfectly good daily puzzle.
   const displayError = state.error ?? (state.match || state.isDaily ? null : optionsError);
 
-  // Shared page chrome. The filter panel lives on the pre-screen only —
-  // during the game there is no in-page filter access; New puzzle / Play
-  // Again / Change filters all return to the gate instead. Unmounting the
-  // panel for the game is deliberate: on return it remounts and re-syncs its
-  // draft from the applied filters (sections start collapsed again).
+  // Shared page chrome. The game has no in-page filter access; New puzzle /
+  // Play again / Change filters all return to the gate instead, where the
+  // panel remounts and re-syncs its draft from the applied filters.
   const shell = (content: ReactNode) => (
     <div className="mx-auto w-full max-w-6xl px-4 py-6 md:px-6 md:py-8">
-      {!started && (
-        <FilterPanel
-          open
-          filters={filters}
-          options={filterOptions}
-          optionsLoading={optionsLoading}
-          optionsError={optionsError}
-          onApply={setFilters}
-          onStart={handleStart}
-        />
-      )}
       {/*
         The <Suspense> boundary is the fix for Next 16's
         missing-suspense-with-csr-bailout, which is a `next build` FAILURE
@@ -481,45 +468,60 @@ export default function MissingElevenPage() {
     </div>
   );
 
-  // Entry gate: before the first start there is no match, no error, and no
-  // board — only the panel (forced open, Start inside) and the placeholder.
-  // The board branch owns its own "Missing Eleven" h1; only one renders.
+  // Entry gate. The daily is the primary path and sits above the fold; the
+  // custom match builder is the secondary path below it. The board branch owns
+  // its own "Missing Eleven" h1; only one renders.
   if (!started) {
     return shell(
-      <div className="mx-auto flex w-full max-w-6xl flex-col items-center px-4 py-24 text-center md:px-6">
-        <header className="w-full pb-8">
+      <div className="mx-auto w-full max-w-5xl pb-12">
+        <header className="pb-8 text-center">
           <h1 className="font-display text-[clamp(40px,4.6vw,50px)] uppercase leading-[0.92] tracking-[-0.02em] text-ink">
             Missing Eleven
           </h1>
+          <p className="mt-3 font-mono text-[10px] uppercase tracking-[0.22em] text-ink/50">
+            A daily football lineup puzzle
+          </p>
         </header>
-        <div className="w-full pb-8">
-          <DifficultySelector value={state.difficulty} onChange={setDifficulty} />
+
+        <DailyEntry
+          dailyKey={state.dailyKey}
+          todayKey={todayKey}
+          urlReady={urlReady}
+          onStartDaily={handleStartDaily}
+          variant="hero"
+        />
+
+        <div className="mb-8 mt-12 flex items-center gap-4">
+          <span aria-hidden="true" className="h-px flex-1 bg-ink/15" />
+          <span className="font-mono text-[10px] uppercase tracking-[0.2em] text-ink/50">
+            Or build your own match
+          </span>
+          <span aria-hidden="true" className="h-px flex-1 bg-ink/15" />
         </div>
-        {/* An empty slot on the tactics board: dashed like a chalk outline,
-            the arrow pointing up at the filters that fill it. */}
-        <div className="w-full max-w-md rounded-xl border-2 border-dashed border-ink/25 px-6 py-10">
-          <p aria-hidden="true" className="text-2xl leading-none text-ink/40">↑</p>
-          <h2 className="mt-3 font-display text-2xl uppercase tracking-[0.08em] text-ink">
-            Choose your match
-          </h2>
-          <p className="mt-3 text-sm text-ink/65">
-            Expand a filter above and pick your clubs — or start with any match.
-          </p>
-          <p className="mt-4 text-xs uppercase tracking-[0.15em] text-ink/45">
-            Press Start game when you&rsquo;re ready
-          </p>
-        </div>
-        {/* Daily is a mode, not a filter variant: it sits below the card, not
-            inside the filter panel. It renders nothing until the URL has been
-            read and today's key is known, so the first paint is unchanged. */}
-        <div className="w-full max-w-md pt-6">
-          <DailyEntry
-            dailyKey={state.dailyKey}
-            todayKey={todayKey}
-            urlReady={urlReady}
-            onStartDaily={handleStartDaily}
-          />
-        </div>
+
+        <section aria-labelledby="custom-match-heading" className="mx-auto w-full max-w-3xl">
+          <div className="mb-5 text-center">
+            <h2 id="custom-match-heading" className="font-display text-3xl uppercase tracking-[0.06em] text-ink">
+              Choose your match
+            </h2>
+            <p className="mt-2 text-sm text-ink/60">
+              Pick a difficulty and narrow the fixture pool. Start when
+              you&rsquo;re ready.
+            </p>
+          </div>
+          <div className="space-y-4">
+            <DifficultySelector value={state.difficulty} onChange={setDifficulty} />
+            <FilterPanel
+              open
+              filters={filters}
+              options={filterOptions}
+              optionsLoading={optionsLoading}
+              optionsError={optionsError}
+              onApply={setFilters}
+              onStart={handleStart}
+            />
+          </div>
+        </section>
       </div>,
     );
   }
@@ -658,6 +660,7 @@ export default function MissingElevenPage() {
             todayKey={todayKey}
             urlReady={urlReady}
             onStartDaily={handleStartDaily}
+            variant="compact"
           />
 
           <div className="flex w-full flex-col gap-3">
