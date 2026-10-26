@@ -667,14 +667,17 @@ export default function MissingElevenPage() {
           )}
 
           {/* A sibling of the controls group, never a member of it: daily is a
-              mode, not a filter variant (§6.2). */}
-          <DailyEntry
-            dailyKey={state.dailyKey}
-            todayKey={todayKey}
-            urlReady={urlReady}
-            onStartDaily={handleStartDaily}
-            variant="compact"
-          />
+              mode, not a filter variant (§6.2). In an ordinary match this is
+              only a status card; the entry point stays on the pre-screen. */}
+          {state.isDaily && (
+            <DailyEntry
+              dailyKey={state.dailyKey}
+              todayKey={todayKey}
+              urlReady={urlReady}
+              onStartDaily={handleStartDaily}
+              variant="compact"
+            />
+          )}
 
           <div className="flex w-full flex-col gap-3">
             <div className="flex items-center justify-between gap-2">

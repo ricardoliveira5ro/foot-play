@@ -169,6 +169,7 @@ describe('daily mode', () => {
     expect(dailyMock).toHaveBeenCalledWith(TODAY);
     expect(randomMock).not.toHaveBeenCalled();
     expect(await screen.findByText('game 104')).toBeInTheDocument();
+    expect(screen.getByText(/you’re playing today’s puzzle/i)).toBeInTheDocument();
   });
 
   it('loads only the target XI with Normal clues and defers the opponent', async () => {

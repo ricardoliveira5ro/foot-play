@@ -488,6 +488,17 @@ describe('missing-eleven pre-screen gate', () => {
     expect(screen.queryByRole('region', { name: 'Filters' })).toBeNull(); // panel closed in-game
   });
 
+  it('does not offer the daily puzzle from inside a custom match', async () => {
+    mirrorReplace();
+    const user = userEvent.setup();
+    render(<MissingElevenPage />);
+
+    await user.click(screen.getByRole('button', { name: 'Start game' }));
+    await screen.findByRole('button', { name: 'New puzzle' });
+
+    expect(screen.queryByRole('button', { name: /daily puzzle/i })).toBeNull();
+  });
+
   it('sends the selected Easy mode with the match request', async () => {
     mirrorReplace();
     const user = userEvent.setup();

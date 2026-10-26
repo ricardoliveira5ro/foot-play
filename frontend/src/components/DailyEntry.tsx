@@ -19,7 +19,8 @@ import {
  * Two shapes:
  * - `hero` (pre-screen): the matchday ticket. The primary path into the game.
  * - `compact` (in-game aside): a status card while today's daily is on the
- *   board, or a quiet offer while an ordinary match is being played.
+ *   board. The page does not render it during an ordinary match — the daily
+ *   entry point belongs on the pre-screen only.
  */
 
 export interface DailyEntryProps {

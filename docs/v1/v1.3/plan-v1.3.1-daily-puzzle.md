@@ -2550,6 +2550,8 @@ The daily is still a mode, not a difficulty, but it has exactly one ruleset: **N
 
 `fetchDailyMatch` mock mode mirrors the same preview-only shape so the mock path cannot drift from the network path.
 
+The in-game `DailyEntry` is now **status only**: it renders while `isDaily`, showing “You’re playing today’s puzzle”, and is absent during an ordinary custom match. The daily entry point remains the pre-screen hero.
+
 ## Acceptance criteria
 
 1. `selectDailyGameId(candidates, key)` is **total, deterministic, and pure**: the same candidate id set and the same `YYYY-MM-DD` key always yield the same id, and the function performs no I/O. It is mirrored byte-for-byte across the network boundary and pinned by a shared fixture table, so a client and server cannot disagree about today's puzzle.

@@ -135,7 +135,9 @@ The fix makes the daily a single Normal-ruleset mode:
 - `canContinueOpponent(state)` is now a tested selector in `frontend/src/lib/gameState.ts`; the page no longer keeps an inline copy.
 - `fetchDailyMatch` mock mode returns the same preview-only shape.
 
-This supersedes the “both full lineups” expectation in the original acceptance criteria and the “daily and difficulty are orthogonal” reading of §6.2. `DailyEntry` copy is unchanged.
+This supersedes the “both full lineups” expectation in the original acceptance criteria and the “daily and difficulty are orthogonal” reading of §6.2.
+
+The in-game daily entry is now status-only: it appears while the daily is active (“You’re playing today’s puzzle”) and is absent during an ordinary custom match. The daily link remains on the pre-screen hero.
 
 Post-fix validation (2026-10-26):
 
