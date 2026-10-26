@@ -7,8 +7,9 @@ import { DIFFICULTY_CONFIG } from '@/lib/difficulty';
 import { availableClues } from '@/lib/shirtBadges';
 import DifficultySelector from '@/components/DifficultySelector';
 import FinishButton from '@/components/FinishButton';
-import { fetchRandomMatch, fetchLineup, submitGuess as submitGuessApi, fetchReveal, revealOnePlayer } from '@/lib/api';
-import { filtersToParams } from '@/lib/filterParams';
+import { fetchRandomMatch, fetchDailyMatch, fetchLineup, submitGuess as submitGuessApi, fetchReveal, revealOnePlayer } from '@/lib/api';
+import { filtersToParams, dailyToParams } from '@/lib/filterParams';
+import { toDailyKey, isPlayableDaily, type DailyKey } from '@/lib/daily';
 import { hasActiveFilters } from '@/lib/filters';
 import { useFilterOptions } from '@/lib/useFilterOptions';
 import { revealMatches } from '@/lib/reveal';
@@ -19,6 +20,7 @@ import GameComplete from '@/components/GameComplete';
 import ScoreCounter from '@/components/ScoreCounter';
 import FilterPanel from '@/components/FilterPanel';
 import FilterEmptyState from '@/components/FilterEmptyState';
+import DailyEntry from '@/components/DailyEntry';
 import { computeTotalScore } from '@/lib/scoring';
 import FilterUrlSync from './FilterUrlSync';
 import type { ShirtData, LineupPlayer, RevealPlayer, GameFilterParams, TeamSide } from '@/types';
@@ -47,6 +49,7 @@ export default function MissingElevenPage() {
     filters,
     setFilters,
     setDifficulty,
+    startDaily,
   } = useGameState();
 
   const resolvedCount = resolvedShirtCount(state.targetShirts, state.opponentShirts);
@@ -65,9 +68,28 @@ export default function MissingElevenPage() {
   // is a build failure; FilterUrlSync under Suspense is the only reader).
   // Reload recomputes this from the URL: no session or storage flag exists.
   const [started, setStarted] = useState(false);
+  // True once the query string has been read. On the pre-screen there is
+  // nothing to read, so the mount effect below unlocks it immediately; on a
+  // deep link FilterUrlSync's onReady unlocks it after its read dispatch has
+  // landed. The load effect waits for this so a ?daily= link never fetches a
+  // random match first.
+  const [urlReady, setUrlReady] = useState(false);
+  // `todayKey` is null on the server and on the first client render, and is
+  // filled in by an effect. Computing it inline with `new Date()` would read
+  // the clock during render, and a render that straddles 00:00:00 UTC would
+  // produce different markup on the server than on the client.
+  const [todayKey, setTodayKey] = useState<DailyKey | null>(null);
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- one-shot gate init after hydration; same pattern as FilterPanel's re-sync
-    setStarted(new URLSearchParams(window.location.search).size > 0);
+    setTodayKey(toDailyKey(new Date()));
+  }, []);
+  useEffect(() => {
+    const hasParams = new URLSearchParams(window.location.search).size > 0;
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- one-shot gate init after hydration; same pattern as FilterPanel's re-sync
+    setStarted(hasParams);
+    // The pre-screen has no URL to read, so it is ready immediately. A deep
+    // link waits for FilterUrlSync's onReady.
+    if (!hasParams) setUrlReady(true);
   }, []);
 
   const router = useRouter();
@@ -83,6 +105,26 @@ export default function MissingElevenPage() {
     setStarted(true);
     setFilters(next);
   }, [router, pathname, setFilters]);
+
+  // FilterUrlSync's bridge. A null daily key is a NO-OP: leaving daily is
+  // driven by NEW_GAME (New puzzle / Play again), never by a stale URL read.
+  // The write effect removes ?daily= when the state clears.
+  const handleDaily = useCallback((key: DailyKey | null) => {
+    if (key !== null) startDaily(key);
+  }, [startDaily]);
+  const handleReady = useCallback(() => setUrlReady(true), []);
+
+  // Start today's daily from the pre-screen entry. Write the URL first (the
+  // board's FilterUrlSync mount-read must see the finished URL), then flip the
+  // gate and the mode in one batched commit so the load effect runs once.
+  const handleStartDaily = useCallback(() => {
+    if (todayKey === null) return;
+    const params = filtersToParams(filters);
+    for (const [k, v] of dailyToParams(todayKey)) params.set(k, v);
+    router.replace(`${pathname}?${params.toString()}`, { scroll: false });
+    setStarted(true);
+    startDaily(todayKey);
+  }, [todayKey, filters, router, pathname, startDaily]);
 
   const [confirmingSurrender, setConfirmingSurrender] = useState(false);
   const [isContinuingOpponent, setIsContinuingOpponent] = useState(false);
@@ -180,19 +222,62 @@ export default function MissingElevenPage() {
       });
   }, [filters, state.difficulty, setLoading, setError, startNewGame]);
 
-  // Load once for the initial filter key, and again whenever the canonical
-  // key changes (a deep link's filters arrive via FilterUrlSync's read
-  // dispatch). The fetched-key ref keeps the mount load singular; a later
-  // filter change refetches through this same path instead of a second one.
-  // Before the first start the guard returns early — the pre-screen fetches
-  // nothing; Start changes both deps in one commit, and the ref keeps that
-  // single.
+  // The daily fetch mirrors loadMatch: same sequence ref, same loading/error
+  // discipline, same startNewGame hand-off. It takes only a day key — there is
+  // no parameter through which a filter could narrow it (§6.2).
+  const loadDaily = useCallback((key: DailyKey) => {
+    const seq = ++matchSeqRef.current;
+    setLoading(true);
+    setError(null);
+    fetchDailyMatch(key)
+      .then((response) => {
+        if (seq !== matchSeqRef.current) return;
+        startNewGame(response);
+      })
+      .catch((cause: unknown) => {
+        if (seq !== matchSeqRef.current) return;
+        setError(describeError(cause));
+      })
+      .finally(() => {
+        if (seq === matchSeqRef.current) setLoading(false);
+      });
+  }, [setLoading, setError, startNewGame]);
+
+  // The single owner of "which puzzle should be on the board". It replaces the
+  // filter-key effect: every transition into "no game loaded" loads the right
+  // one, so the handlers only have to reset state.
+  //
+  // The `urlReady` guard is load-bearing. Without it this effect runs on the
+  // first commit of a ?daily= deep link, where its closure still has
+  // `isDaily === false` even though FilterUrlSync has already dispatched
+  // START_DAILY from a child effect, and a random match is fetched and then
+  // thrown away — a visible flash of the wrong puzzle.
+  //
+  // The daily branch returns early on a filter change, which is the §6.2
+  // guard: daily ignores filters entirely. This is the only filter-driven
+  // fetch, so no second effect needs the same guard.
   useEffect(() => {
-    if (!started) return; // pre-screen: zero match requests until Start
+    if (!started || !urlReady) return;
+    if (state.isDaily) {
+      if (state.dailyKey === null || todayKey === null) return;
+      const key = `daily:${state.dailyKey}`;
+      if (fetchedKeyRef.current === key) return;
+      fetchedKeyRef.current = key;
+      if (!isPlayableDaily(state.dailyKey, todayKey)) {
+        // §6.1: today's puzzle only. A shared link to a past day is not
+        // playable and is never silently swapped for a different puzzle.
+        // "Try again" (handleRetry) is the documented way out, and it leaves
+        // daily mode.
+        setError('That day’s puzzle is no longer available. Try again for a new puzzle.');
+        return;
+      }
+      loadDaily(state.dailyKey);
+      return;
+    }
     if (fetchedKeyRef.current === filterKey) return;
     fetchedKeyRef.current = filterKey;
     loadMatch();
-  }, [started, filterKey, loadMatch]);
+  }, [started, urlReady, state.isDaily, state.dailyKey, filterKey, todayKey, loadMatch, loadDaily, setError]);
 
   // Reveal only the side the player has actually finished. The opponent is
   // fetched only after Continue, and Expert retains its two-sided flow.
@@ -278,12 +363,28 @@ export default function MissingElevenPage() {
     fetchedKeyRef.current = null;
     router.replace(pathname, { scroll: false });
     setStarted(false);
+    // Returning to the pre-screen means there is no URL left to read.
+    setUrlReady(true);
   }, [filters, newGame, setFilters, router, pathname]);
 
   const handleRetry = useCallback(() => {
+    if (state.isDaily) {
+      if (state.dailyKey === null || todayKey === null || !isPlayableDaily(state.dailyKey, todayKey)) {
+        // The expired-link escape hatch: leaving daily also removes ?daily=
+        // from the URL through FilterUrlSync's write effect, and the load
+        // effect then fetches an ordinary match.
+        newGame();
+        fetchedKeyRef.current = null;
+        return;
+      }
+      // "Try again" retries the SAME daily, not a different puzzle.
+      setError(null);
+      loadDaily(state.dailyKey);
+      return;
+    }
     reloadOptions();
     loadMatch();
-  }, [reloadOptions, loadMatch]);
+  }, [state.isDaily, state.dailyKey, todayKey, newGame, setError, loadDaily, reloadOptions, loadMatch]);
 
   const handleContinueOpponent = useCallback(async () => {
     if (!state.match || state.opponentShirts.length > 0 || isContinuingOpponent) return;
@@ -317,6 +418,7 @@ export default function MissingElevenPage() {
   // `!optionsLoading` guard stops the empty state flashing over a good board
   // while a new filter set's options are still in flight.
   const showEmptyState =
+    !state.isDaily &&
     filterOptions !== null &&
     !optionsLoading &&
     filterOptions.total === 0 &&
@@ -329,7 +431,9 @@ export default function MissingElevenPage() {
 
   // An options failure is still a failure: surface it as the error state when
   // no match is on screen, so "the server is down" never reads as "no games".
-  const displayError = state.error ?? (state.match ? null : optionsError);
+  // Daily does not depend on filter options, so their failure must not mask a
+  // perfectly good daily puzzle.
+  const displayError = state.error ?? (state.match || state.isDaily ? null : optionsError);
 
   // Shared page chrome. The filter panel lives on the pre-screen only —
   // during the game there is no in-page filter access; New puzzle / Play
@@ -348,6 +452,30 @@ export default function MissingElevenPage() {
           onApply={setFilters}
           onStart={handleStart}
         />
+      )}
+      {/*
+        The <Suspense> boundary is the fix for Next 16's
+        missing-suspense-with-csr-bailout, which is a `next build` FAILURE
+        ("Entire page /missing-eleven deopted into client-side rendering"),
+        not a runtime warning — `next dev` will not show it. FilterUrlSync is
+        the app's only reader of the URL search params and must stay below it.
+
+        It is mounted for every STARTED state — loading, error, empty and
+        board — because its onReady is what unlocks the first load on a deep
+        link. It is deliberately absent from the pre-screen, which has no URL
+        to read; hoisting it into the always-mounted shell would make it read
+        the URL before the player has started.
+      */}
+      {started && (
+        <Suspense fallback={null}>
+          <FilterUrlSync
+            applied={filters}
+            onFilters={handleFilters}
+            daily={state.dailyKey}
+            onDaily={handleDaily}
+            onReady={handleReady}
+          />
+        </Suspense>
       )}
       {content}
     </div>
@@ -380,6 +508,17 @@ export default function MissingElevenPage() {
           <p className="mt-4 text-xs uppercase tracking-[0.15em] text-ink/45">
             Press Start game when you&rsquo;re ready
           </p>
+        </div>
+        {/* Daily is a mode, not a filter variant: it sits below the card, not
+            inside the filter panel. It renders nothing until the URL has been
+            read and today's key is known, so the first paint is unchanged. */}
+        <div className="w-full max-w-md pt-6">
+          <DailyEntry
+            dailyKey={state.dailyKey}
+            todayKey={todayKey}
+            urlReady={urlReady}
+            onStartDaily={handleStartDaily}
+          />
         </div>
       </div>,
     );
@@ -498,19 +637,6 @@ export default function MissingElevenPage() {
 
   return shell(
     <>
-      {/*
-        The <Suspense> boundary is the fix for Next 16's
-        missing-suspense-with-csr-bailout, which is a `next build` FAILURE
-        ("Entire page /missing-eleven deopted into client-side rendering"),
-        not a runtime warning — `next dev` will not show it. FilterUrlSync is
-        the app's only reader of the URL search params and must stay below it.
-        It intentionally lives only in this branch: its mount-time read re-syncs
-        the URL after loading/error transitions (and is what Play again / Retry
-        rely on), so it must NOT be hoisted into the always-mounted shell.
-      */}
-      <Suspense fallback={null}>
-        <FilterUrlSync applied={filters} onFilters={handleFilters} />
-      </Suspense>
       <div className="grid gap-6 lg:grid-cols-[340px_minmax(0,620px)] lg:items-start lg:gap-x-10">
         <aside className="flex flex-col gap-8 text-center lg:sticky lg:top-6 lg:items-start lg:text-left">
           <header className="w-full pb-4">
@@ -524,6 +650,15 @@ export default function MissingElevenPage() {
           {state.gameStatus === 'playing' && (
             <ScoreCounter score={liveScore} />
           )}
+
+          {/* A sibling of the controls group, never a member of it: daily is a
+              mode, not a filter variant (§6.2). */}
+          <DailyEntry
+            dailyKey={state.dailyKey}
+            todayKey={todayKey}
+            urlReady={urlReady}
+            onStartDaily={handleStartDaily}
+          />
 
           <div className="flex w-full flex-col gap-3">
             <div className="flex items-center justify-between gap-2">

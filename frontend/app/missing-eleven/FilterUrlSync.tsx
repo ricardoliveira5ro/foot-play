@@ -114,8 +114,15 @@ export default function FilterUrlSync({ applied, onFilters, daily, onDaily, onRe
     // FILTER_PARAM_KEYS, which stays a list of FILTER keys only. Leaving daily
     // means removing it from the URL, which is how the address bar self-heals
     // after a stale ?daily= link is declined.
-    if (daily) next.set(DAILY_PARAM_KEY, daily);
-    else next.delete(DAILY_PARAM_KEY);
+    //
+    // Only a daily the state actually owned is removed. A malformed ?daily=
+    // was never adopted (paramsToDailyKey returns null), so it is an opaque
+    // param like any other and is preserved rather than silently rewritten.
+    if (daily) {
+      next.set(DAILY_PARAM_KEY, daily);
+    } else if (paramsToDailyKey(new URLSearchParams(currentKey)) !== null) {
+      next.delete(DAILY_PARAM_KEY);
+    }
     const href = next.size ? `${pathname}?${next}` : pathname;
     if (href === (currentKey ? `${pathname}?${currentKey}` : pathname)) return; // already canonical
     router.replace(href, { scroll: false });
