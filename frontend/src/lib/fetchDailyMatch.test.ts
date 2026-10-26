@@ -65,4 +65,15 @@ describe('fetchDailyMatch — mock branch', () => {
     const res = await fetchDailyMatch('2026-03-01');
     expect(MOCK_MATCHES.some((m) => m.game.gameId === res.game.gameId)).toBe(true);
   });
+
+  it('returns previews only, mirroring the Normal daily contract', async () => {
+    vi.stubEnv('NEXT_PUBLIC_USE_MOCK_API', 'true');
+    vi.resetModules();
+    const { fetchDailyMatch } = await import('@/lib/api');
+    const res = await fetchDailyMatch('2026-03-01');
+    expect(res.homeLineup).toEqual([]);
+    expect(res.awayLineup).toEqual([]);
+    expect(res.homePreview).toHaveLength(11);
+    expect(res.awayPreview).toHaveLength(11);
+  });
 });

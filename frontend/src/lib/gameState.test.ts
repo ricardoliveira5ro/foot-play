@@ -6,9 +6,15 @@ import { EMPTY_FILTERS } from '../../types';
  */
 
 import { describe, it, expect, vi, afterEach } from 'vitest';
-import { gameReducer, initialState, MAX_ATTEMPTS, resolvedShirtCount } from './gameState';
+import {
+  canContinueOpponent,
+  gameReducer,
+  initialState,
+  MAX_ATTEMPTS,
+  resolvedShirtCount,
+} from './gameState';
 import type { GameState, GameAction, ShirtGameData } from './gameState';
-import { DEFAULT_DIFFICULTY, DIFFICULTY_CONFIG } from './difficulty';
+import { DAILY_DIFFICULTY, DEFAULT_DIFFICULTY, DIFFICULTY_CONFIG } from './difficulty';
 import type { Difficulty } from './difficulty';
 import type { GameResponse, LineupPlayer, GuessResult, ShirtState } from '@/types';
 
@@ -72,6 +78,20 @@ function correctGuess(token: string, name = 'Messi') {
       name,
     },
   };
+}
+
+function elevenPlayers(prefix: string): LineupPlayer[] {
+  return Array.from({ length: 11 }, (_, index) => player(`${prefix}-${index + 1}`));
+}
+
+function elevenShirts(prefix: string): ShirtGameData[] {
+  return elevenPlayers(prefix).map((entry) => ({
+    ...entry,
+    state: 'default' as const,
+    attempts: 0,
+    guessHistory: [],
+    correctLetters: [],
+  }));
 }
 
 /**
@@ -683,6 +703,13 @@ describe('gameReducer', () => {
       expect(gameReducer(easy, { type: 'NEW_GAME' }).difficulty).toBe(DEFAULT_DIFFICULTY);
     });
 
+    it('cannot change the mode while a daily is active', () => {
+      const daily = gameReducer(initialState, { type: 'START_DAILY', payload: '2026-01-01' });
+      const next = gameReducer(daily, { type: 'SET_DIFFICULTY', payload: 'expert' });
+      expect(next).toBe(daily);
+      expect(next.difficulty).toBe(DAILY_DIFFICULTY);
+    });
+
     it('keeps MAX_ATTEMPTS in step with the default mode', () => {
       expect(MAX_ATTEMPTS).toBe(DIFFICULTY_CONFIG[DEFAULT_DIFFICULTY].attempts);
     });
@@ -732,6 +759,31 @@ describe('START_DAILY', () => {
     const errored = gameReducer(initialState, { type: 'SET_ERROR', payload: 'boom' });
     expect(gameReducer(errored, { type: 'START_DAILY', payload: '2026-01-01' }).error).toBeNull();
   });
+  it.each(['easy', 'hard', 'expert'] as const)(
+    'normalizes a previously selected %s mode to Normal',
+    (mode) => {
+      const selected = gameReducer(initialState, { type: 'SET_DIFFICULTY', payload: mode });
+      const next = gameReducer(selected, { type: 'START_DAILY', payload: '2026-01-01' });
+      expect(next.difficulty).toBe(DAILY_DIFFICULTY);
+      expect(next.difficulty).toBe('normal');
+    },
+  );
+  it('normalizes a same-key daily that is not Normal — the lock is not bypassed', () => {
+    const first = gameReducer(initialState, { type: 'START_DAILY', payload: '2026-01-01' });
+    const drifted = { ...first, difficulty: 'hard' as const };
+    const next = gameReducer(drifted, { type: 'START_DAILY', payload: '2026-01-01' });
+    expect(next).not.toBe(drifted);
+    expect(next.difficulty).toBe(DAILY_DIFFICULTY);
+  });
+  it('clears stale board state from the previous game', () => {
+    const playing = gameReducer(initialState, { type: 'SET_MATCH', payload: makeMatch() });
+    const next = gameReducer(playing, { type: 'START_DAILY', payload: '2026-01-01' });
+    expect(next.targetShirts).toEqual([]);
+    expect(next.opponentShirts).toEqual([]);
+    expect(next.activeBoard).toBe('target');
+    expect(next.opponentPhase).toBe(false);
+    expect(next.targetRoundSurrendered).toBe(false);
+  });
 });
 
 it('initialises isDaily to false and dailyKey to null', () => {
@@ -751,4 +803,94 @@ it('SET_MATCH preserves isDaily and dailyKey', () => {
   const loaded = gameReducer(daily, { type: 'SET_MATCH', payload: makeMatch() });
   expect(loaded.isDaily).toBe(true);
   expect(loaded.dailyKey).toBe('2026-01-01');
+});
+
+it('SET_MATCH keeps the opponent XI hidden in a daily Normal game', () => {
+  const daily = gameReducer(initialState, { type: 'START_DAILY', payload: '2026-01-01' });
+  const full = makeMatch({ homeLineup: elevenPlayers('home'), awayLineup: elevenPlayers('away') });
+  const loaded = gameReducer(daily, { type: 'SET_MATCH', payload: full });
+  expect(loaded.targetShirts).toHaveLength(11);
+  expect(loaded.opponentShirts).toHaveLength(0);
+});
+
+describe('canContinueOpponent', () => {
+  const withBothPreviews = makeMatch({
+    homeLineup: elevenPlayers('home'),
+    awayLineup: [],
+    homePreview: elevenPlayers('home'),
+    awayPreview: elevenPlayers('away'),
+  });
+
+  function dailyReadyForOpponent(): GameState {
+    const daily = gameReducer(initialState, { type: 'START_DAILY', payload: '2026-01-01' });
+    const loaded = gameReducer(daily, { type: 'SET_MATCH', payload: withBothPreviews });
+    return {
+      ...loaded,
+      gameStatus: 'complete',
+      targetShirts: loaded.targetShirts.map((shirt) => ({ ...shirt, state: 'correct' as const, attempts: 1 })),
+      opponentShirts: [],
+    };
+  }
+
+  it('opens the bonus round after a Normal target completion', () => {
+    expect(canContinueOpponent(dailyReadyForOpponent())).toBe(true);
+  });
+
+  it('also opens it after a target surrender', () => {
+    expect(canContinueOpponent({ ...dailyReadyForOpponent(), gameStatus: 'surrendered' })).toBe(true);
+  });
+
+  it('rejects Expert, which requires both sides up front', () => {
+    expect(canContinueOpponent({ ...dailyReadyForOpponent(), difficulty: 'expert' })).toBe(false);
+  });
+
+  it('rejects a game that is still playing', () => {
+    expect(canContinueOpponent({ ...dailyReadyForOpponent(), gameStatus: 'playing' })).toBe(false);
+  });
+
+  it('rejects a game already in the opponent phase', () => {
+    expect(canContinueOpponent({ ...dailyReadyForOpponent(), opponentPhase: true })).toBe(false);
+  });
+
+  it('rejects a state whose opponent shirts are already present', () => {
+    expect(canContinueOpponent({ ...dailyReadyForOpponent(), opponentShirts: elevenShirts('away') })).toBe(false);
+  });
+
+  it('requires the target XI and a full opponent preview', () => {
+    expect(canContinueOpponent({ ...dailyReadyForOpponent(), targetShirts: elevenShirts('home').slice(0, 10) })).toBe(false);
+    const noPreview = gameReducer(initialState, {
+      type: 'SET_MATCH',
+      payload: makeMatch({ homeLineup: elevenPlayers('home'), awayLineup: [] }),
+    });
+    expect(canContinueOpponent({
+      ...noPreview,
+      gameStatus: 'complete',
+      targetShirts: noPreview.targetShirts.map((shirt) => ({ ...shirt, state: 'correct' as const })),
+      opponentShirts: [],
+    })).toBe(false);
+  });
+});
+
+it('daily Normal can continue into the opponent phase after the target XI', () => {
+  const daily = gameReducer(initialState, { type: 'START_DAILY', payload: '2026-01-01' });
+  const loaded = gameReducer(daily, {
+    type: 'SET_MATCH',
+    payload: makeMatch({
+      homeLineup: elevenPlayers('home'),
+      awayLineup: [],
+      homePreview: elevenPlayers('home'),
+      awayPreview: elevenPlayers('away'),
+    }),
+  });
+  const complete = {
+    ...loaded,
+    gameStatus: 'complete' as const,
+    targetShirts: loaded.targetShirts.map((shirt) => ({ ...shirt, state: 'correct' as const, attempts: 1 })),
+  };
+  expect(canContinueOpponent(complete)).toBe(true);
+
+  const continued = gameReducer(complete, { type: 'CONTINUE_OPPONENT', payload: elevenPlayers('away') });
+  expect(continued.opponentPhase).toBe(true);
+  expect(continued.opponentShirts).toHaveLength(11);
+  expect(continued.gameStatus).toBe('playing');
 });

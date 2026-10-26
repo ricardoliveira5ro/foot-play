@@ -5,7 +5,7 @@ import type { GameResponse, ShirtData, ShirtState, TeamSide, LineupPlayer, Guess
 import { CURATED_TEAM_IDS } from '@/lib/curatedTeams';
 import { EMPTY_FILTERS } from '@/types';
 import { filtersEqual } from './filtersEqual';
-import { DEFAULT_DIFFICULTY, DIFFICULTY_CONFIG, type Difficulty } from './difficulty';
+import { DAILY_DIFFICULTY, DEFAULT_DIFFICULTY, DIFFICULTY_CONFIG, type Difficulty } from './difficulty';
 import type { DailyKey } from '@/lib/daily';
 
 /**
@@ -155,6 +155,21 @@ export function checkGameComplete(target: ShirtGameData[], opponent: ShirtGameDa
   return !DIFFICULTY_CONFIG[difficulty].opponentRequired || opponent.every(settled);
 }
 
+/**
+ * Whether the optional opponent bonus round can be opened after the target XI.
+ * The opponent lineup is deliberately not loaded until then, so its preview is
+ * the only evidence that a second XI exists.
+ */
+export function canContinueOpponent(state: GameState): boolean {
+  if (!state.match) return false;
+  if (state.gameStatus !== 'complete' && state.gameStatus !== 'surrendered') return false;
+  if (DIFFICULTY_CONFIG[state.difficulty].opponentRequired) return false;
+  if (state.opponentPhase || state.opponentShirts.length > 0) return false;
+  if (state.targetShirts.length !== 11) return false;
+  const opponentPreview = state.teamSide === 'home' ? state.match.awayPreview : state.match.homePreview;
+  return opponentPreview?.length === 11;
+}
+
 /** Lineup swap for a chosen side: target = chosen side, opponent = the other. */
 function lineupsForSide(
   match: GameResponse,
@@ -234,7 +249,7 @@ function handleSelectTeam(state: GameState, action: Extract<GameAction, { type: 
     ...state,
     teamSide: action.payload,
     targetShirts: createShirts(targetLineup),
-    opponentShirts: createShirts(opponentLineup),
+    opponentShirts: state.isDaily ? [] : createShirts(opponentLineup),
     activeBoard: 'target',
     opponentPhase: false,
     targetRoundSurrendered: false,
@@ -315,12 +330,24 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
     }
 
     case 'START_DAILY': {
-      if (state.isDaily && state.dailyKey === action.payload) return state;
+      if (
+        state.isDaily &&
+        state.dailyKey === action.payload &&
+        state.difficulty === DAILY_DIFFICULTY
+      ) {
+        return state;
+      }
       return {
         ...state,
         isDaily: true,
         dailyKey: action.payload,
+        difficulty: DAILY_DIFFICULTY,
         match: null,
+        targetShirts: [],
+        opponentShirts: [],
+        activeBoard: 'target',
+        opponentPhase: false,
+        targetRoundSurrendered: false,
         gameStatus: 'loading',
         error: null,
         activeShirtIndex: null,
@@ -335,17 +362,19 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
         match: action.payload,
         teamSide: side,
         targetShirts: createShirts(targetLineup),
-        opponentShirts: createShirts(opponentLineup),
+        opponentShirts: state.isDaily ? [] : createShirts(opponentLineup),
         activeBoard: 'target',
         gameStatus: 'playing',
         opponentPhase: false,
         targetRoundSurrendered: false,
+        difficulty: state.isDaily ? DAILY_DIFFICULTY : state.difficulty,
         error: null,
         activeShirtIndex: null,
       };
     }
 
     case 'SET_DIFFICULTY':
+      if (state.isDaily) return state;
       return { ...state, difficulty: action.payload };
 
     case 'SELECT_TEAM': {

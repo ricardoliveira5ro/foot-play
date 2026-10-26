@@ -22,6 +22,7 @@ const EXPIRED = '2020-01-01';
 const search = vi.hoisted(() => ({ current: '' }));
 const randomMock = vi.hoisted(() => vi.fn());
 const dailyMock = vi.hoisted(() => vi.fn());
+const lineupMock = vi.hoisted(() => vi.fn());
 const optionsMock = vi.hoisted(() => vi.fn());
 const router = vi.hoisted(() => ({ replace: vi.fn(), push: vi.fn() }));
 
@@ -34,6 +35,7 @@ vi.mock('next/navigation', () => ({
 vi.mock('@/lib/api', () => ({
   fetchRandomMatch: randomMock,
   fetchDailyMatch: dailyMock,
+  fetchLineup: lineupMock,
   fetchFilterOptions: optionsMock,
   submitGuess: vi.fn(),
   fetchReveal: vi.fn().mockResolvedValue({ players: [] }),
@@ -93,6 +95,29 @@ function matchResponse(gameId: number): GameResponse {
   };
 }
 
+function elevenPlayers(prefix: string): LineupPlayer[] {
+  return Array.from({ length: 11 }, (_, index) => player(`${prefix}-${index + 1}`));
+}
+
+function preview(prefix: string): LineupPlayer[] {
+  return elevenPlayers(prefix).map(({ position, coords, shirtNumber }) => ({
+    ...player(`${prefix}-preview`),
+    position,
+    coords,
+    shirtNumber,
+  }));
+}
+
+function dailyPreviewResponse(gameId: number): GameResponse {
+  return {
+    ...matchResponse(gameId),
+    homeLineup: [],
+    awayLineup: [],
+    homePreview: preview('home'),
+    awayPreview: preview('away'),
+  };
+}
+
 const options = {
   teams: [],
   competitions: [],
@@ -112,12 +137,16 @@ beforeEach(() => {
   setSearch('');
   randomMock.mockReset();
   dailyMock.mockReset();
+  lineupMock.mockReset();
   optionsMock.mockReset();
   router.replace.mockReset();
   router.push.mockReset();
   // Every test that does not care about the fetch path still needs it to settle.
   randomMock.mockResolvedValue(matchResponse(7));
-  dailyMock.mockResolvedValue(matchResponse(104));
+  dailyMock.mockResolvedValue(dailyPreviewResponse(104));
+  lineupMock.mockImplementation((_gameId: number, side: 'home' | 'away') =>
+    Promise.resolve(elevenPlayers(side)),
+  );
   optionsMock.mockResolvedValue(options);
 });
 
@@ -140,6 +169,26 @@ describe('daily mode', () => {
     expect(dailyMock).toHaveBeenCalledWith(TODAY);
     expect(randomMock).not.toHaveBeenCalled();
     expect(await screen.findByText('game 104')).toBeInTheDocument();
+  });
+
+  it('loads only the target XI with Normal clues and defers the opponent', async () => {
+    setSearch(`daily=${TODAY}`);
+    render(<MissingElevenPage />);
+
+    await waitFor(() => expect(lineupMock).toHaveBeenCalledWith(104, 'home', 'normal'));
+    expect(await screen.findByText('game 104')).toBeInTheDocument();
+    expect(lineupMock).not.toHaveBeenCalledWith(104, 'away', expect.anything());
+  });
+
+  it('starts the daily in Normal even when Expert was selected on the pre-screen', async () => {
+    render(<MissingElevenPage />);
+    await screen.findByRole('button', { name: /daily puzzle/i });
+
+    fireEvent.click(screen.getByRole('button', { name: /expert/i }));
+    fireEvent.click(screen.getByRole('button', { name: /daily puzzle/i }));
+
+    await waitFor(() => expect(lineupMock).toHaveBeenCalledWith(104, 'home', 'normal'));
+    expect(lineupMock).not.toHaveBeenCalledWith(104, 'home', 'expert');
   });
 
   it('does not fetch a random match first on a ?daily= deep link (no flash of the wrong puzzle)', async () => {

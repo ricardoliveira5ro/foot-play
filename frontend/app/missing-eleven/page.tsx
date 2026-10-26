@@ -2,8 +2,8 @@
 
 import { Suspense, useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
-import { useGameState, resolvedShirtCount } from '@/lib/gameState';
-import { DIFFICULTY_CONFIG } from '@/lib/difficulty';
+import { canContinueOpponent, useGameState, resolvedShirtCount } from '@/lib/gameState';
+import { DAILY_DIFFICULTY, DIFFICULTY_CONFIG } from '@/lib/difficulty';
 import { availableClues } from '@/lib/shirtBadges';
 import DifficultySelector from '@/components/DifficultySelector';
 import FinishButton from '@/components/FinishButton';
@@ -230,8 +230,17 @@ export default function MissingElevenPage() {
     setLoading(true);
     setError(null);
     fetchDailyMatch(key)
-      .then((response) => {
+      .then(async (response) => {
         if (seq !== matchSeqRef.current) return;
+        const side = targetSideForMatch(response);
+        const targetKey = side === 'home' ? 'homeLineup' : 'awayLineup';
+        if (response[targetKey].length === 0) {
+          const targetLineup = await fetchLineup(response.game.gameId, side, DAILY_DIFFICULTY);
+          if (seq !== matchSeqRef.current) return;
+          response = { ...response, targetSide: side, [targetKey]: targetLineup };
+        } else {
+          response = { ...response, targetSide: side };
+        }
         startNewGame(response);
       })
       .catch((cause: unknown) => {
@@ -391,14 +400,18 @@ export default function MissingElevenPage() {
     const side = state.teamSide === 'home' ? 'away' : 'home';
     setIsContinuingOpponent(true);
     try {
-      const lineup = await fetchLineup(state.match.game.gameId, side, state.difficulty);
+      const lineup = await fetchLineup(
+        state.match.game.gameId,
+        side,
+        state.isDaily ? DAILY_DIFFICULTY : state.difficulty,
+      );
       continueOpponent(lineup);
     } catch (cause: unknown) {
       setError(describeError(cause));
     } finally {
       setIsContinuingOpponent(false);
     }
-  }, [state.match, state.teamSide, state.difficulty, state.opponentShirts.length, isContinuingOpponent, continueOpponent, setError]);
+  }, [state.match, state.teamSide, state.isDaily, state.difficulty, state.opponentShirts.length, isContinuingOpponent, continueOpponent, setError]);
 
   // Clear all from the empty state. The URL is the source of truth, so it must
   // be cleared here too: the empty state does not render FilterUrlSync, and
@@ -751,7 +764,7 @@ export default function MissingElevenPage() {
           opponentTeamName={opponentTeamName}
           onPlayAgain={handleNewPuzzle}
           difficulty={state.difficulty}
-          canContinueOpponent={(state.gameStatus === 'complete' || state.gameStatus === 'surrendered') && !state.opponentPhase && state.opponentShirts.length === 0 && state.difficulty !== 'expert' && state.targetShirts.length === 11 && (state.teamSide === 'home' ? state.match.awayPreview?.length : state.match.homePreview?.length) === 11}
+          canContinueOpponent={canContinueOpponent(state)}
           onContinueOpponent={handleContinueOpponent}
           isContinuingOpponent={isContinuingOpponent}
           surrendered={state.gameStatus === 'surrendered'}

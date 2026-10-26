@@ -3,12 +3,30 @@ import request from 'supertest';
 import { app } from '../../../app';
 
 describe('GET /api/matches/daily', () => {
-  it('returns a game with both full lineups', async () => {
+  it('returns a Normal preview with both lineups hidden', async () => {
     const res = await request(app).get('/api/matches/daily?date=2026-01-01');
     expect(res.status).toBe(200);
     expect(res.body.game.gameId).toBeGreaterThan(0);
-    expect(res.body.homeLineup.length).toBe(11);
-    expect(res.body.awayLineup.length).toBe(11);
+    expect(res.body.homeLineup).toEqual([]);
+    expect(res.body.awayLineup).toEqual([]);
+    expect(res.body.homePreview).toHaveLength(11);
+    expect(res.body.awayPreview).toHaveLength(11);
+    expect(res.body.homePreview[0]).not.toHaveProperty('token');
+    expect(res.body.awayPreview[0]).not.toHaveProperty('token');
+  });
+
+  it('serves either full lineup on request with Normal clues', async () => {
+    const daily = await request(app).get('/api/matches/daily?date=2026-01-01');
+    const gameId = daily.body.game.gameId;
+
+    for (const side of ['home', 'away'] as const) {
+      const lineup = await request(app).get(
+        `/api/matches/${gameId}/lineup?teamSide=${side}&difficulty=normal`,
+      );
+      expect(lineup.status).toBe(200);
+      expect(lineup.body.lineup).toHaveLength(11);
+      expect(lineup.body.lineup[0].token).toEqual(expect.any(String));
+    }
   });
 
   it('is deterministic for a given date', async () => {

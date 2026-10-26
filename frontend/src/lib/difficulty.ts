@@ -55,3 +55,10 @@ export const DIFFICULTY_CONFIG: Record<Difficulty, DifficultyConfig> = {
 export const DIFFICULTIES: readonly Difficulty[] = ['easy', 'normal', 'hard', 'expert'];
 
 export const DEFAULT_DIFFICULTY: Difficulty = 'normal';
+
+/**
+ * The daily is a single shared puzzle, so it has a single ruleset.
+ * Normal is the baseline: the target XI is enough to finish, and the
+ * opponent is an optional bonus round unlocked after that.
+ */
+export const DAILY_DIFFICULTY: Difficulty = 'normal';

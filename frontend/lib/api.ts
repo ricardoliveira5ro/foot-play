@@ -169,7 +169,13 @@ export async function fetchDailyMatch(key: DailyKey): Promise<GameResponse> {
     if (!found) {
       throw new Error(`Daily game ${gameId} not found in mock dataset`);
     }
-    return found;
+    return {
+      game: found.game,
+      homeLineup: [],
+      awayLineup: [],
+      homePreview: found.homeLineup.map(({ position, coords, shirtNumber }) => ({ position, coords, shirtNumber })),
+      awayPreview: found.awayLineup.map(({ position, coords, shirtNumber }) => ({ position, coords, shirtNumber })),
+    };
   }
   return requestJson<GameResponse>(`/api/matches/daily?date=${encodeURIComponent(key)}`);
 }

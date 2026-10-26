@@ -64,7 +64,9 @@ router.get('/daily', asyncHandler(async (req, res) => {
   }
 
   const game = await getDailyMatch(key);
-  return res.json(buildMatchResponse(game));
+  // The daily is always the Normal ruleset: the target XI can finish the
+  // puzzle, and the opponent XI is an optional bonus round loaded on demand.
+  return res.json(buildMatchResponse(game, 'normal', true));
 }));
 
 router.get('/:id', asyncHandler(async (req, res) => {

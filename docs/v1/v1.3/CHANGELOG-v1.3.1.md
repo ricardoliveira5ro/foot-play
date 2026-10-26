@@ -90,7 +90,8 @@ malformed 2026-02-30:                400
   {"error":"Query parameter 'date' must be a calendar date in YYYY-MM-DD form","code":"INVALID_PARAMETER"}
 GET /api/matches/daily?date=TODAY:   200
 GET /api/matches/2478658:            200
-lineups present:                     homeLineup=11 awayLineup=11
+daily response:                      homeLineup=0 awayLineup=0 homePreview=11 awayPreview=11
+target lineup on request:            homeLineup=11 (normal clues)
 ```
 
 - Determinism: identical `gameId` for the same key.
@@ -121,6 +122,29 @@ Caveat: the plan's `GET /api/matches/1 → 200` assumed id `1` exists. This data
 | **E3** (client/server duplicate) | Accepted. The duplicated selection is pinned by identical fixture tables in both suites. |
 | **E4** (Next 16 docs unavailable) | Accepted. The production build in Step 11.2 passed, confirming the existing `<Suspense>` placement for Next 16.3.4. |
 | **E5** (does a surrendered daily count toward a streak?) | Deferred to v1.3.2; v1.3.1 has no streak. |
+
+## Post-release fix — daily is Normal, opponent deferred
+
+The original daily response returned both full lineups. That pre-populated the opponent board, so Normal's “opponent only after the target XI” rule could never open: `canContinueOpponent` required an empty opponent board and a full opponent preview, while the daily had neither. A previously selected Easy/Hard/Expert mode also leaked into a daily because `START_DAILY` did not reset `difficulty`.
+
+The fix makes the daily a single Normal-ruleset mode:
+
+- `START_DAILY` normalizes `difficulty` to `normal` on every entry, including same-key re-entry; `SET_DIFFICULTY` is ignored while `isDaily`; `SET_MATCH` keeps opponent shirts empty in daily mode.
+- `GET /api/matches/daily` now calls `buildMatchResponse(game, 'normal', true)` and returns `homePreview` / `awayPreview` with empty lineups.
+- `loadDaily` fetches only the target XI with `normal` clues. Continue fetches the opponent through the same path as an ordinary Normal game.
+- `canContinueOpponent(state)` is now a tested selector in `frontend/src/lib/gameState.ts`; the page no longer keeps an inline copy.
+- `fetchDailyMatch` mock mode returns the same preview-only shape.
+
+This supersedes the “both full lineups” expectation in the original acceptance criteria and the “daily and difficulty are orthogonal” reading of §6.2. `DailyEntry` copy is unchanged.
+
+Post-fix validation (2026-10-26):
+
+| Workspace | Tests | Coverage |
+|---|---|---|
+| Backend | 27 files / 381 tests | 99.20% statements, 97.17% branches, 100% functions, 99.53% lines |
+| Frontend | 38 files / 670 tests | 98.66% statements, 96.81% branches, 98.13% functions, 99.50% lines |
+
+`npx tsc --noEmit` is clean in both workspaces; `npm run build` is clean; `npm run lint` exits 0 with the same pre-existing `react-hooks/exhaustive-deps` warning at `page.tsx:180`.
 
 ## Known deviation
 
