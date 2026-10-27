@@ -65,7 +65,7 @@ function useCountdown(): string | null {
   return remaining === null ? null : formatUtcCountdown(remaining);
 }
 
-function LiveDot({ tone }: { tone: 'flare' | 'turf' }) {
+function LiveDot({ tone }: Readonly<{ tone: 'flare' | 'turf' }>) {
   return (
     <span
       aria-hidden="true"
@@ -93,7 +93,8 @@ function PitchDiagram() {
     <svg
       viewBox="0 0 240 160"
       className="h-auto w-full text-chalk"
-      role="presentation"
+      role="img"
+      aria-label="Empty 4-3-3 formation diagram"
       focusable="false"
     >
       <g fill="none" stroke="currentColor" strokeOpacity="0.3" strokeWidth="1.5">
@@ -141,12 +142,12 @@ function Hero({
   countdown,
   playingToday,
   onStartDaily,
-}: {
+}: Readonly<{
   todayKey: DailyKey;
   countdown: string | null;
   playingToday: boolean;
   onStartDaily: () => void;
-}) {
+}>) {
   return (
     <section
       aria-labelledby="daily-heading"
@@ -234,11 +235,11 @@ function Compact({
   countdown,
   playingToday,
   onStartDaily,
-}: {
+}: Readonly<{
   countdown: string | null;
   playingToday: boolean;
   onStartDaily: () => void;
-}) {
+}>) {
   if (playingToday) {
     return (
       <div className="w-full rounded-lg border border-turf-deep/25 bg-turf-deep/[0.06] px-4 py-3 text-left">
@@ -284,7 +285,7 @@ export default function DailyEntry({
   dailyKey,
   onStartDaily,
   variant = 'hero',
-}: DailyEntryProps) {
+}: Readonly<DailyEntryProps>) {
   // Pre-hydration gate. Before the URL is read and before today's key is
   // known there is genuinely nothing to say, and rendering a placeholder
   // would be a value we would then have to keep correct. Rendering nothing

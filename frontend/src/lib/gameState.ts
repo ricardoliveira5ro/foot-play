@@ -322,124 +322,121 @@ function handleSetLoading(state: GameState, loading: boolean): GameState {
 
 // --- Reducer ---
 
+function handleSetFilters(state: GameState, payload: GameFilterParams): GameState {
+  if (filtersEqual(state.filters, payload)) return state;
+  return { ...state, filters: payload };
+}
+
+function handleStartDaily(state: GameState, payload: DailyKey): GameState {
+  if (
+    state.isDaily &&
+    state.dailyKey === payload &&
+    state.difficulty === DAILY_DIFFICULTY
+  ) {
+    return state;
+  }
+  return {
+    ...state,
+    isDaily: true,
+    dailyKey: payload,
+    difficulty: DAILY_DIFFICULTY,
+    match: null,
+    targetShirts: [],
+    opponentShirts: [],
+    activeBoard: 'target',
+    opponentPhase: false,
+    targetRoundSurrendered: false,
+    gameStatus: 'loading',
+    error: null,
+    activeShirtIndex: null,
+  };
+}
+
+function handleSetMatch(state: GameState, payload: GameResponse): GameState {
+  const side = pickSide(payload);
+  const { targetLineup, opponentLineup } = lineupsForSide(payload, side);
+  return {
+    ...state,
+    match: payload,
+    teamSide: side,
+    targetShirts: createShirts(targetLineup),
+    opponentShirts: state.isDaily ? [] : createShirts(opponentLineup),
+    activeBoard: 'target',
+    gameStatus: 'playing',
+    opponentPhase: false,
+    targetRoundSurrendered: false,
+    difficulty: state.isDaily ? DAILY_DIFFICULTY : state.difficulty,
+    error: null,
+    activeShirtIndex: null,
+  };
+}
+
+function handleSetDifficulty(state: GameState, payload: Difficulty): GameState {
+  if (state.isDaily) return state;
+  return { ...state, difficulty: payload };
+}
+
+function handleToggleBoard(state: GameState): GameState {
+  return {
+    ...state,
+    activeBoard: state.activeBoard === 'target' ? 'opponent' : 'target',
+    activeShirtIndex: null,
+  };
+}
+
+function handleCloseShirt(state: GameState): GameState {
+  return {
+    ...state,
+    activeShirtIndex: null,
+  };
+}
+
+function handleContinueOpponent(state: GameState, payload: LineupPlayer[]): GameState {
+  if ((state.gameStatus !== 'complete' && state.gameStatus !== 'surrendered') || DIFFICULTY_CONFIG[state.difficulty].opponentRequired || payload.length !== 11) return state;
+  return {
+    ...state,
+    opponentShirts: createShirts(payload),
+    activeBoard: 'opponent',
+    activeShirtIndex: null,
+    opponentPhase: true,
+    gameStatus: 'playing',
+  };
+}
+
 export function gameReducer(state: GameState, action: GameAction): GameState {
   switch (action.type) {
-    case 'SET_FILTERS': {
-      if (filtersEqual(state.filters, action.payload)) return state;
-      return { ...state, filters: action.payload };
-    }
-
-    case 'START_DAILY': {
-      if (
-        state.isDaily &&
-        state.dailyKey === action.payload &&
-        state.difficulty === DAILY_DIFFICULTY
-      ) {
-        return state;
-      }
-      return {
-        ...state,
-        isDaily: true,
-        dailyKey: action.payload,
-        difficulty: DAILY_DIFFICULTY,
-        match: null,
-        targetShirts: [],
-        opponentShirts: [],
-        activeBoard: 'target',
-        opponentPhase: false,
-        targetRoundSurrendered: false,
-        gameStatus: 'loading',
-        error: null,
-        activeShirtIndex: null,
-      };
-    }
-
-    case 'SET_MATCH': {
-      const side = pickSide(action.payload);
-      const { targetLineup, opponentLineup } = lineupsForSide(action.payload, side);
-      return {
-        ...state,
-        match: action.payload,
-        teamSide: side,
-        targetShirts: createShirts(targetLineup),
-        opponentShirts: state.isDaily ? [] : createShirts(opponentLineup),
-        activeBoard: 'target',
-        gameStatus: 'playing',
-        opponentPhase: false,
-        targetRoundSurrendered: false,
-        difficulty: state.isDaily ? DAILY_DIFFICULTY : state.difficulty,
-        error: null,
-        activeShirtIndex: null,
-      };
-    }
-
+    case 'SET_FILTERS':
+      return handleSetFilters(state, action.payload);
+    case 'START_DAILY':
+      return handleStartDaily(state, action.payload);
+    case 'SET_MATCH':
+      return handleSetMatch(state, action.payload);
     case 'SET_DIFFICULTY':
-      if (state.isDaily) return state;
-      return { ...state, difficulty: action.payload };
-
-    case 'SELECT_TEAM': {
+      return handleSetDifficulty(state, action.payload);
+    case 'SELECT_TEAM':
       return handleSelectTeam(state, action);
-    }
-
-    case 'TOGGLE_BOARD': {
-      return {
-        ...state,
-        activeBoard: state.activeBoard === 'target' ? 'opponent' : 'target',
-        activeShirtIndex: null,
-      };
-    }
-
-    case 'OPEN_SHIRT': {
+    case 'TOGGLE_BOARD':
+      return handleToggleBoard(state);
+    case 'OPEN_SHIRT':
       return handleOpenShirt(state, action);
-    }
-
-    case 'CLOSE_SHIRT': {
-      return {
-        ...state,
-        activeShirtIndex: null,
-      };
-    }
-
-    case 'SUBMIT_GUESS': {
+    case 'CLOSE_SHIRT':
+      return handleCloseShirt(state);
+    case 'SUBMIT_GUESS':
       return handleSubmitGuess(state, action);
-    }
-
-    case 'REVEAL_NAME': {
+    case 'REVEAL_NAME':
       return handleRevealName(state, action);
-    }
-
-    case 'SURRENDER': {
+    case 'SURRENDER':
       return handleSurrender(state);
-    }
-
-    case 'FINISH_GAME': {
+    case 'FINISH_GAME':
       return handleFinishGame(state);
-    }
-
-    case 'CONTINUE_OPPONENT': {
-      if ((state.gameStatus !== 'complete' && state.gameStatus !== 'surrendered') || DIFFICULTY_CONFIG[state.difficulty].opponentRequired || action.payload.length !== 11) return state;
-      return {
-        ...state,
-        opponentShirts: createShirts(action.payload),
-        activeBoard: 'opponent',
-        activeShirtIndex: null,
-        opponentPhase: true,
-        gameStatus: 'playing',
-      };
-    }
-
-    case 'NEW_GAME': {
+    case 'CONTINUE_OPPONENT':
+      return handleContinueOpponent(state, action.payload);
+    case 'NEW_GAME':
       return initialState;
-    }
-
-    case 'SET_ERROR': {
+    case 'SET_ERROR':
       return handleSetError(state, action.payload);
-    }
-
-    case 'SET_LOADING': {
+    case 'SET_LOADING':
       return handleSetLoading(state, action.payload);
-    }
-
     default:
       return state;
   }
