@@ -182,7 +182,7 @@ function Hero({
                 className="mt-4 max-w-xl font-display text-[clamp(34px,5.4vw,58px)] uppercase leading-[0.9] tracking-[-0.01em]"
               >
                 The same eleven
-                <span className="block">for everyone.</span>
+                <span className="block">{'for everyone.'}</span>
               </h2>
               <p className="mt-4 max-w-md text-sm leading-relaxed text-chalk/90">
                 One lineup a day. No filters. Find all eleven names.
@@ -199,7 +199,7 @@ function Hero({
               >
                 Play today&rsquo;s daily puzzle
                 <span aria-hidden="true" className="transition-transform motion-safe:group-hover:translate-x-0.5">
-                  →
+                  {'→'}
                 </span>
               </button>
             )}
@@ -272,7 +272,7 @@ function Compact({
       <span className="mt-1 flex items-center justify-between gap-3 text-sm font-semibold">
         Play today&rsquo;s daily puzzle
         <span aria-hidden="true" className="transition-transform motion-safe:group-hover:translate-x-0.5">
-          →
+          {'→'}
         </span>
       </span>
     </button>
