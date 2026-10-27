@@ -15,13 +15,10 @@
  * repeated calls.
  */
 
-/** Canonical day key for "today" in the project's agreed timezone. */
-export type DailyKey = string; // 'YYYY-MM-DD'
-
 const DAILY_KEY_SHAPE = /^\d{4}-\d{2}-\d{2}$/;
 
 /** UTC calendar date of an instant, as 'YYYY-MM-DD'. */
-export function toDailyKey(date: Date): DailyKey {
+export function toDailyKey(date: Date): string {
   return date.toISOString().slice(0, 10);
 }
 
@@ -34,7 +31,7 @@ export function toDailyKey(date: Date): DailyKey {
  * guard covers the other Date.UTC quirk: years 0-99 are remapped into the
  * 1900s, so '0099-01-01' would otherwise silently validate as '1999-01-01'.
  */
-export function isDailyKey(value: unknown): value is DailyKey {
+export function isDailyKey(value: unknown): value is string {
   if (typeof value !== 'string' || !DAILY_KEY_SHAPE.test(value)) return false;
   const year = Number(value.slice(0, 4));
   const month = Number(value.slice(5, 7));
@@ -69,7 +66,7 @@ export function dailyHash32(key: string): number {
  * and the caller — the daily service — maps the throw to a 404, which is
  * the honest response to an unseeded database.
  */
-export function selectDailyGameId(candidates: number[], key: DailyKey): number {
+export function selectDailyGameId(candidates: number[], key: string): number {
   if (candidates.length === 0) {
     throw new Error('selectDailyGameId requires at least one candidate game id');
   }
@@ -82,7 +79,7 @@ export function selectDailyGameId(candidates: number[], key: DailyKey): number {
  * catch-up and no playing yesterday. A shared link to a past day is not
  * playable and is never silently swapped for a different puzzle.
  */
-export function isPlayableDaily(requested: DailyKey | null, today: DailyKey): boolean {
+export function isPlayableDaily(requested: string | null, today: string): boolean {
   return requested !== null && requested === today;
 }
 
