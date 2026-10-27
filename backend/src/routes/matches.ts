@@ -1,8 +1,10 @@
 import { Router } from 'express';
 import { asyncHandler } from '../middleware/asyncHandler';
 import { getRandomMatch, buildMatchResponse, buildLineupForSide, getMatchById } from '../services/matchService';
+import { getDailyMatch } from '../services/dailyService';
 import { getFilterOptions } from '../services/filterService';
 import type { GameFilterParams } from '../lib/filterQuery';
+import { isDailyKey, toDailyKey } from '../lib/dailyKey';
 import { validateNonNegativeIntParam } from '../middleware/validate';
 
 const router = Router();
@@ -37,6 +39,34 @@ router.get('/:id/lineup', asyncHandler(async (req, res) => {
   const game = await getMatchById(validation);
   if (!game) return res.status(404).json({ error: 'Match not found', code: 'NOT_FOUND' });
   res.json({ lineup: buildLineupForSide(game, side === 'home' ? game.homeClubId : game.awayClubId, difficulty) });
+}));
+
+// MUST stay above '/:id' — Express would otherwise match 'daily' as a game id.
+// Same ordering constraint as '/filter-options' above it.
+router.get('/daily', asyncHandler(async (req, res) => {
+  const raw = req.query.date;
+
+  // Absent date means "today", resolved on the server's clock in UTC so a
+  // bare curl is useful. The frontend always sends an explicit date so a
+  // request that crosses the UTC midnight boundary cannot be resolved to a
+  // different day than the client asked for.
+  const key = raw === undefined ? toDailyKey(new Date()) : String(raw);
+
+  // Unlike the filter endpoints — which degrade a malformed query to
+  // "unfiltered" — a malformed date is a 400. A wrong filter silently widens
+  // the result set; a wrong date silently serves the WRONG PUZZLE. Failing
+  // loudly is the safer of the two.
+  if (!isDailyKey(key)) {
+    return res.status(400).json({
+      error: `Query parameter 'date' must be a calendar date in YYYY-MM-DD form`,
+      code: 'INVALID_PARAMETER',
+    });
+  }
+
+  const game = await getDailyMatch(key);
+  // The daily is always the Normal ruleset: the target XI can finish the
+  // puzzle, and the opponent XI is an optional bonus round loaded on demand.
+  return res.json(buildMatchResponse(game, 'normal', true));
 }));
 
 router.get('/:id', asyncHandler(async (req, res) => {

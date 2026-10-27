@@ -13,11 +13,13 @@ import MOCK_MATCHES, {
   getMockFilterOptions,
   getMockRandomMatch,
   searchMockPlayers,
+  MOCK_DAILY_CANDIDATES,
 } from './mockData';
 import { evaluateGuess } from '@/lib/wordle';
 import { EMPTY_FILTERS } from '@/types';
 import { filtersToParams } from '@/lib/filterParams';
 import type { Difficulty } from '@/lib/difficulty';
+import { selectDailyGameId, type DailyKey } from '@/lib/daily';
 
 /**
  * API client for the FootPlay backend.
@@ -148,6 +150,34 @@ export async function fetchMatchById(id: number): Promise<GameResponse> {
     return found;
   }
   return requestJson<GameResponse>(`/api/matches/${id}`);
+}
+
+/**
+ * GET /api/matches/daily?date=<key> — the deterministic puzzle for a day.
+ *
+ * Takes a day key and nothing else. There is deliberately no `filters`
+ * parameter: §6.2 says daily ignores filters entirely, and the strongest way
+ * to guarantee that is for the request to have nowhere to put them. This
+ * function is the server-side twin of GET /api/matches/random, which keeps
+ * the `fetchX` naming convention of this file.
+ */
+export async function fetchDailyMatch(key: DailyKey): Promise<GameResponse> {
+  if (USE_MOCK) {
+    await delay(MOCK_DELAY_MS);
+    const gameId = selectDailyGameId([...MOCK_DAILY_CANDIDATES], key);
+    const found = MOCK_MATCHES.find((entry) => entry.game.gameId === gameId);
+    if (!found) {
+      throw new Error(`Daily game ${gameId} not found in mock dataset`);
+    }
+    return {
+      game: found.game,
+      homeLineup: [],
+      awayLineup: [],
+      homePreview: found.homeLineup.map(({ position, coords, shirtNumber }) => ({ position, coords, shirtNumber })),
+      awayPreview: found.awayLineup.map(({ position, coords, shirtNumber }) => ({ position, coords, shirtNumber })),
+    };
+  }
+  return requestJson<GameResponse>(`/api/matches/daily?date=${encodeURIComponent(key)}`);
 }
 
 /** GET /api/players?name=<query> — player search for guess autocompletion. */

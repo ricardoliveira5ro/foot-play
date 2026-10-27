@@ -2540,6 +2540,18 @@ Both figures are confirmed by counting `it(`/`test(` in the tree (backend 175, f
 
 ---
 
+## Post-implementation amendment (2026-10-26): the daily is always Normal
+
+This supersedes the earlier reading of §6.2 that treated daily and difficulty as fully orthogonal axes.
+
+The daily is still a mode, not a difficulty, but it has exactly one ruleset: **Normal**. `START_DAILY` normalizes `difficulty` to `normal` on every entry path, including a same-key re-entry; `SET_DIFFICULTY` is a no-op while `isDaily`; and `SET_MATCH` defensively refuses to preload opponent shirts for a daily. There is no “Normal” chip in `DailyEntry`; the behavior is a contract, not a new control.
+
+**Opponent gating now matches Normal.** `GET /api/matches/daily` returns the board geometry as `homePreview` / `awayPreview` with empty `homeLineup` / `awayLineup`, via `buildMatchResponse(game, 'normal', true)`. The client fetches only the target XI with `normal` clues, then offers the opponent bonus round through the shared `canContinueOpponent(state)` selector. Selecting Continue fetches the opponent XI. The previous response — both full lineups — made `opponentShirts` non-empty at load time, so Normal's “opponent only after the target” gate could never open.
+
+`fetchDailyMatch` mock mode mirrors the same preview-only shape so the mock path cannot drift from the network path.
+
+The in-game `DailyEntry` is now **status only**: it renders while `isDaily`, showing “You’re playing today’s puzzle”, and is absent during an ordinary custom match. The daily entry point remains the pre-screen hero.
+
 ## Acceptance criteria
 
 1. `selectDailyGameId(candidates, key)` is **total, deterministic, and pure**: the same candidate id set and the same `YYYY-MM-DD` key always yield the same id, and the function performs no I/O. It is mirrored byte-for-byte across the network boundary and pinned by a shared fixture table, so a client and server cannot disagree about today's puzzle.
@@ -2557,6 +2569,9 @@ Both figures are confirmed by counting `it(`/`test(` in the tree (backend 175, f
 13. `fetchDailyMatch` and its mock branch agree on shape, so the mock path cannot drift from the network path.
 14. No Prisma schema change and no migration: `git diff --stat -- backend/prisma/schema.prisma` is empty.
 15. `npm run test`, `npm run build`, `npx tsc --noEmit`, and `npm run lint` are clean on both workspaces, and every new suite is collected. Neither suite is asserted against a fixed count — both are measured and recorded, per `docs/v1/v1.2/overview.md:209`.
+16. The daily is **always Normal**: every `START_DAILY` entry normalizes `difficulty` to `normal`, `SET_DIFFICULTY` cannot change it while `isDaily`, and a same-key re-entry re-normalizes rather than taking the no-op path.
+17. A daily load **defers the opponent**: the endpoint returns previews only, the client fetches the target XI with `normal` clues, and `fetchLineup` is not called for the opponent until Continue. `canContinueOpponent` is the single shared gate.
+18. The mock daily branch returns the same preview-only shape as the network branch.
 
 ## Validation
 

@@ -8,6 +8,62 @@ from, and release notes are taken from the entry itself.
 
 ---
 
+## v1.3.1 — Deterministic Daily Puzzle
+
+_2026-10-26 · Spec: `docs/v1/v1.3/plan-v1.3.1-daily-puzzle.md`_
+
+### Added
+
+- **A deterministic daily puzzle.** `GET /api/matches/daily?date=YYYY-MM-DD`
+  selects one playable game from the eligible pool for each UTC date. The same
+  date resolves to the same game everywhere, daily puzzles ignore match
+  filters, and the UTC day changes at `00:00:00Z`.
+- **Daily links.** `/missing-eleven?daily=YYYY-MM-DD` opens that day's puzzle;
+  the in-game indicator identifies an active daily, and the pre-screen hero
+  links to today's puzzle.
+- **Daily uses Normal rules.** Starting or re-entering a daily resets the
+  difficulty to Normal. The daily response supplies lineup previews, loads the
+  target XI first, and defers the opponent XI until the player continues.
+- **Mirrored daily selection.** Frontend and backend selection and hash
+  fixtures agree, so a change to either implementation is caught by tests.
+
+### Fixed
+
+- **Daily mode no longer preloads the opponent lineup.** This lets the Normal
+  opponent round begin only after the target XI is complete. Difficulty changes
+  are ignored while a daily is active, and the opponent board stays empty until
+  its lineup is requested.
+- **Daily date validation.** Invalid calendar dates return `400` rather than
+  falling back to another puzzle. The daily route is handled before the
+  parameterized match route.
+- **Daily URL handling.** A valid daily key is removed when leaving daily mode;
+  malformed values remain untouched as opaque query parameters.
+
+### Validation
+
+- Backend: **27 files / 381 tests passed**; 99.20% statements, 97.17% branches,
+  100% functions, and 99.53% lines.
+- Frontend: **38 files / 670 tests passed**; 98.66% statements, 96.81% branches,
+  98.13% functions, and 99.50% lines.
+- `npx tsc --noEmit` passed in both workspaces; the frontend production build
+  passed; frontend lint exited 0 with one pre-existing
+  `react-hooks/exhaustive-deps` warning at `page.tsx:180`.
+- Live API checks confirmed same-day determinism, different games on different
+  dates, ignored filters, invalid-date rejection, and playable lineups. The
+  interactive browser walkthrough was not run because no headless browser was
+  available.
+
+### Notes
+
+- No browser storage, schema change, migration, seed change, or data repair was
+  added. Reverting the release is a code-only rollback.
+- Re-seeding the eligible game pool can change which game a past date selects;
+  daily history is not frozen.
+- A surrendered daily's streak behavior is deferred to v1.3.2; this release
+  does not add streaks.
+
+---
+
 ## v1.2.5 — Multiplier scoring
 
 _2026-10-22 · Spec: `docs/v1/v1.2/plan-v1.2.5-multiplier-scoring.md`_
