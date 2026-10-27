@@ -84,7 +84,9 @@ export async function getMatchById(id: number) {
   return game as GameWithRelations | null;
 }
 
-export function buildMatchResponse(game: GameWithRelations, difficulty: 'easy' | 'normal' | 'hard' | 'expert' = 'normal', hideOptionalLineups = false) {
+export type Difficulty = 'easy' | 'normal' | 'hard' | 'expert';
+
+export function buildMatchResponse(game: GameWithRelations, difficulty: Difficulty = 'normal', hideOptionalLineups = false) {
   const homeLineup = buildLineup(game.gameId, game.appearances, game.homeClubId, game.homeClubFormation, difficulty);
   const awayLineup = buildLineup(game.gameId, game.appearances, game.awayClubId, game.awayClubFormation, difficulty);
   return {
@@ -113,11 +115,11 @@ export function buildMatchResponse(game: GameWithRelations, difficulty: 'easy' |
   };
 }
 
-export function buildLineupForSide(game: GameWithRelations, clubId: number, difficulty: 'easy' | 'normal' | 'hard' | 'expert') {
+export function buildLineupForSide(game: GameWithRelations, clubId: number, difficulty: Difficulty) {
   return buildLineup(game.gameId, game.appearances, clubId, clubId === game.homeClubId ? game.homeClubFormation : game.awayClubFormation, difficulty);
 }
 
-function buildLineup(gameId: number, appearances: GameWithRelations['appearances'], clubId: number, formation: string | null, difficulty: 'easy' | 'normal' | 'hard' | 'expert') {
+function buildLineup(gameId: number, appearances: GameWithRelations['appearances'], clubId: number, formation: string | null, difficulty: Difficulty) {
   const side = appearances
     .filter((a) => a.clubId === clubId && (a.type === undefined || a.type === STARTING_LINEUP))
     .sort((a, b) => {

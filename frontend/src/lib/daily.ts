@@ -16,7 +16,7 @@
  */
 
 /** Canonical day key for "today" in the project's agreed timezone. */
-export type DailyKey = string; // 'YYYY-MM-DD'
+export type DailyKey = `${number}-${number}-${number}` | string; // 'YYYY-MM-DD'
 
 const DAILY_KEY_SHAPE = /^\d{4}-\d{2}-\d{2}$/;
 
@@ -54,7 +54,7 @@ export function isDailyKey(value: unknown): value is DailyKey {
 export function dailyHash32(key: string): number {
   let hash = 2166136261;
   for (let index = 0; index < key.length; index += 1) {
-    hash ^= key.charCodeAt(index);
+    hash ^= key.codePointAt(index) ?? 0;
     hash = Math.imul(hash, 16777619);
   }
   return hash >>> 0;

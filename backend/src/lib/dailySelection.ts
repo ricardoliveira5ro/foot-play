@@ -7,7 +7,7 @@
 export function dailyHash32(key: string): number {
   let hash = 2166136261;
   for (let index = 0; index < key.length; index += 1) {
-    hash ^= key.charCodeAt(index);
+    hash ^= key.codePointAt(index) ?? 0;
     hash = Math.imul(hash, 16777619);
   }
   return hash >>> 0;
