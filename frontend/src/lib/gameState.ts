@@ -6,7 +6,6 @@ import { CURATED_TEAM_IDS } from '@/lib/curatedTeams';
 import { EMPTY_FILTERS } from '@/types';
 import { filtersEqual } from './filtersEqual';
 import { DAILY_DIFFICULTY, DEFAULT_DIFFICULTY, DIFFICULTY_CONFIG, type Difficulty } from './difficulty';
-import type { DailyKey } from '@/lib/daily';
 
 /**
  * The Normal-mode attempt budget. Retained because it is the pre-v1.2
@@ -53,7 +52,7 @@ export interface GameState {
   /** True when the board is showing the deterministic daily puzzle (§6.2). */
   isDaily: boolean;
   /** The day key the daily puzzle belongs to; null in ordinary play. */
-  dailyKey: DailyKey | null;
+  dailyKey: string | null;
 }
 
 export type GameAction =
@@ -72,7 +71,7 @@ export type GameAction =
   | { type: 'SET_ERROR'; payload: string | null }
   | { type: 'SET_LOADING'; payload: boolean }
   | { type: 'SET_FILTERS'; payload: GameFilterParams }
-  | { type: 'START_DAILY'; payload: DailyKey };
+  | { type: 'START_DAILY'; payload: string };
 
 // --- Initial State ---
 
@@ -327,7 +326,7 @@ function handleSetFilters(state: GameState, payload: GameFilterParams): GameStat
   return { ...state, filters: payload };
 }
 
-function handleStartDaily(state: GameState, payload: DailyKey): GameState {
+function handleStartDaily(state: GameState, payload: string): GameState {
   if (
     state.isDaily &&
     state.dailyKey === payload &&
@@ -463,7 +462,7 @@ interface UseGameStateReturn {
   filters: GameFilterParams;
   setFilters: (filters: GameFilterParams) => void;
   setDifficulty: (mode: Difficulty) => void;
-  startDaily: (key: DailyKey) => void;
+  startDaily: (key: string) => void;
 }
 
 export function useGameState(): UseGameStateReturn {
@@ -524,7 +523,7 @@ export function useGameState(): UseGameStateReturn {
 
   const setDifficulty = useCallback((mode: Difficulty) => dispatch({ type: 'SET_DIFFICULTY', payload: mode }), []);
 
-  const startDaily = useCallback((key: DailyKey) => {
+  const startDaily = useCallback((key: string) => {
     dispatch({ type: 'START_DAILY', payload: key });
   }, []);
 

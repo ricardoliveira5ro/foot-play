@@ -4,7 +4,6 @@ import { useEffect, useState } from 'react';
 import {
   formatUtcCountdown,
   msUntilNextUtcMidnight,
-  type DailyKey,
 } from '@/lib/daily';
 
 /**
@@ -25,9 +24,9 @@ import {
 
 export interface DailyEntryProps {
   /** The day key currently requested via ?daily=, or null in ordinary play. */
-  dailyKey: DailyKey | null;
+  dailyKey: string | null;
   /** Today's UTC day key, or null before the post-mount read has happened. */
-  todayKey: DailyKey | null;
+  todayKey: string | null;
   /** True once the query string has been read. */
   urlReady: boolean;
   /** Request the daily puzzle. */
@@ -36,7 +35,7 @@ export interface DailyEntryProps {
 }
 
 /** '1 January 2026' — display only. Never fed back into a day key. */
-function formatDay(key: DailyKey): string {
+function formatDay(key: string): string {
   const date = new Date(`${key}T00:00:00Z`);
   return new Intl.DateTimeFormat('en-GB', {
     day: 'numeric',
@@ -143,7 +142,7 @@ function Hero({
   playingToday,
   onStartDaily,
 }: Readonly<{
-  todayKey: DailyKey;
+  todayKey: string;
   countdown: string | null;
   playingToday: boolean;
   onStartDaily: () => void;
@@ -182,6 +181,7 @@ function Hero({
                 className="mt-4 max-w-xl font-display text-[clamp(34px,5.4vw,58px)] uppercase leading-[0.9] tracking-[-0.01em]"
               >
                 The same eleven
+                {' '}
                 <span className="block">{'for everyone.'}</span>
               </h2>
               <p className="mt-4 max-w-md text-sm leading-relaxed text-chalk/90">
@@ -198,6 +198,7 @@ function Hero({
                 className="group inline-flex w-full items-center justify-center gap-2 rounded-lg bg-flare px-6 py-3.5 text-base font-semibold text-ink transition-colors hover:bg-chalk focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-chalk sm:w-auto"
               >
                 Play today&rsquo;s daily puzzle
+                {' '}
                 <span aria-hidden="true" className="transition-transform motion-safe:group-hover:translate-x-0.5">
                   {'→'}
                 </span>
@@ -271,6 +272,7 @@ function Compact({
       </span>
       <span className="mt-1 flex items-center justify-between gap-3 text-sm font-semibold">
         Play today&rsquo;s daily puzzle
+        {' '}
         <span aria-hidden="true" className="transition-transform motion-safe:group-hover:translate-x-0.5">
           {'→'}
         </span>

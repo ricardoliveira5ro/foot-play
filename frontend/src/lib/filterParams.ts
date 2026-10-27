@@ -89,7 +89,7 @@ function validSeason(value: unknown): boolean {
   return value === null || (Number.isInteger(value) && (value as number) >= 2013 && (value as number) <= 2025);
 }
 
-import { isDailyKey, type DailyKey } from '@/lib/daily';
+import { isDailyKey } from '@/lib/daily';
 
 /** Query param carrying the daily day key. Shared by the writer and reader. */
 export const DAILY_PARAM_KEY = 'daily';
@@ -101,7 +101,7 @@ export const DAILY_PARAM_KEY = 'daily';
  * caller merges it over the live query string (v1.1.2's rule), so building
  * an href from this alone would delete the user's filters.
  */
-export function dailyToParams(key: DailyKey): URLSearchParams {
+export function dailyToParams(key: string): URLSearchParams {
   const params = new URLSearchParams();
   params.set(DAILY_PARAM_KEY, key);
   return params;
@@ -114,7 +114,7 @@ export function dailyToParams(key: DailyKey): URLSearchParams {
  * '2026-02-30' would either 400 on the request or, worse, be normalised
  * somewhere downstream into a different day than the one the link names.
  */
-export function paramsToDailyKey(params: URLSearchParams): DailyKey | null {
+export function paramsToDailyKey(params: URLSearchParams): string | null {
   const raw = params.get(DAILY_PARAM_KEY);
   if (raw === null) return null;
   return isDailyKey(raw) ? raw : null;
