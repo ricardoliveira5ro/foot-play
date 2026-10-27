@@ -16,7 +16,7 @@
  */
 
 /** Canonical day key for "today" in the project's agreed timezone. */
-export type DailyKey = `${number}-${number}-${number}` | string; // 'YYYY-MM-DD'
+export type DailyKey = string; // 'YYYY-MM-DD'
 
 const DAILY_KEY_SHAPE = /^\d{4}-\d{2}-\d{2}$/;
 
