@@ -50,7 +50,7 @@ router.get('/daily', asyncHandler(async (req, res) => {
   // bare curl is useful. The frontend always sends an explicit date so a
   // request that crosses the UTC midnight boundary cannot be resolved to a
   // different day than the client asked for.
-  const key = raw === undefined ? toDailyKey(new Date()) : raw;
+  const key = raw ?? toDailyKey(new Date());
 
   // Unlike the filter endpoints — which degrade a malformed query to
   // "unfiltered" — a malformed date is a 400. A wrong filter silently widens

@@ -7,7 +7,6 @@ import FilterUrlSync from './FilterUrlSync';
 import { EMPTY_FILTERS } from '@/types';
 import type { GameFilterParams } from '@/types';
 import { FILTER_PARAM_KEYS } from '@/lib/filterParams';
-import type { DailyKey } from '@/lib/daily';
 
 vi.mock('next/navigation', () => ({
   useSearchParams: vi.fn(),
@@ -36,15 +35,15 @@ const onReady = vi.fn();
  * default so those cases still exercise filter preservation rather than daily
  * cleanup. Daily-specific cases pass `daily` explicitly.
  */
-function currentUrlDaily(): DailyKey | null {
+function currentUrlDaily(): string | null {
   return mockUseSearchParams().get('daily');
 }
 
 interface HarnessProps {
   applied: GameFilterParams;
   onFilters: (filters: GameFilterParams) => void;
-  daily?: DailyKey | null;
-  onDaily?: (key: DailyKey | null) => void;
+  daily?: string | null;
+  onDaily?: (key: string | null) => void;
   onReady?: () => void;
 }
 
@@ -69,8 +68,8 @@ function Harness({
 }
 
 interface RenderOverrides {
-  daily?: DailyKey | null;
-  onDaily?: (key: DailyKey | null) => void;
+  daily?: string | null;
+  onDaily?: (key: string | null) => void;
   onReady?: () => void;
 }
 
