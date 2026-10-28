@@ -5,14 +5,13 @@ import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { filtersToParams, paramsToFilters, FILTER_PARAM_KEYS, LEGACY_FILTER_KEYS, paramsToDailyKey, DAILY_PARAM_KEY } from '@/lib/filterParams';
 import { hasActiveFilters } from '@/lib/filters';
 import type { GameFilterParams } from '@/types';
-import type { DailyKey } from '@/lib/daily';
 
 interface Props {
   applied: GameFilterParams;
   onFilters: (filters: GameFilterParams) => void;
   /** The day key currently requested via ?daily=, or null. */
-  daily: DailyKey | null;
-  onDaily: (key: DailyKey | null) => void;
+  daily: string | null;
+  onDaily: (key: string | null) => void;
   /** Fired once the query string has been read, so the page may load. */
   onReady: () => void;
 }

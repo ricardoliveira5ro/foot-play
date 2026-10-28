@@ -19,7 +19,7 @@ import { evaluateGuess } from '@/lib/wordle';
 import { EMPTY_FILTERS } from '@/types';
 import { filtersToParams } from '@/lib/filterParams';
 import type { Difficulty } from '@/lib/difficulty';
-import { selectDailyGameId, type DailyKey } from '@/lib/daily';
+import { selectDailyGameId } from '@/lib/daily';
 
 /**
  * API client for the FootPlay backend.
@@ -161,7 +161,7 @@ export async function fetchMatchById(id: number): Promise<GameResponse> {
  * function is the server-side twin of GET /api/matches/random, which keeps
  * the `fetchX` naming convention of this file.
  */
-export async function fetchDailyMatch(key: DailyKey): Promise<GameResponse> {
+export async function fetchDailyMatch(key: string): Promise<GameResponse> {
   if (USE_MOCK) {
     await delay(MOCK_DELAY_MS);
     const gameId = selectDailyGameId([...MOCK_DAILY_CANDIDATES], key);

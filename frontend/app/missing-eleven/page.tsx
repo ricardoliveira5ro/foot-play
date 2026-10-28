@@ -9,7 +9,7 @@ import DifficultySelector from '@/components/DifficultySelector';
 import FinishButton from '@/components/FinishButton';
 import { fetchRandomMatch, fetchDailyMatch, fetchLineup, submitGuess as submitGuessApi, fetchReveal, revealOnePlayer } from '@/lib/api';
 import { filtersToParams, dailyToParams } from '@/lib/filterParams';
-import { toDailyKey, isPlayableDaily, type DailyKey } from '@/lib/daily';
+import { toDailyKey, isPlayableDaily } from '@/lib/daily';
 import { hasActiveFilters } from '@/lib/filters';
 import { useFilterOptions } from '@/lib/useFilterOptions';
 import { revealMatches } from '@/lib/reveal';
@@ -78,7 +78,7 @@ export default function MissingElevenPage() {
   // filled in by an effect. Computing it inline with `new Date()` would read
   // the clock during render, and a render that straddles 00:00:00 UTC would
   // produce different markup on the server than on the client.
-  const [todayKey, setTodayKey] = useState<DailyKey | null>(null);
+  const [todayKey, setTodayKey] = useState<string | null>(null);
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- one-shot gate init after hydration; same pattern as FilterPanel's re-sync
     setTodayKey(toDailyKey(new Date()));
@@ -109,7 +109,7 @@ export default function MissingElevenPage() {
   // FilterUrlSync's bridge. A null daily key is a NO-OP: leaving daily is
   // driven by NEW_GAME (New puzzle / Play again), never by a stale URL read.
   // The write effect removes ?daily= when the state clears.
-  const handleDaily = useCallback((key: DailyKey | null) => {
+  const handleDaily = useCallback((key: string | null) => {
     if (key !== null) startDaily(key);
   }, [startDaily]);
   const handleReady = useCallback(() => setUrlReady(true), []);
@@ -225,7 +225,7 @@ export default function MissingElevenPage() {
   // The daily fetch mirrors loadMatch: same sequence ref, same loading/error
   // discipline, same startNewGame hand-off. It takes only a day key — there is
   // no parameter through which a filter could narrow it (§6.2).
-  const loadDaily = useCallback((key: DailyKey) => {
+  const loadDaily = useCallback((key: string) => {
     const seq = ++matchSeqRef.current;
     setLoading(true);
     setError(null);
