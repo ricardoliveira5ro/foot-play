@@ -5,6 +5,7 @@ import {
   formatUtcCountdown,
   msUntilNextUtcMidnight,
 } from '@/lib/daily';
+import { hasPlayed, EMPTY_STREAK, type StreakState } from '@/lib/streak';
 
 /**
  * The daily entry point.
@@ -29,6 +30,12 @@ export interface DailyEntryProps {
   todayKey: string | null;
   /** True once the query string has been read. */
   urlReady: boolean;
+  /**
+   * v1.3.2: the persisted streak. Optional so the component renders
+   * identically without storage (server, first paint, tests); the page
+   * supplies it once the post-mount read has happened.
+   */
+  streak?: StreakState;
   /** Request the daily puzzle. */
   onStartDaily: () => void;
   variant?: 'hero' | 'compact';
@@ -140,13 +147,18 @@ function Hero({
   todayKey,
   countdown,
   playingToday,
+  playedToday,
+  streak,
   onStartDaily,
 }: Readonly<{
   todayKey: string;
   countdown: string | null;
   playingToday: boolean;
+  playedToday: boolean;
+  streak: StreakState;
   onStartDaily: () => void;
 }>) {
+  const hasHistory = streak.longest > 0;
   return (
     <section
       aria-labelledby="daily-heading"
@@ -174,6 +186,18 @@ function Hero({
                 worldwide.
               </p>
             </>
+          ) : playedToday ? (
+            <>
+              <h2
+                id="daily-heading"
+                className="mt-4 max-w-xl font-display text-[clamp(32px,5vw,52px)] uppercase leading-[0.9] tracking-[-0.01em]"
+              >
+                You&rsquo;ve played today&rsquo;s puzzle.
+              </h2>
+              <p className="mt-4 max-w-md text-sm leading-relaxed text-chalk/90">
+                One result a day. A new eleven drops at 00:00 UTC.
+              </p>
+            </>
           ) : (
             <>
               <h2
@@ -191,7 +215,7 @@ function Hero({
           )}
 
           <div className="mt-6 flex flex-col gap-5 sm:flex-row sm:items-center sm:gap-8">
-            {!playingToday && (
+            {!playingToday && !playedToday && (
               <button
                 type="button"
                 onClick={onStartDaily}
@@ -219,6 +243,12 @@ function Hero({
             </div>
           </div>
 
+          {hasHistory && (
+            <p className="mt-4 font-mono text-[11px] uppercase tracking-[0.14em] text-chalk/90">
+              Current streak: {streak.current} &middot; Longest: {streak.longest}
+            </p>
+          )}
+
         </div>
 
         <div className="hidden text-chalk/90 sm:block" aria-hidden="true">
@@ -235,13 +265,19 @@ function Hero({
 function Compact({
   countdown,
   playingToday,
+  playedToday,
+  streak,
   onStartDaily,
 }: Readonly<{
   countdown: string | null;
   playingToday: boolean;
+  playedToday: boolean;
+  streak: StreakState;
   onStartDaily: () => void;
 }>) {
-  if (playingToday) {
+  const hasHistory = streak.longest > 0;
+
+  if (playingToday || playedToday) {
     return (
       <div className="w-full rounded-lg border border-turf-deep/25 bg-turf-deep/[0.06] px-4 py-3 text-left">
         <p className="flex items-center gap-2 font-mono text-[10px] uppercase tracking-[0.18em] text-turf-deep">
@@ -249,7 +285,9 @@ function Compact({
           Today&rsquo;s eleven
         </p>
         <p className="mt-1.5 text-sm font-medium text-ink">
-          You&rsquo;re playing today&rsquo;s puzzle.
+          {playingToday
+            ? 'You’re playing today’s puzzle.'
+            : 'You’ve played today’s puzzle.'}
         </p>
         <p className="mt-1 font-mono text-[11px] text-ink/60">
           Next in{' '}
@@ -257,6 +295,11 @@ function Compact({
             {countdown ?? '--:--:--'}
           </span>
         </p>
+        {hasHistory && (
+          <p className="mt-1 font-mono text-[11px] text-ink/60">
+            Current streak: {streak.current} &middot; Longest: {streak.longest}
+          </p>
+        )}
       </div>
     );
   }
@@ -285,6 +328,7 @@ export default function DailyEntry({
   todayKey,
   urlReady,
   dailyKey,
+  streak = EMPTY_STREAK,
   onStartDaily,
   variant = 'hero',
 }: Readonly<DailyEntryProps>) {
@@ -296,12 +340,15 @@ export default function DailyEntry({
   if (!urlReady || todayKey === null) return null;
 
   const playingToday = dailyKey === todayKey;
+  const playedToday = hasPlayed(streak, todayKey);
 
   if (variant === 'compact') {
     return (
       <Compact
         countdown={countdown}
         playingToday={playingToday}
+        playedToday={playedToday}
+        streak={streak}
         onStartDaily={onStartDaily}
       />
     );
@@ -312,6 +359,8 @@ export default function DailyEntry({
       todayKey={todayKey}
       countdown={countdown}
       playingToday={playingToday}
+      playedToday={playedToday}
+      streak={streak}
       onStartDaily={onStartDaily}
     />
   );

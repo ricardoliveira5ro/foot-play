@@ -3,8 +3,12 @@ import { describe, it, expect, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import DailyEntry from './DailyEntry';
+import { EMPTY_STREAK, type StreakState } from '@/lib/streak';
 
 const base = { dailyKey: null, todayKey: '2026-01-01', urlReady: true, onStartDaily: vi.fn() };
+
+const playedToday: StreakState = { current: 1, longest: 1, lastPlayedKey: '2026-01-01', playedKeys: ['2026-01-01'] };
+const threeDayStreak: StreakState = { current: 3, longest: 5, lastPlayedKey: '2025-12-30', playedKeys: ['2025-12-28', '2025-12-29', '2025-12-30'] };
 
 describe('DailyEntry', () => {
   it('renders nothing before the URL has been read (first paint must not differ)', () => {
@@ -64,5 +68,45 @@ describe('DailyEntry', () => {
     render(<DailyEntry {...base} dailyKey="2026-01-01" variant="compact" />);
     expect(screen.queryByRole('button', { name: /daily puzzle/i })).not.toBeInTheDocument();
     expect(screen.getByText(/today[’']s puzzle/i)).toBeInTheDocument();
+  });
+
+  it('shows the current and longest streak when there is history', () => {
+    render(<DailyEntry {...base} streak={threeDayStreak} />);
+    expect(screen.getByText(/current streak: 3/i)).toBeInTheDocument();
+    expect(screen.getByText(/longest: 5/i)).toBeInTheDocument();
+  });
+
+  it('does not show a streak line when nothing has been played', () => {
+    render(<DailyEntry {...base} streak={EMPTY_STREAK} />);
+    expect(screen.queryByText(/current streak/i)).not.toBeInTheDocument();
+  });
+
+  it('hides the start button and says played today when today is in playedKeys (O1)', () => {
+    render(<DailyEntry {...base} streak={playedToday} />);
+    expect(screen.queryByRole('button', { name: /daily puzzle/i })).not.toBeInTheDocument();
+    expect(screen.getByText(/played today/i)).toBeInTheDocument();
+  });
+
+  it('still offers the daily puzzle when today is not played', () => {
+    render(<DailyEntry {...base} streak={threeDayStreak} />);
+    expect(screen.getByRole('button', { name: /daily puzzle/i })).toBeInTheDocument();
+  });
+
+  it('defaults to EMPTY_STREAK when no streak prop is given (hydration-safe)', () => {
+    render(<DailyEntry {...base} />);
+    expect(screen.getByRole('button', { name: /daily puzzle/i })).toBeInTheDocument();
+    expect(screen.queryByText(/current streak/i)).not.toBeInTheDocument();
+  });
+
+  it('shows the streak in the compact status while playing today', () => {
+    render(<DailyEntry {...base} dailyKey="2026-01-01" variant="compact" streak={playedToday} />);
+    expect(screen.getByText(/current streak: 1/i)).toBeInTheDocument();
+    expect(screen.getByText(/longest: 1/i)).toBeInTheDocument();
+  });
+
+  it('gates the compact start button once today is played', () => {
+    render(<DailyEntry {...base} variant="compact" streak={playedToday} />);
+    expect(screen.queryByRole('button', { name: /daily puzzle/i })).not.toBeInTheDocument();
+    expect(screen.getByText(/played today/i)).toBeInTheDocument();
   });
 });
