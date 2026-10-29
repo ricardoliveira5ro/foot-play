@@ -114,6 +114,12 @@ describe('isStreakState', () => {
   it('rejects current 0 with a lastPlayedKey', () => {
     expect(isStreakState({ current: 0, longest: 1, lastPlayedKey: '2026-01-01', playedKeys: ['2026-01-01'] })).toBe(false);
   });
+  it('rejects a lastPlayedKey with no played keys', () => {
+    expect(isStreakState({ current: 0, longest: 0, lastPlayedKey: '2026-01-01', playedKeys: [] })).toBe(false);
+  });
+  it('rejects longest smaller than current', () => {
+    expect(isStreakState({ current: 2, longest: 1, lastPlayedKey: '2026-01-02', playedKeys: ['2026-01-01', '2026-01-02'] })).toBe(false);
+  });
   it('rejects a lastPlayedKey that is not the last played key', () => {
     expect(isStreakState({ current: 1, longest: 1, lastPlayedKey: '2026-01-01', playedKeys: ['2026-01-02'] })).toBe(false);
   });

@@ -95,7 +95,6 @@ export function isStreakState(value: unknown): value is StreakState {
   if (s.current > s.playedKeys.length) return false;
   if (s.longest > s.playedKeys.length) return false;
   if (s.current === 0 && s.lastPlayedKey !== null) return false;
-  if (s.playedKeys.length === 0 && s.lastPlayedKey !== null) return false;
   if (s.playedKeys.length > 0 && s.lastPlayedKey !== s.playedKeys[s.playedKeys.length - 1]) return false;
   return true;
 }
