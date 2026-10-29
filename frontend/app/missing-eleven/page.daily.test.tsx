@@ -10,6 +10,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import MissingElevenPage from './page';
 import { toDailyKey } from '@/lib/daily';
+import { STORAGE_KEY, getDailyStorage } from '@/lib/streakStorage';
 import type { GameResponse, LineupPlayer } from '@/types';
 
 // Today is frozen so `?daily=<today>` is a fixed string and the suite cannot
@@ -131,6 +132,26 @@ function setSearch(query: string) {
   window.history.replaceState(null, '', query ? `/missing-eleven?${query}` : '/missing-eleven');
 }
 
+/** Seed storage through the adapter's own seam (never the storage API in tests). */
+function seedStreak(playedKeys: string[], current: number, longest = current) {
+  getDailyStorage()!.setItem(STORAGE_KEY, JSON.stringify({
+    current,
+    longest,
+    lastPlayedKey: playedKeys[playedKeys.length - 1] ?? null,
+    playedKeys,
+  }));
+}
+
+function storedStreak(): { current: number; longest: number; lastPlayedKey: string | null; playedKeys: string[] } | null {
+  const raw = getDailyStorage()!.getItem(STORAGE_KEY);
+  return raw === null ? null : JSON.parse(raw);
+}
+
+async function surrender() {
+  fireEvent.click(await screen.findByRole('button', { name: /give up/i }));
+  fireEvent.click(await screen.findByRole('button', { name: /are you sure/i }));
+}
+
 beforeEach(() => {
   vi.useFakeTimers({ shouldAdvanceTime: true });
   vi.setSystemTime(new Date('2026-01-01T12:00:00Z'));
@@ -148,6 +169,7 @@ beforeEach(() => {
     Promise.resolve(elevenPlayers(side)),
   );
   optionsMock.mockResolvedValue(options);
+  getDailyStorage()!.clear();
 });
 
 afterEach(() => {
@@ -290,5 +312,90 @@ describe('daily mode', () => {
     expect(dailyMock).toHaveBeenCalledTimes(1);
     expect(randomMock).not.toHaveBeenCalled();
     expect(router.replace).toHaveBeenCalledWith('/missing-eleven', { scroll: false });
+  });
+});
+
+describe('daily streak persistence (v1.3.2)', () => {
+  it('shows the stored streak on the pre-screen after mount', async () => {
+    seedStreak(['2025-12-30', '2025-12-31', '2026-01-01'], 3, 3);
+    render(<MissingElevenPage />);
+
+    expect(await screen.findByText(/current streak: 3/i)).toBeInTheDocument();
+    expect(screen.getByText(/longest: 3/i)).toBeInTheDocument();
+  });
+
+  it('hides the daily entry and says played today once today is in playedKeys', async () => {
+    seedStreak([TODAY], 1);
+    render(<MissingElevenPage />);
+
+    expect(await screen.findByText(/played today’s puzzle/i)).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /daily puzzle/i })).not.toBeInTheDocument();
+  });
+
+  it('records the daily on surrender, which is a played daily', async () => {
+    setSearch(`daily=${TODAY}`);
+    render(<MissingElevenPage />);
+    await screen.findByText('game 104');
+
+    await surrender();
+
+    await waitFor(() => expect(storedStreak()?.lastPlayedKey).toBe(TODAY));
+    expect(storedStreak()?.current).toBe(1);
+    expect(storedStreak()?.playedKeys).toEqual([TODAY]);
+  });
+
+  it('does not record an ordinary game', async () => {
+    setSearch('seasonFrom=2020');
+    render(<MissingElevenPage />);
+    await screen.findByText('game 7');
+
+    await surrender();
+
+    await waitFor(() => expect(screen.getAllByText(/complete/).length).toBeGreaterThan(0));
+    expect(storedStreak()).toBeNull();
+  });
+
+  it('keeps the same-day record a no-op when the daily is replayed via a deep link', async () => {
+    seedStreak([TODAY], 1);
+    setSearch(`daily=${TODAY}`);
+    render(<MissingElevenPage />);
+    await screen.findByText('game 104');
+
+    await surrender();
+
+    await waitFor(() => expect(screen.getAllByText(/complete/).length).toBeGreaterThan(0));
+    expect(storedStreak()).toEqual({
+      current: 1,
+      longest: 1,
+      lastPlayedKey: TODAY,
+      playedKeys: [TODAY],
+    });
+  });
+
+  it('extends the streak for a consecutive day', async () => {
+    seedStreak(['2025-12-31'], 1);
+    setSearch(`daily=${TODAY}`);
+    render(<MissingElevenPage />);
+    await screen.findByText('game 104');
+
+    await surrender();
+
+    await waitFor(() => expect(storedStreak()?.lastPlayedKey).toBe(TODAY));
+    expect(storedStreak()?.current).toBe(2);
+    expect(storedStreak()?.longest).toBe(2);
+  });
+
+  it('resets current but keeps longest after a missed day', async () => {
+    seedStreak(['2025-12-27', '2025-12-28', '2025-12-29'], 3, 3);
+    setSearch(`daily=${TODAY}`);
+    render(<MissingElevenPage />);
+    await screen.findByText('game 104');
+
+    await surrender();
+
+    await waitFor(() => expect(storedStreak()?.lastPlayedKey).toBe(TODAY));
+    expect(storedStreak()?.current).toBe(1);
+    expect(storedStreak()?.longest).toBe(3);
+    expect(storedStreak()?.playedKeys).toHaveLength(4);
   });
 });

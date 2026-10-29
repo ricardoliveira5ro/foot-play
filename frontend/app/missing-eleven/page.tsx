@@ -22,6 +22,8 @@ import FilterPanel from '@/components/FilterPanel';
 import FilterEmptyState from '@/components/FilterEmptyState';
 import DailyEntry from '@/components/DailyEntry';
 import { computeTotalScore } from '@/lib/scoring';
+import { loadStreak, recordCompletion, getDailyStorage } from '@/lib/streakStorage';
+import { EMPTY_STREAK, type StreakState } from '@/lib/streak';
 import FilterUrlSync from './FilterUrlSync';
 import type { ShirtData, LineupPlayer, RevealPlayer, GameFilterParams, TeamSide } from '@/types';
 import { EMPTY_FILTERS } from '@/types';
@@ -90,6 +92,18 @@ export default function MissingElevenPage() {
     // The pre-screen has no URL to read, so it is ready immediately. A deep
     // link waits for FilterUrlSync's onReady.
     if (!hasParams) setUrlReady(true);
+  }, []);
+
+  // v1.3.2: streak state starts empty so the server HTML and the first client
+  // paint agree. The real value is read from storage in a post-mount effect —
+  // storage is never touched during render, for the same hydration reason as
+  // `todayKey` above.
+  const [streak, setStreak] = useState<StreakState>(EMPTY_STREAK);
+  useEffect(() => {
+    const storage = getDailyStorage();
+    if (!storage) return;
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- one-shot post-hydration read; storage must not be touched during render
+    setStreak(loadStreak(storage));
   }, []);
 
   const router = useRouter();
@@ -305,6 +319,24 @@ export default function MissingElevenPage() {
     }
   }, [state.gameStatus, state.match, state.teamSide, state.opponentPhase, setError, revealTeam]);
 
+  // v1.3.2: record the daily exactly once, on the reducer's own completion
+  // transition. Surrender counts — a surrendered daily is a played daily, and
+  // `nextStreak` is idempotent for the same day, so a re-render cannot inflate
+  // the streak. Storage failures are swallowed: a browser that refuses to
+  // persist must not break the game, and the UI simply keeps the last value.
+  useEffect(() => {
+    const finished = state.gameStatus === 'complete' || state.gameStatus === 'surrendered';
+    if (!finished || !state.isDaily || state.dailyKey === null) return;
+    const storage = getDailyStorage();
+    if (!storage) return;
+    try {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- mirrors the completed day from the reducer transition, not render
+      setStreak(recordCompletion(storage, state.dailyKey));
+    } catch {
+      // Ignore: storage is a convenience, never the source of truth for play.
+    }
+  }, [state.gameStatus, state.isDaily, state.dailyKey]);
+
   // Cleanup confirm timer on unmount
   useEffect(() => {
     return () => {
@@ -500,6 +532,7 @@ export default function MissingElevenPage() {
           dailyKey={state.dailyKey}
           todayKey={todayKey}
           urlReady={urlReady}
+          streak={streak}
           onStartDaily={handleStartDaily}
           variant="hero"
         />
@@ -674,6 +707,7 @@ export default function MissingElevenPage() {
               dailyKey={state.dailyKey}
               todayKey={todayKey}
               urlReady={urlReady}
+              streak={streak}
               onStartDaily={handleStartDaily}
               variant="compact"
             />

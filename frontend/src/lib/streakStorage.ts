@@ -1,4 +1,4 @@
-import { isDailyKey, type DailyKey } from '@/lib/daily';
+import { isDailyKey } from '@/lib/daily';
 import { EMPTY_STREAK, isStreakState, nextStreak, type StreakState } from './streak';
 
 /**
@@ -60,7 +60,7 @@ export function loadStreak(storage?: Storage): StreakState {
  * A setItem failure propagates. Swallowing it would let the UI claim a
  * streak that was never written; the page catches and degrades instead.
  */
-export function recordCompletion(storage: Storage, key: DailyKey): StreakState {
+export function recordCompletion(storage: Storage, key: string): StreakState {
   if (!isDailyKey(key)) {
     throw new Error(`recordCompletion requires a valid daily key, got ${String(key)}`);
   }

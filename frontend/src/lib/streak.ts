@@ -1,4 +1,4 @@
-import { isDailyKey, type DailyKey } from '@/lib/daily';
+import { isDailyKey } from '@/lib/daily';
 
 /**
  * Daily-puzzle streak state.
@@ -17,9 +17,9 @@ export interface StreakState {
   /** The longest current has ever been. */
   longest: number;
   /** The day key of the most recent completion, or null before the first. */
-  lastPlayedKey: DailyKey | null;
+  lastPlayedKey: string | null;
   /** Every day key ever completed, in completion order. O1 gate. */
-  playedKeys: DailyKey[];
+  playedKeys: string[];
 }
 
 /** The state before anything has been played. Frozen; never mutate it. */
@@ -37,7 +37,7 @@ export const EMPTY_STREAK: Readonly<StreakState> = Object.freeze({
  * through Date.UTC(year, month - 1, day), the same rule isDailyKey froze in
  * v1.3.1. A day is always 86,400,000 ms because UTC has no DST.
  */
-export function daysBetween(a: DailyKey, b: DailyKey): number {
+export function daysBetween(a: string, b: string): number {
   const aEpoch = Date.UTC(Number(a.slice(0, 4)), Number(a.slice(5, 7)) - 1, Number(a.slice(8, 10)));
   const bEpoch = Date.UTC(Number(b.slice(0, 4)), Number(b.slice(5, 7)) - 1, Number(b.slice(8, 10)));
   return (bEpoch - aEpoch) / 86_400_000;
@@ -52,7 +52,7 @@ export function daysBetween(a: DailyKey, b: DailyKey): number {
  * never lowers `longest`. `playedKeys` grows in completion order and never
  * contains a duplicate.
  */
-export function nextStreak(state: StreakState, completedKey: DailyKey): StreakState {
+export function nextStreak(state: StreakState, completedKey: string): StreakState {
   if (state.lastPlayedKey === completedKey) return state;
   const current = state.lastPlayedKey === null
     ? 1
@@ -71,7 +71,7 @@ export function nextStreak(state: StreakState, completedKey: DailyKey): StreakSt
 }
 
 /** True when todayKey is in playedKeys — the O1 already-played-today gate. */
-export function hasPlayed(state: StreakState, todayKey: DailyKey): boolean {
+export function hasPlayed(state: StreakState, todayKey: string): boolean {
   return state.playedKeys.includes(todayKey);
 }
 
