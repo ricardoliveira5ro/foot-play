@@ -8,6 +8,20 @@ from, and release notes are taken from the entry itself.
 
 ---
 
+## v1.4.1 — Share Grid
+
+_2026-10-30_
+
+### Added
+
+- **Shareable result grid** — a completed Missing Eleven game now shows an
+  emoji block in the game-over dialog: one slot per shirt in scope for that
+  result, plus the mode and score, ready to select and copy. The opponent
+  half appears when the player actually put an attempt into it, so a game they
+  never opposed shows 11 slots and one they played shows 22 — in every mode,
+  including Expert, where surrendering without touching the opponent half
+  yields the same honest 11 as a Normal game.
+
 ## v1.3.1 — Deterministic Daily Puzzle
 
 _2026-10-26 · Spec: `docs/v1/v1.3/plan-v1.3.1-daily-puzzle.md`_
