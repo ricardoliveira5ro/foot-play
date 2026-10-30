@@ -7,6 +7,7 @@ import type { ShirtGameData } from '@/lib/gameState';
 import { DEFAULT_DIFFICULTY, DIFFICULTY_CONFIG, type Difficulty } from '@/lib/difficulty';
 import { computeTotalScore, formatMultiplier } from '@/lib/scoring';
 import type { PerPlayerScore } from '@/lib/scoring';
+import { compareShirtPosition, getPositionLabel } from '@/lib/positionOrder';
 
 interface GameCompleteProps {
   /** The match data */
@@ -56,51 +57,6 @@ function getNameColor(isCorrect: boolean, isFailed: boolean): string {
   if (isCorrect) return 'var(--color-correct)';
   if (isFailed) return 'var(--color-failed)';
   return 'var(--color-ink/40)';
-}
-
-const POSITION_ORDER: Record<string, number> = {
-  // Goalkeeper
-  'Goalkeeper': 0, 'GK': 0,
-  // Defenders
-  'Centre-Back': 10, 'CB': 10,
-  'Left-Back': 11, 'LB': 11,
-  'Right-Back': 12, 'RB': 12,
-  'Defender': 15, 'Sweeper': 15,
-  // Midfielders
-  'Defensive Midfield': 20, 'DM': 20,
-  'Central Midfield': 21, 'CM': 21,
-  'Attacking Midfield': 22, 'AM': 22, 'CAM': 22,
-  'Midfield': 23,
-  'Left Midfield': 24, 'LM': 24,
-  'Right Midfield': 25, 'RM': 25,
-  // Forwards
-  'Left Winger': 30, 'LW': 30, 'LWB': 30,
-  'Right Winger': 31, 'RW': 31, 'RWB': 31,
-  'Second Striker': 32,
-  'Centre-Forward': 33, 'ST': 33, 'CF': 34,
-  'Attack': 35,
-};
-
-function getPositionLabel(position: string | null): string {
-  const labels: Record<string, string> = {
-    GK: 'GK',
-    CB: 'CB',
-    LB: 'LB',
-    RB: 'RB',
-    LWB: 'LWB',
-    RWB: 'RWB',
-    DM: 'DM',
-    CM: 'CM',
-    AM: 'AM',
-    CAM: 'CAM',
-    LM: 'LM',
-    RM: 'RM',
-    LW: 'LW',
-    RW: 'RW',
-    ST: 'ST',
-    CF: 'ST',
-  };
-  return position ? labels[position] ?? position : '?';
 }
 
 /**
@@ -178,7 +134,7 @@ export default function GameComplete({
         <div className="space-y-2">
           {shirts
             .slice()
-            .sort((a, b) => (POSITION_ORDER[a.position ?? ''] ?? 99) - (POSITION_ORDER[b.position ?? ''] ?? 99))
+            .sort(compareShirtPosition)
             .map((shirt) => {
               const isCorrect = shirt.state === 'correct';
               const isFailed = shirt.state === 'failed';
