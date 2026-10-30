@@ -18,6 +18,11 @@ function makeShirt(overrides: Partial<ShirtGameData> & { token: string }): Shirt
     attempts: 0,
     guessHistory: [],
     correctLetters: [],
+    goals: 0,
+    assists: 0,
+    redCards: 0,
+    isCaptain: false,
+    hasFirstLetter: true,
     ...overrides,
   };
 }
@@ -272,5 +277,116 @@ describe('buildShareGrid', () => {
       })
     );
     expect(targetShirts.map((shirt) => shirt.token)).toEqual(before);
+  });
+});
+
+describe('renderShareGrid', () => {
+  it('renders one target row and the tally for an 11-slot result', () => {
+    const grid = buildShareGrid(makeInput({ difficulty: 'normal', score: 8300 }));
+    expect(renderShareGrid(grid)).toBe('🟩⬛⬛⬛🟩🟩⬛⬛⬛🟩🟩\nNormal ×1 · 8300');
+  });
+
+  it('renders a target row then an opponent row for a 22-slot result', () => {
+    const grid = buildShareGrid(
+      makeInput({
+        difficulty: 'hard',
+        opponentAttempted: true,
+        score: 12450,
+        opponentShirts: uniformHalf('o', 'failed'),
+      })
+    );
+    expect(renderShareGrid(grid)).toBe(
+      '🟩⬛⬛⬛🟩🟩⬛⬛⬛🟩🟩\n⬛⬛⬛⬛⬛⬛⬛⬛⬛⬛⬛\nHard ×2 · 12450'
+    );
+  });
+
+  it('renders one row for expert when the opponent was never attempted', () => {
+    // RD2/§7 row 4, and the reason the grid reads `opponentAttempted` alone. The
+    // mode requires the opponent half; the player never played it, because they
+    // gave up. Reading the requirement here would render two rows and claim a
+    // half that was never touched. One row, 11 slots, in every mode.
+    const grid = buildShareGrid(
+      makeInput({ difficulty: 'expert', opponentAttempted: false, score: 19800 })
+    );
+    expect(renderShareGrid(grid)).toBe(
+      '🟩⬛⬛⬛🟩🟩⬛⬛⬛🟩🟩\nExpert ×3 · 19800'
+    );
+  });
+
+  it('renders a perfect expert result as two all-correct rows', () => {
+    const grid = buildShareGrid(
+      makeInput({
+        targetShirts: uniformHalf('t', 'correct'),
+        opponentShirts: uniformHalf('o', 'correct'),
+        difficulty: 'expert',
+        opponentAttempted: true,
+        score: 33000,
+      })
+    );
+    expect(renderShareGrid(grid)).toBe(
+      '🟩🟩🟩🟩🟩🟩🟩🟩🟩🟩🟩\n🟩🟩🟩🟩🟩🟩🟩🟩🟩🟩🟩\nExpert ×3 · 33000'
+    );
+  });
+
+  it('renders a surrendered result as one all-failed row', () => {
+    const grid = buildShareGrid(
+      makeInput({
+        targetShirts: uniformHalf('t', 'failed'),
+        opponentShirts: [],
+        difficulty: 'normal',
+        opponentAttempted: false,
+        score: 620,
+      })
+    );
+    expect(renderShareGrid(grid)).toBe('⬛⬛⬛⬛⬛⬛⬛⬛⬛⬛⬛\nNormal ×1 · 620');
+  });
+
+  it('renders the score as a raw integer, not a localised string', () => {
+    const grid = buildShareGrid(makeInput({ score: 1234567 }));
+    expect(renderShareGrid(grid)).toContain('· 1234567');
+    expect(renderShareGrid(grid)).not.toContain('1,234,567');
+  });
+
+  it('still carries the mode and score when the grid has no slots', () => {
+    const grid = buildShareGrid(
+      makeInput({ targetShirts: [], opponentShirts: [], difficulty: 'easy', score: 0 })
+    );
+    expect(renderShareGrid(grid)).toBe('Easy ×0.5 · 0');
+  });
+
+  it('emits no empty line for a half that is out of scope', () => {
+    const grid = buildShareGrid(makeInput({ difficulty: 'normal', opponentAttempted: false }));
+    expect(renderShareGrid(grid).split('\n')).toHaveLength(2);
+  });
+});
+
+describe('renderShareText', () => {
+  it('prefixes the title and omits the link when link is null', () => {
+    const grid = buildShareGrid(makeInput({ score: 8300 }));
+    expect(renderShareText(grid, null)).toBe(
+      'Missing Eleven\n🟩⬛⬛⬛🟩🟩⬛⬛⬛🟩🟩\nNormal ×1 · 8300'
+    );
+  });
+
+  it('appends the link on its own final line', () => {
+    const grid = buildShareGrid(makeInput({ difficulty: 'easy', score: 4150 }));
+    expect(
+      renderShareText(grid, 'https://footplay.online/missing-eleven?daily=2026-01-01')
+    ).toBe(
+      'Missing Eleven\n🟩⬛⬛⬛🟩🟩⬛⬛⬛🟩🟩\nEasy ×0.5 · 4150\nhttps://footplay.online/missing-eleven?daily=2026-01-01'
+    );
+  });
+
+  it('omits an empty-string link rather than emitting a blank final line', () => {
+    const grid = buildShareGrid(makeInput({ difficulty: 'easy', score: 4150 }));
+    expect(renderShareText(grid, '')).toBe(
+      'Missing Eleven\n🟩⬛⬛⬛🟩🟩⬛⬛⬛🟩🟩\nEasy ×0.5 · 4150'
+    );
+  });
+
+  it('passes the link through untouched', () => {
+    const grid = buildShareGrid(makeInput());
+    const link = 'https://footplay.online/missing-eleven?daily=2026-01-01&difficulty=hard';
+    expect(renderShareText(grid, link).endsWith(link)).toBe(true);
   });
 });

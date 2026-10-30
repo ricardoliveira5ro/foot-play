@@ -1,4 +1,4 @@
-import type { Difficulty } from './difficulty';
+import { DIFFICULTY_CONFIG, type Difficulty } from './difficulty';
 import { compareShirtPosition } from './positionOrder';
 import type { ShirtGameData } from './gameState';
 
@@ -81,4 +81,39 @@ export function buildShareGrid(input: ShareGridInput): ShareGrid {
     score,
     difficulty,
   };
+}
+
+/** Correct shirt. The only slot that reads as solved. */
+const GLYPH: Record<SlotOutcome, string> = {
+  correct: '🟩', // U+1F7E9
+  failed: '⬛',  // U+2B1B
+};
+
+/** One emoji line per half that is in scope, then the tally line. */
+export function renderShareGrid(grid: ShareGrid): string {
+  // Group by team rather than by position in `slots`, so the row order is a
+  // property of this function and does not depend on how the grid was built.
+  const rows = (['target', 'opponent'] as const)
+    .map((team) => grid.slots.filter((slot) => slot.team === team))
+    .filter((slots) => slots.length > 0)
+    .map((slots) => slots.map((slot) => GLYPH[slot.state]).join(''));
+
+  const { label, multiplier } = DIFFICULTY_CONFIG[grid.difficulty];
+  // The score is the raw integer. The dialog localises its own display total,
+  // but "1,234" in a monospace block is three characters wider than "1234" and
+  // misaligns the tally line.
+  rows.push(`${label} ×${multiplier} · ${grid.score}`);
+
+  return rows.join('\n');
+}
+
+/**
+ * The full share payload: title, block, and a link when one is supplied.
+ * v1.4.2 copies this string verbatim, so an empty or absent link must not
+ * leave a blank trailing line for the recipient to trip over.
+ */
+export function renderShareText(grid: ShareGrid, link: string | null): string {
+  const lines = ['Missing Eleven', renderShareGrid(grid)];
+  if (link !== null && link !== '') lines.push(link);
+  return lines.join('\n');
 }
