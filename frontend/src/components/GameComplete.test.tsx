@@ -4,7 +4,7 @@ import { describe, it, expect, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import GameComplete from './GameComplete';
-import type { Game } from '@/types';
+import type { Game, ShirtState } from '@/types';
 import type { ShirtGameData } from '@/lib/gameState';
 import type { Difficulty } from '@/lib/difficulty';
 
@@ -341,5 +341,135 @@ describe('mode multiplier', () => {
     expect(screen.getByTestId('opponent-section-label').textContent ?? '').toMatch(
       /not played this game/i,
     );
+  });
+});
+
+
+describe('share block', () => {
+  const eleven = (prefix: string, state: ShirtState = 'default'): ShirtGameData[] =>
+    Array.from({ length: 11 }, (_, i) =>
+      makeShirt({ token: `${prefix}-${i}`, shirtNumber: i + 1, position: null, state })
+    );
+
+  it('renders the block with 11 slots when the opponent was not attempted', () => {
+    renderGameComplete({
+      targetShirts: eleven('t', 'correct'),
+      opponentShirts: [],
+      difficulty: 'normal',
+    });
+    // 11000 = 11 correct shirts × 1000 (scorePlayer's base, which attempts: 0
+    // does not reduce). This is the end-to-end check that the block carries
+    // scoreBreakdown.grandTotal rather than something re-derived.
+    expect(screen.getByRole('img', { name: /share grid/i }).textContent).toBe(
+      '🟩🟩🟩🟩🟩🟩🟩🟩🟩🟩🟩\nNormal ×1 · 11000'
+    );
+  });
+
+  it('renders 22 slots when the opponent has attempts', () => {
+    renderGameComplete({
+      targetShirts: eleven('t', 'correct'),
+      opponentShirts: eleven('o', 'failed').map((shirt, i) => ({ ...shirt, attempts: 2, token: `o-${i}` })),
+      difficulty: 'normal',
+    });
+    const lines = (screen.getByRole('img', { name: /share grid/i }).textContent ?? '').split('\n');
+    expect(lines).toHaveLength(3);
+    expect(lines[0]).toBe('🟩🟩🟩🟩🟩🟩🟩🟩🟩🟩🟩');
+    expect(lines[1]).toBe('⬛⬛⬛⬛⬛⬛⬛⬛⬛⬛⬛');
+    expect(lines[2]).toContain('Normal ×1 · ');
+  });
+
+  it('treats an opponent half with no attempts as out of scope', () => {
+    // The surrender case: the opponent half exists in state but was never
+    // played, so a game that never touched it is an 11-slot result.
+    renderGameComplete({
+      targetShirts: eleven('t', 'failed'),
+      opponentShirts: eleven('o', 'default'),
+      difficulty: 'hard',
+    });
+    const text = screen.getByRole('img', { name: /share grid/i }).textContent ?? '';
+    expect(text.split('\n')).toHaveLength(2);
+    expect(text.split('\n')[0]).toBe('⬛⬛⬛⬛⬛⬛⬛⬛⬛⬛⬛');
+  });
+
+  it('renders 11 slots for expert when the opponent was never attempted', () => {
+    // RD2 at the component seam: the flag is derived from the shirts, so an
+    // untouched opponent half yields one row whatever the mode requires.
+    renderGameComplete({
+      targetShirts: eleven('t', 'correct'),
+      opponentShirts: eleven('o', 'default'),
+      difficulty: 'expert',
+    });
+    const text = screen.getByRole('img', { name: /share grid/i }).textContent ?? '';
+    expect(text.split('\n')).toHaveLength(2);
+    expect(text.split('\n')[0]).toBe('🟩🟩🟩🟩🟩🟩🟩🟩🟩🟩🟩');
+  });
+
+  it('renders 22 slots for an expert surrender that put attempts in the opponent half', () => {
+    // The case §7 row 4's label exists to exclude, and the reason the row is
+    // qualified "opponent untouched". Surrender does not make the opponent half
+    // out of scope — `attempts > 0` does, or does not. Same mode, same way the
+    // game ended, opposite flag, 22 slots.
+    renderGameComplete({
+      targetShirts: eleven('t', 'correct'),
+      opponentShirts: eleven('o', 'default').map((shirt, i) => ({ ...shirt, attempts: 1, token: `o-${i}` })),
+      difficulty: 'expert',
+    });
+    const text = screen.getByRole('img', { name: /share grid/i }).textContent ?? '';
+    expect(text.split('\n')).toHaveLength(3);
+    expect(text.split('\n')[2]).toContain('Expert ×3 · ');
+  });
+
+  it('carries the mode label and multiplier in the tally line', () => {
+    renderGameComplete({
+      targetShirts: eleven('t', 'correct'),
+      opponentShirts: [],
+      difficulty: 'hard',
+    });
+    // The multiplier and the score are asserted separately and loosely on
+    // purpose. `DIFFICULTY_CONFIG.hard.multiplier` is 2 and v1.2.5 has already
+    // scaled `grandTotal` by it, so the exact total is scoring's assertion to
+    // make, not this one. What v1.4.1 owns is that the mode and its
+    // multiplier are read from the table and shown.
+    expect(screen.getByRole('img', { name: /share grid/i }).textContent).toContain('Hard ×2 · ');
+  });
+
+  it('places the block between the match summary and Play Again', () => {
+    const { container } = renderGameComplete({
+      targetShirts: eleven('t', 'correct'),
+      opponentShirts: [],
+      difficulty: 'normal',
+    });
+    const block = screen.getByRole('img', { name: /share grid/i });
+    const again = screen.getByRole('button', { name: 'Play Again' });
+    // Node.DOCUMENT_POSITION_FOLLOWING === 4: the block sits after the summary
+    // and before the control, so the dialog ends on the thing to press.
+    expect(
+      block.compareDocumentPosition(again) & Node.DOCUMENT_POSITION_FOLLOWING
+    ).toBeTruthy();
+    expect(container.querySelector('pre')).toBe(block);
+  });
+
+  it('keeps the block selectable and monospace', () => {
+    renderGameComplete({ targetShirts: eleven('t', 'correct'), opponentShirts: [] });
+    const block = screen.getByRole('img', { name: /share grid/i });
+    expect(block.tagName).toBe('PRE');
+    expect(block.className).toContain('font-mono');
+    expect(block.className).toContain('select-text');
+  });
+
+  it('renders no clipboard control in v1.4.1', () => {
+    renderGameComplete({ targetShirts: eleven('t', 'correct'), opponentShirts: [] });
+    expect(screen.queryByRole('button', { name: /copy/i })).toBeNull();
+  });
+
+  it('describes the block for a screen reader with a plain-language label', () => {
+    renderGameComplete({
+      targetShirts: eleven('t', 'correct'),
+      opponentShirts: [],
+      difficulty: 'normal',
+    });
+    // role="img" with a text alternative: the emoji themselves would otherwise
+    // be read as a run of unpronounceable squares.
+    expect(screen.getByRole('img', { name: 'Share grid' })).toBeTruthy();
   });
 });

@@ -8,6 +8,7 @@ import { DEFAULT_DIFFICULTY, DIFFICULTY_CONFIG, type Difficulty } from '@/lib/di
 import { computeTotalScore, formatMultiplier } from '@/lib/scoring';
 import type { PerPlayerScore } from '@/lib/scoring';
 import { compareShirtPosition, getPositionLabel } from '@/lib/positionOrder';
+import { buildShareGrid, renderShareGrid } from '@/lib/shareGrid';
 
 interface GameCompleteProps {
   /** The match data */
@@ -123,6 +124,17 @@ export default function GameComplete({
   // Score breakdown — computed once from the final state
   const scoreBreakdown = computeTotalScore(targetShirts, opponentShirts, targetTeamName, opponentTeamName, multiplier);
   const scoreMap = new Map(scoreBreakdown.perPlayer.map(p => [p.token, p]));
+
+  const shareText = renderShareGrid(
+    buildShareGrid({
+      targetShirts,
+      opponentShirts,
+      difficulty,
+      opponentAttempted,
+      // Raw total, not the localised string the dialog displays further down.
+      score: scoreBreakdown.grandTotal,
+    })
+  );
 
   function renderTeamSection(
     shirts: ShirtGameData[],
@@ -335,6 +347,20 @@ export default function GameComplete({
               {match.competition && <span>{match.competition}</span>}
             </div>
           )}
+        </div>
+
+        {/* Share block — v1.4.1 renders it; v1.4.2 adds the control. */}
+        <div className="border-t border-ink/10 px-6 py-3">
+          <p className="mb-2 text-center text-xs uppercase tracking-[0.08em] text-ink/55">
+            Share grid
+          </p>
+          <pre
+            role="img"
+            aria-label="Share grid"
+            className="overflow-x-auto rounded-lg bg-ink/5 px-3 py-2 text-center font-mono text-sm leading-relaxed text-ink select-text"
+          >
+            {shareText}
+          </pre>
         </div>
 
         {/* Play Again button */}
